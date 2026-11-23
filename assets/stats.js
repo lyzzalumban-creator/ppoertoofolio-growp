@@ -55,3 +55,38 @@ export const SORT_KEYS = Object.keys(SORTS);
 export function sortPositions(rows, key) {
   return [...rows].sort(SORTS[key] || SORTS.value);
 }
+
+// ---------- halaman depan ----------
+
+/** Perubahan hari ini per aset (rupiah, dari dayPct); naik/turun terbanyak, maks. n per sisi. */
+export function dayMovers(rows, n = 3) {
+  const moved = rows
+    .filter((p) => Number.isFinite(p.dayPct) && p.dayPct !== 0)
+    .map((p) => ({ ...p, dayAmt: p.value - p.value / (1 + p.dayPct) }));
+  return {
+    gainers: moved.filter((p) => p.dayPct > 0).sort((a, b) => b.dayPct - a.dayPct).slice(0, n),
+    losers: moved.filter((p) => p.dayPct < 0).sort((a, b) => a.dayPct - b.dayPct).slice(0, n),
+  };
+}
+
+// Ambang konsentrasi. Aset "manual" (kas, deposito, reksa dana pasar uang) tidak dihitung: dominannya bukan risiko pasar.
+export const LIMIT = { asset: 0.3, type: 0.6 };
+
+/** Peringatan dari snapshot terbaru: [{ id, text }], paling penting dulu. Hanya persen, tanpa nominal. */
+export function insights(snap, labels, pctText) {
+  const out = [];
+  const pos = (snap.positions || []).filter((p) => p.type !== 'manual');
+  const top = [...pos].sort((a, b) => b.weight - a.weight)[0];
+  if (top && top.weight >= LIMIT.asset) out.push({ id: `asset:${top.type}:${top.symbol}`, text: `${top.name || top.symbol} menguasai ${pctText(top.weight)} dari total. Satu aset terlalu besar membuat portofolio mudah goyah.` });
+  const bt = Object.entries(snap.byType || {}).filter(([t]) => t !== 'manual').sort((a, b) => b[1].weight - a[1].weight)[0];
+  if (bt && bt[1].weight >= LIMIT.type) out.push({ id: `type:${bt[0]}`, text: `Alokasi condong ke ${labels[bt[0]] || bt[0]} (${pctText(bt[1].weight)}). Pertimbangkan jenis lain agar lebih seimbang.` });
+  const stale = (snap.positions || []).filter((p) => p.stale).length; // semua jenis, termasuk manual
+  if (stale) out.push({ id: 'stale', text: `${stale} aset memakai harga lama karena gagal diambil. Nilai total bisa meleset.` });
+  return out;
+}
+
+/** Kemajuan menuju target: pecahan 0..1 (dibatasi), atau null bila target belum valid. */
+export function goalProgress(total, goal) {
+  if (!(goal > 0) || !Number.isFinite(total)) return null;
+  return Math.min(1, Math.max(0, total / goal));
+}

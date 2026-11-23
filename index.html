@@ -58,8 +58,13 @@
       </div>
 
       <div class="panel" id="panel-ringkasan" role="tabpanel" aria-labelledby="tab-ringkasan">
+        <section id="insights" class="insights" aria-labelledby="ins-h" hidden>
+          <h2 id="ins-h" class="vh">Perlu diperhatikan</h2>
+          <ul id="insight-list"></ul>
+        </section>
+
         <div class="grid">
-          <section class="card" aria-labelledby="chart-h">
+          <section class="card g-chart" aria-labelledby="chart-h">
             <div class="card-head">
               <h2 id="chart-h">Nilai portofolio</h2>
               <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
@@ -68,13 +73,23 @@
             <div id="chart-key" class="chart-key" aria-hidden="true"></div>
           </section>
 
-          <section class="card" aria-labelledby="alloc-h">
+          <section class="card g-moves" aria-labelledby="mv-h">
+            <h2 id="mv-h">Pergerakan hari ini</h2>
+            <div id="movers"></div>
+          </section>
+
+          <section class="card g-alloc" aria-labelledby="alloc-h">
             <h2 id="alloc-h">Alokasi</h2>
             <p class="hint">Ketuk jenis untuk melihat asetnya.</p>
             <div class="alloc-body">
               <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
               <ul id="legend" class="legend"></ul>
             </div>
+          </section>
+
+          <section class="card g-goal" aria-labelledby="goal-h">
+            <h2 id="goal-h">Target</h2>
+            <div id="goal"></div>
           </section>
         </div>
       </div>
@@ -121,6 +136,20 @@
 
     <p class="foot foot-actions" id="foot-actions" hidden><button id="logout" class="link" type="button">Keluar</button></p>
   </main>
+  <dialog id="goal-dlg" aria-labelledby="goal-dlg-h">
+    <form id="goal-form" class="form" novalidate>
+      <h2 id="goal-dlg-h">Target nilai portofolio</h2>
+      <p class="muted">Disimpan hanya di browser ini, tidak dikirim ke mana pun.</p>
+      <label class="field"><span>Target nilai (Rp)</span><input id="goal-input" type="number" step="any" min="1" inputmode="decimal"></label>
+      <p id="goal-err" class="err" role="alert" hidden></p>
+      <div class="row">
+        <button id="goal-del" class="btn" type="button">Hapus target</button>
+        <button id="goal-cancel" class="btn" type="button">Batal</button>
+        <button class="btn primary" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="assets/nofile.js"></script>
   <script type="module" src="assets/app.js"></script>
 </body>

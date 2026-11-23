@@ -3,7 +3,7 @@
 
 import { call } from '../scripts/lib/api.mjs';
 import { clearCreds, readCreds, saveCreds, scriptUrlOk } from './creds.js';
-import { maxDrawdown, monthlyReturns, returnIndex, sortPositions } from './stats.js';
+import { dayMovers, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, sortPositions } from './stats.js';
 
 const TYPE = {
   idx: { label: 'Saham IDX', unit: 'lembar' },
@@ -21,6 +21,7 @@ const DAY = 86_400_000;
 const ICON = {
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.7 8.4 2 12 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.4v.1"/></svg>',
   chev: '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
 };
 
@@ -59,10 +60,12 @@ function heldText(buyDate) {
   return ` (${t})`;
 }
 
-const state = { snapshots: [], hidden: true, range: 'Semua', filter: null, open: new Set(), tab: 'ringkasan', sort: 'value' };
+const state = { snapshots: [], hidden: true, range: 'Semua', filter: null, open: new Set(), tab: 'ringkasan', sort: 'value', goal: null };
 
 // Privasi dulu: pada kunjungan pertama nominal tersembunyi; pilihanmu diingat di browser ini.
 try { const v = localStorage.getItem('pf-hidden'); state.hidden = v === null ? true : v === '1'; } catch { state.hidden = true; }
+// Target nilai: preferensi per perangkat (seperti pf-hidden), tidak dikirim ke Sheet.
+try { const g = Number(localStorage.getItem('pf-goal')); state.goal = g > 0 ? g : null; } catch { state.goal = null; }
 
 const latest = () => state.snapshots[state.snapshots.length - 1];
 
@@ -342,6 +345,51 @@ function renderList() {
   }).join('') || '<li class="muted">Tidak ada aset.</li>';
 }
 
+// -- halaman depan: sorotan, pergerakan hari ini, target --
+
+function renderInsights() {
+  const list = insights(latest(), Object.fromEntries(ORDER.map((t) => [t, TYPE[t].label])), weightText);
+  $('insights').hidden = !list.length;
+  $('insight-list').innerHTML = list.map((i) => `<li class="insight">${ICON.warn}<div><b>Perhatian</b><p>${esc(i.text)}</p></div></li>`).join('');
+}
+
+function moverList(title, rows) {
+  if (!rows.length) return '';
+  return `<div class="mv-group"><h3>${title}</h3><ul class="mv">${rows.map((p) => `<li><i class="dot" style="background:var(--c-${p.type})"></i>
+    <span class="n">${esc(symDisp(p))}<small>${esc(p.name && p.name !== p.symbol ? p.name : TYPE[p.type].label)}</small></span>
+    <span class="v">${delta(p.dayPct)}<small class="flat">${esc(money(p.dayAmt, { sign: true }))}</small></span></li>`).join('')}</ul></div>`;
+}
+
+function renderMovers() {
+  const { gainers, losers } = dayMovers(latest().positions || []);
+  $('movers').innerHTML = gainers.length || losers.length
+    ? moverList('Naik terbanyak', gainers) + moverList('Turun terbanyak', losers)
+    : '<p class="muted">Belum ada pergerakan hari ini, atau belum ada hari pembanding.</p>';
+}
+
+function renderGoal() {
+  const L = latest();
+  const f = goalProgress(L.total, state.goal);
+  if (f == null) {
+    $('goal').innerHTML = '<div class="goal-empty"><p>Tetapkan target nilai portofolio untuk melihat kemajuanmu.</p><button type="button" class="btn" data-goal="open">Atur target</button></div>';
+    return;
+  }
+  const done = f >= 1;
+  const p = Math.floor(f * 100); // 99,8% tampil 99%, bukan 100% sebelum benar-benar tercapai
+  $('goal').innerHTML = `<div class="goal">
+    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(var(--accent) ${(f * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
+    <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
+      <p class="g-sub">${done ? 'Target tercapai' : `Sisa ${money(state.goal - L.total)}`}</p>
+      <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
+}
+
+function setGoal(v) {
+  state.goal = v > 0 ? v : null;
+  try { if (state.goal) localStorage.setItem('pf-goal', String(state.goal)); else localStorage.removeItem('pf-goal'); } catch { /* abaikan */ }
+  $('goal-dlg').close();
+  renderGoal();
+}
+
 // -- kinerja (semua dalam persen, jadi aman saat nominal disembunyikan) --
 
 const tile = (label, value, note) => `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
@@ -394,7 +442,10 @@ function render() {
   renderKpis();
   renderRanges();
   renderChart();
+  renderInsights();
+  renderMovers();
   renderAlloc();
+  renderGoal();
   renderList();
   renderKinerja();
 }
@@ -467,6 +518,23 @@ $('filter-note').addEventListener('click', (e) => {
   renderList();
   $('sort').focus(); // tombolnya hilang; fokus jangan jatuh ke awal halaman
 });
+
+$('goal').addEventListener('click', (e) => {
+  if (!e.target.closest('[data-goal="open"]')) return;
+  $('goal-input').value = state.goal ?? '';
+  $('goal-err').hidden = true;
+  $('goal-del').hidden = state.goal == null;
+  $('goal-dlg').showModal();
+  $('goal-input').focus();
+});
+$('goal-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('goal-input').valueAsNumber;
+  if (!(v > 0) || !Number.isFinite(v)) { $('goal-err').hidden = false; $('goal-err').textContent = 'Isi angka lebih dari 0.'; return; }
+  setGoal(v);
+});
+$('goal-del').addEventListener('click', () => setGoal(null));
+$('goal-cancel').addEventListener('click', () => $('goal-dlg').close());
 
 $('sort').addEventListener('change', (e) => {
   state.sort = e.target.value;

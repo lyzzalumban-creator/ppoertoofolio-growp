@@ -472,6 +472,100 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await ctx.close();
   }
 
+  // ============ J. halaman depan: sorotan, pergerakan hari ini, target ============
+  {
+    const { dayMovers } = await load('assets/stats.js');
+    const { ctx, page, fake, errors } = await newPage();
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fake.token });
+    await page.waitForSelector('#dash:not([hidden])');
+    const L = fake.call({ token: fake.token, action: 'list' }).history.at(-1);
+    const pctTxt = (w) => `${(w * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
+
+    // Sorotan
+    const top = [...L.positions].filter((p) => p.type !== 'manual').sort((a, b) => b.weight - a.weight)[0];
+    const ins = await page.locator('#insight-list').innerText();
+    check('J1 sorotan: aset terbesar (≥30%) diperingatkan dengan bobotnya, tanpa nominal', top.weight >= 0.3 && ins.includes(top.name) && ins.includes(pctTxt(top.weight)) && !/Rp|\d{1,3}(\.\d{3}){2,}/.test(ins), ins.replace(/\n/g, ' '));
+    check('J1b sorotan punya judul tersembunyi untuk pembaca layar dan tidak menyaingi tab', (await page.locator('#ins-h').innerText()) === 'Perlu diperhatikan');
+
+    // Pergerakan hari ini
+    const mv = dayMovers(L.positions);
+    const names = (grp) => page.locator('.mv-group', { hasText: grp }).locator('.n').evaluateAll((els) => els.map((e) => e.firstChild.textContent.trim()));
+    const sym = (p) => (p.type === 'manual' ? p.symbol : String(p.symbol).toUpperCase());
+    check('J2 pergerakan hari ini: naik dan turun terbanyak sesuai hitungan, urut menurut persen', JSON.stringify(await names('Naik terbanyak')) === JSON.stringify(mv.gainers.map(sym)) && JSON.stringify(await names('Turun terbanyak')) === JSON.stringify(mv.losers.map(sym)), `${await names('Naik terbanyak')} | ${await names('Turun terbanyak')}`);
+    check('J2b setiap baris pergerakan memakai panah dan tanda', /▲\s*\+\d/.test(await page.locator('.mv-group', { hasText: 'Naik terbanyak' }).innerText()) && /▼\s*−\d/.test(await page.locator('.mv-group', { hasText: 'Turun terbanyak' }).innerText()));
+
+    // Target
+    check('J3 belum ada target: ajakan dan tombol Atur target', /Tetapkan target/.test(await page.locator('#goal').innerText()) && (await page.locator('#goal [data-goal="open"]').innerText()) === 'Atur target');
+    await page.locator('#goal [data-goal="open"]').click();
+    check('J3b dialog terbuka, "Hapus target" belum tampil', (await page.locator('#goal-dlg').evaluate((d) => d.open)) && !(await page.locator('#goal-del').isVisible()));
+    for (const bad of ['', '0', '-5']) {
+      await page.fill('#goal-input', bad);
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      if (!(await page.locator('#goal-err').isVisible()) || !(await page.locator('#goal-dlg').evaluate((d) => d.open))) { check(`J4 target "${bad}" ditolak dan dialog tetap terbuka`, false); break; }
+    }
+    check('J4 target kosong, 0, atau negatif ditolak; tidak ada yang tersimpan', (await page.evaluate(() => localStorage.getItem('pf-goal'))) === null);
+    const goal = 150_000_000;
+    await page.fill('#goal-input', String(goal));
+    await page.getByRole('button', { name: 'Simpan' }).click();
+    const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+    const wantPct = Math.floor((L.total / goal) * 100);
+    const gtxt = await page.locator('#goal').innerText();
+    check('J5 target tersimpan: persen = total ÷ target (dibulatkan ke bawah), sisa dan target tampil', !(await page.locator('#goal-dlg').evaluate((d) => d.open)) && gtxt.includes(`${wantPct}%`) && gtxt.includes(idr.format(goal)) && gtxt.includes(`Sisa ${idr.format(goal - L.total)}`), gtxt.replace(/\n/g, ' '));
+    check('J5b cincin punya label untuk pembaca layar', (await page.locator('#goal .ring').getAttribute('aria-label')) === `${wantPct} persen menuju target`);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForSelector('#dash:not([hidden])');
+    check('J6 target diingat setelah muat ulang', (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
+
+    // nominal tersembunyi: target dan sisa ikut disamarkan, persen tetap
+    await page.locator('#privacy').click();
+    const hid = await page.locator('main').textContent();
+    check('J7 nominal tersembunyi: target dan sisa tidak bocor, persen tetap', !hid.includes(idr.format(goal)) && !hid.includes(idr.format(goal - L.total)) && (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
+    await page.locator('#privacy').click();
+
+    // ubah, batal, hapus
+    await page.locator('#goal [data-goal="open"]').click();
+    check('J8 dialog ubah terisi target lama dan menawarkan Hapus', (await page.inputValue('#goal-input')) === String(goal) && (await page.locator('#goal-del').isVisible()));
+    await page.fill('#goal-input', '1000');
+    await page.getByRole('button', { name: 'Batal' }).click();
+    check('J8b Batal tidak mengubah target', (await page.evaluate(() => localStorage.getItem('pf-goal'))) === String(goal));
+    await page.locator('#goal [data-goal="open"]').click();
+    await page.fill('#goal-input', '1000'); // jauh di bawah total
+    await page.getByRole('button', { name: 'Simpan' }).click();
+    check('J9 target sudah terlewati: "Target tercapai", cincin 100%', /Target tercapai/.test(await page.locator('#goal').innerText()) && (await page.locator('#goal .hole').innerText()) === '100%');
+    await page.locator('#goal [data-goal="open"]').click();
+    await page.getByRole('button', { name: 'Hapus target' }).click();
+    check('J10 Hapus target: kembali ke ajakan dan localStorage bersih', /Tetapkan target/.test(await page.locator('#goal').innerText()) && (await page.evaluate(() => localStorage.getItem('pf-goal'))) === null);
+
+    // tata letak desktop: Alokasi dan Target bertumpuk di kanan grafik, Pergerakan di bawah keduanya
+    const bb = (sel) => page.locator(sel).boundingBox();
+    const [chart, alloc, g, mvBox] = [await bb('.g-chart'), await bb('.g-alloc'), await bb('.g-goal'), await bb('.g-moves')];
+    check('J11 desktop: Alokasi dan Target bertumpuk di kolom kanan; Pergerakan di bawah grafik', Math.abs(alloc.x - g.x) < 1 && g.y >= alloc.y + alloc.height && alloc.x > chart.x + chart.width - 1 && mvBox.y >= chart.y + chart.height && mvBox.y >= g.y + g.height - 1, JSON.stringify({ chart, alloc, g, mvBox }));
+    check('J12 tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await shot(page, 'v5-dash.png', { fullPage: true });
+    await ctx.close();
+  }
+  {
+    // portofolio seimbang (5 aset x 20%, 5 jenis) dan hanya satu hari data: tanpa sorotan, tanpa pembanding
+    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+    const fk = createFake();
+    const assets = [
+      { type: 'idx', symbol: 'AAA', qty: 1, avgCost: 90 }, { type: 'us', symbol: 'BBB', qty: 1, avgCost: 90 },
+      { type: 'crypto', symbol: 'CCC', coingeckoId: 'ccc', qty: 1, avgCost: 90 }, { type: 'gold', symbol: 'XAU', qty: 1, avgCost: 90 },
+      { type: 'manual', symbol: 'DDD', qty: 1, price: 100, avgCost: 90 },
+    ];
+    fk.call({ token: fk.token, action: 'saveAssets', assets });
+    const quotes = new Map(assets.map((a) => [`${a.type}:${a.symbol}`, { price: 100, asOf: '2026-11-23' }]));
+    fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...buildSnapshot({ date: '2026-11-23', assets, quotes, fx: 1 }), at: '2026-11-23T06:30:00Z' } });
+    const { ctx, page } = await newPage({ fake: fk });
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fk.token });
+    await page.waitForSelector('#dash:not([hidden])');
+    check('J13 portofolio seimbang: tidak ada sorotan sama sekali', !(await page.locator('#insights').isVisible()) && (await page.locator('.insight').count()) === 0);
+    check('J14 satu hari data: pergerakan hari ini memberi tahu belum ada pembanding', /Belum ada pergerakan/.test(await page.locator('#movers').innerText()) && (await page.locator('.mv-group').count()) === 0);
+    await ctx.close();
+  }
+
   // ============ F. skrip Apps Script LAMA (belum mengenal tanggal beli) ============
   {
     const { ctx, page, fake, env } = await newPage();
@@ -511,7 +605,7 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await shot(page, 'v4-m-ringkasan.png', { fullPage: true });
     // Target sentuh: aturan proyek minimal 44 px (HP dulu).
     const tooSmall = (sel) => page.evaluate((s) => [...document.querySelectorAll(s)].filter((el) => { const r = el.getBoundingClientRect(); return r.width && (r.height < 44 || r.width < 44); }).map((el) => `${el.id || el.textContent.trim()} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`), sel);
-    const small = await tooSmall('[role="tab"], .seg button, .lg, #reload, #logout, #privacy, #actions .btn');
+    const small = await tooSmall('[role="tab"], .seg button, .lg, #reload, #logout, #privacy, #actions .btn, #goal .btn');
     const over = [];
     for (const t of ['aset', 'kinerja']) {
       await page.locator(`#tab-${t}`).click();

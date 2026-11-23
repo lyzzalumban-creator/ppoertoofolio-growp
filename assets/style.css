@@ -205,8 +205,37 @@ button:focus-visible, summary:focus-visible, a:focus-visible, select:focus-visib
 }
 .panel { display: grid; gap: 12px; }
 
-.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; grid-template-areas: "chart" "moves" "alloc" "goal"; }
+.g-chart { grid-area: chart; } .g-moves { grid-area: moves; } .g-alloc { grid-area: alloc; } .g-goal { grid-area: goal; }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); grid-template-areas: "chart alloc" "chart goal" "moves moves"; } #movers { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; } }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Sorotan: peringatan dari data, tanpa nominal */
+.insights ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.insight { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px 14px; border: 1px solid var(--border); border-left: 4px solid var(--warn); border-radius: 14px; background: var(--surface); font-size: 0.9rem; }
+.insight svg { width: 20px; height: 20px; margin-top: 1px; fill: none; stroke: var(--warn); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.insight b { display: block; color: var(--warn); font-size: 0.78rem; letter-spacing: 0.02em; text-transform: uppercase; }
+.insight p { margin: 2px 0 0; }
+
+/* Pergerakan hari ini */
+.mv-group { margin-top: 10px; }
+.mv-group h3 { margin: 0 0 2px; color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+.mv { list-style: none; margin: 0; padding: 0; }
+.mv li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; border-top: 1px solid var(--border); }
+.mv li:first-child { border-top: 0; }
+.mv .n { min-width: 0; overflow-wrap: anywhere; font-weight: 600; font-size: 0.92rem; }
+.mv .n small { display: block; color: var(--muted); font-weight: 400; font-size: 0.75rem; }
+.mv .v { text-align: right; font-size: 0.88rem; }
+.mv .v small { display: block; font-size: 0.75rem; }
+
+/* Target */
+.goal { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: center; margin-top: 10px; }
+.ring { position: relative; width: 84px; height: 84px; border-radius: 50%; background: var(--surface-2); }
+.ring .hole { position: absolute; inset: 11px; display: grid; place-content: center; border-radius: 50%; background: var(--surface); font-weight: 650; }
+.goal .g-line { margin: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
+.goal .g-sub { margin: 2px 0 8px; color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
+.goal-empty { margin: 8px 0 0; }
+.goal-empty p { margin: 0 0 10px; color: var(--muted); font-size: 0.9rem; }
 
 /* Segmen rentang waktu */
 .seg { display: inline-flex; flex-wrap: wrap; background: var(--surface-2); border-radius: 999px; padding: 3px; }
