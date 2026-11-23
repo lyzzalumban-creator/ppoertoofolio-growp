@@ -90,3 +90,59 @@ export function goalProgress(total, goal) {
   if (!(goal > 0) || !Number.isFinite(total)) return null;
   return Math.min(1, Math.max(0, total / goal));
 }
+
+// ---------- analisis: risiko, konsentrasi, per jenis ----------
+
+export const MIN_RISK_DAYS = 14;
+
+/** Statistik risiko dari return harian (dayPct); null bila datanya belum cukup untuk dipercaya. */
+export function riskStats(snaps) {
+  const d = snaps.filter((s) => Number.isFinite(s.dayPct)).map((s) => ({ date: s.date, r: s.dayPct }));
+  if (d.length < MIN_RISK_DAYS) return null;
+  const mean = d.reduce((a, x) => a + x.r, 0) / d.length;
+  const sd = Math.sqrt(d.reduce((a, x) => a + (x.r - mean) ** 2, 0) / (d.length - 1));
+  const pick = (better) => d.reduce((a, x) => (better(x.r, a.r) ? x : a));
+  const best = pick((x, y) => x > y);
+  const worst = pick((x, y) => x < y);
+  return {
+    days: d.length,
+    vol: sd * Math.sqrt(365), // snapshot ada tiap hari kalender, jadi 365, bukan 252
+    best: { date: best.date, pct: best.r },
+    worst: { date: worst.date, pct: worst.r },
+    up: d.filter((x) => x.r > 0).length,
+    down: d.filter((x) => x.r < 0).length,
+    flat: d.filter((x) => x.r === 0).length,
+  };
+}
+
+/** Jarak nilai terakhir dari puncaknya: { pct (<= 0), peak (tanggal puncak) }. Butuh indeks tak kosong. */
+export function currentDrawdown(index) {
+  let peak = index[0];
+  for (const p of index) if (p.idx > peak.idx) peak = p;
+  return { pct: index[index.length - 1].idx / peak.idx - 1, peak: peak.date };
+}
+
+/** Seberapa menumpuk: porsi 3 aset terbesar, dan "setara N aset berbobot sama" (1 / jumlah bobot kuadrat). */
+export function concentration(rows) {
+  const w = rows.map((p) => p.weight).filter((x) => x > 0);
+  const sum = w.reduce((a, b) => a + b, 0);
+  if (!sum) return null;
+  const n = w.map((x) => x / sum).sort((a, b) => b - a);
+  return { top3: n.slice(0, 3).reduce((a, b) => a + b, 0), effective: 1 / n.reduce((a, x) => a + x * x, 0) };
+}
+
+/** Nilai, modal, dan untung/rugi per jenis aset: { jenis: { value, cost, count, pnl, pnlPct } }. */
+export function byTypePnl(rows) {
+  const out = {};
+  for (const p of rows) {
+    const t = (out[p.type] ||= { value: 0, cost: 0, count: 0 });
+    t.value += p.value;
+    t.cost += p.cost;
+    t.count += 1;
+  }
+  for (const t of Object.values(out)) {
+    t.pnl = t.value - t.cost;
+    t.pnlPct = t.cost > 0 ? t.pnl / t.cost : null;
+  }
+  return out;
+}

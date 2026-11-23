@@ -4,6 +4,8 @@
 import { call } from '../scripts/lib/api.mjs';
 import { dateInTz, validateHoldings } from '../scripts/lib/portfolio.mjs';
 import { readCreds } from './creds.js';
+import { $, esc, fIdr, fNum, fUsd, longDate } from './lib.js';
+import { mountNav } from './nav.js';
 
 const TYPE = {
   idx: { label: 'Saham IDX', unit: 'lembar', symbol: 'Kode saham (mis. BBCA)', qty: 'Jumlah (lembar, BUKAN lot; 1 lot = 100 lembar)', cost: 'Harga beli rata-rata per lembar (Rp)' },
@@ -15,11 +17,9 @@ const TYPE = {
 const NUM = ['qty', 'avgCost', 'price', 'costIdr'];
 const TXT = ['symbol', 'name', 'coingeckoId', 'currency', 'yahoo', 'buyDate'];
 
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const fNum = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 8 });
-const fDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const today = () => dateInTz(Date.now(), 'Asia/Jakarta');
+
+mountNav('kelola', false);
 
 let creds = readCreds();
 let assets = [];
@@ -41,9 +41,11 @@ function renderList() {
   $('assets').innerHTML = assets.map((a, i) => {
     const t = TYPE[a.type] || { label: a.type, unit: '' };
     const qty = `${fNum.format(a.qty)}${t.unit ? ` ${t.unit}` : ''}`;
-    return `<li><div class="asset-info"><strong>${esc(a.name || a.symbol)}</strong>
-        <small>${esc(t.label)} · ${esc(a.symbol)} · ${esc(qty)} · beli rata-rata ${fNum.format(a.avgCost)}${a.type === 'us' ? ' US$' : ''}${a.buyDate ? ` · dibeli ${fDate.format(Date.parse(`${a.buyDate}T00:00:00Z`))}` : ''}</small></div>
-      <div class="row"><button class="btn" type="button" data-edit="${i}">Ubah</button><button class="btn" type="button" data-del="${i}">Hapus</button></div></li>`;
+    const fmt = (a.type === 'us' || (a.type === 'manual' && a.currency === 'USD')) ? fUsd : fIdr;
+    const meta = [t.label, a.symbol, qty, `modal ${fmt.format(a.avgCost)} per unit`, a.buyDate ? `dibeli ${longDate(a.buyDate)}` : null].filter(Boolean).join(' · ');
+    return `<li><div class="asset-info"><i class="dot" style="background:var(--c-${esc(a.type)})"></i><div><strong>${esc(a.name || a.symbol)}</strong>
+        <small>${esc(meta)}</small></div></div>
+      <div class="row"><button class="btn" type="button" data-edit="${i}" aria-label="Ubah ${esc(a.name || a.symbol)}">Ubah</button><button class="btn" type="button" data-del="${i}" aria-label="Hapus ${esc(a.name || a.symbol)}">Hapus</button></div></li>`;
   }).join('') || '<li class="muted">Belum ada aset. Tekan “Tambah aset”.</li>';
   status(`${assets.length} aset tersimpan di Sheet`);
 }
