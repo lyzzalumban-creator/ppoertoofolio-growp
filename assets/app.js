@@ -309,11 +309,12 @@ new ResizeObserver(() => {
 
 // ---------- sambung & mulai ----------
 
-function show(view) { // 'connect' | 'dash' | 'error'
+function show(view) { // 'connect' | 'dash' | 'empty' | 'error'
   $('connect').hidden = view !== 'connect';
   $('dash').hidden = view !== 'dash';
-  $('actions').hidden = view !== 'dash';
-  if (view !== 'error') $('banner').hidden = true;
+  $('actions').hidden = view !== 'dash' && view !== 'empty';
+  $('privacy').hidden = view !== 'dash';
+  if (view !== 'error' && view !== 'empty') $('banner').hidden = true;
 }
 
 function showConnect(err, url) {
@@ -324,6 +325,16 @@ function showConnect(err, url) {
   $('c-err').hidden = !err;
   $('c-err').textContent = err || '';
   ($('c-url').value ? $('c-token') : $('c-url')).focus();
+}
+
+// Tersambung dengan benar, hanya belum ada snapshot: bukan kegagalan.
+function empty() {
+  show('empty');
+  $('subtitle').textContent = 'Belum ada data';
+  const b = $('banner');
+  b.hidden = false;
+  b.className = 'banner';
+  b.innerHTML = '<strong>Belum ada data portofolio.</strong><br>Tambah aset di <a href="kelola.html">Kelola aset</a>, lalu jalankan workflow <em>Update harga harian</em> di tab Actions GitHub.';
 }
 
 function fail(msg, hint) {
@@ -344,9 +355,7 @@ async function start(creds, prefetched) {
     return fail(`Data tidak bisa dibaca (${e.message}).`, 'Periksa koneksi internet, lalu muat ulang. <a href="#" id="relink">Sambungkan ulang</a>');
   }
   state.snapshots = d.history;
-  if (!state.snapshots.length) {
-    return fail('Belum ada data portofolio.', 'Tambah aset di <a href="kelola.html">Kelola aset</a>, lalu jalankan workflow <em>Update harga harian</em> di tab Actions GitHub.');
-  }
+  if (!state.snapshots.length) return empty();
   show('dash');
   render();
 }
