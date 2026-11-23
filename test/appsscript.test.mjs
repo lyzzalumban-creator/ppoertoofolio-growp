@@ -25,7 +25,7 @@ test('JSON rusak -> error, bukan crash', () => {
 test('list pada Sheet kosong: tab dibuat otomatis, hasil kosong', () => {
   const f = createFake();
   const r = f.call({ token: f.token, action: 'list' });
-  assert.deepEqual(r, { ok: true, assets: [], history: [] });
+  assert.deepEqual(r, { ok: true, version: 2, assets: [], history: [] });
   assert.deepEqual([...f.sheets.keys()].sort(), ['Aset', 'Riwayat']);
 });
 
@@ -96,4 +96,49 @@ test('appendSnapshot menolak tanggal tidak valid dan tidak merusak data', () => 
     assert.match(f.call({ token: f.token, action: 'appendSnapshot', snapshot: bad }).error, /YYYY-MM-DD/);
   }
   assert.equal(f.call({ token: f.token, action: 'list' }).history.length, 1);
+});
+
+// ---------- tanggal beli ----------
+
+test('buyDate bolak-balik sebagai TEKS (bukan diubah Sheets menjadi tanggal)', () => {
+  const f = createFake();
+  const a = { type: 'idx', symbol: 'BBCA', qty: 1, avgCost: 1, buyDate: '2025-03-03' };
+  f.call({ token: f.token, action: 'saveAssets', assets: [a, { type: 'idx', symbol: 'TLKM', qty: 1, avgCost: 1 }] });
+  assert.strictEqual(typeof f.sheets.get('Aset').rows[1][10], 'string', 'sel tersimpan sebagai tanggal, bukan teks');
+  const got = f.call({ token: f.token, action: 'list' }).assets;
+  assert.strictEqual(got[0].buyDate, '2025-03-03');
+  assert.ok(!('buyDate' in got[1]), 'aset tanpa tanggal tidak boleh punya buyDate');
+});
+
+test('tanggal yang diketik manual di Sheet (objek Date) kembali ke YYYY-MM-DD menurut zona waktu Sheet', () => {
+  const f = createFake();
+  f.call({ token: f.token, action: 'saveAssets', assets: [{ type: 'idx', symbol: 'BBCA', qty: 1, avgCost: 1 }] });
+  // Pengguna mengetik 2025-03-03 di sel: Sheets menyimpannya sebagai tanggal tengah malam zona waktu Sheet (UTC+7).
+  f.sheets.get('Aset').rows[1][10] = new Date('2025-03-03T00:00:00+07:00');
+  assert.strictEqual(f.call({ token: f.token, action: 'list' }).assets[0].buyDate, '2025-03-03'); // di UTC akan jadi 03-02
+});
+
+test('baris lama yang lebih pendek dari jumlah kolom tidak menghasilkan "undefined"', () => {
+  const f = createFake();
+  f.call({ token: f.token, action: 'list' }); // membuat tab
+  // Keadaan Sheet yang sudah ter-deploy sebelum kolom buyDate ada: header & baris hanya 10 kolom.
+  f.sheets.get('Aset').rows = [
+    ['type', 'symbol', 'name', 'qty', 'avgCost', 'coingeckoId', 'price', 'currency', 'costIdr', 'yahoo'],
+    ['idx', 'CUAN', '', 1000, 200],
+  ];
+  const a = f.call({ token: f.token, action: 'list' }).assets[0];
+  assert.deepEqual(a, { type: 'idx', symbol: 'CUAN', qty: 1000, avgCost: 200 });
+  assert.ok(!JSON.stringify(a).includes('undefined'));
+});
+
+test('menyimpan ulang menaikkan header lama ke 11 kolom dan menjaga data', () => {
+  const f = createFake();
+  f.call({ token: f.token, action: 'list' });
+  f.sheets.get('Aset').rows = [['type', 'symbol', 'name', 'qty', 'avgCost'], ['idx', 'CUAN', '', 1000, 200]];
+  const cur = f.call({ token: f.token, action: 'list' }).assets;
+  f.call({ token: f.token, action: 'saveAssets', assets: cur.map((x) => ({ ...x, buyDate: '2025-01-15' })) });
+  const rows = f.sheets.get('Aset').rows;
+  assert.strictEqual(rows[0].length, 11);
+  assert.strictEqual(rows[0][10], 'buyDate');
+  assert.deepEqual(f.call({ token: f.token, action: 'list' }).assets[0], { type: 'idx', symbol: 'CUAN', qty: 1000, avgCost: 200, buyDate: '2025-01-15' });
 });

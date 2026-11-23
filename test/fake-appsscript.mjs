@@ -21,8 +21,14 @@ class FakeSheet {
           row.forEach((v, j) => {
             // Seperti input pengguna di Sheets: awalan = + - @ dibaca sebagai RUMUS (nilainya bukan teks asli),
             // kecuali diberi apostrof di depan, yang membuatnya teks biasa (apostrofnya tidak tersimpan).
+            // Teks mirip tanggal (YYYY-MM-DD) tanpa apostrof juga diubah Sheets menjadi tanggal, pada tengah malam
+            // di zona waktu Sheet (di sini Asia/Jakarta, UTC+7); apostrof membuatnya tetap teks.
             let stored = v;
-            if (typeof v === 'string') stored = v.startsWith("'") ? v.slice(1) : /^[=+\-@]/.test(v) ? '#FORMULA!' : v;
+            if (typeof v === 'string') {
+              if (v.startsWith("'")) stored = v.slice(1);
+              else if (/^[=+\-@]/.test(v)) stored = '#FORMULA!';
+              else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) stored = new Date(`${v}T00:00:00+07:00`);
+            }
             self.rows[r - 1 + i][c - 1 + j] = stored;
           });
         });
@@ -41,7 +47,14 @@ export function createFake({ token = 'rahasia-panjang' } = {}) {
     SpreadsheetApp: { getActive: () => ({
       getSheetByName: (n) => sheets.get(n) || null,
       insertSheet: (n) => { const s = new FakeSheet(); sheets.set(n, s); return s; },
+      getSpreadsheetTimeZone: () => 'Asia/Jakarta',
     }) },
+    Utilities: {
+      formatDate: (d, tz, fmt) => {
+        if (fmt !== 'yyyy-MM-dd') throw new Error(`format ${fmt} tidak ditiru`);
+        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+      },
+    },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k === 'TOKEN' ? token : null) }) },
     ContentService: {
       MimeType: { JSON: 'json' },

@@ -2,7 +2,7 @@
 // Validasi memakai modul yang sama dengan robot harian, jadi salah isi ketahuan sekarang, bukan besok pagi.
 
 import { call } from '../scripts/lib/api.mjs';
-import { validateHoldings } from '../scripts/lib/portfolio.mjs';
+import { dateInTz, validateHoldings } from '../scripts/lib/portfolio.mjs';
 import { readCreds } from './creds.js';
 
 const TYPE = {
@@ -13,22 +13,25 @@ const TYPE = {
   manual: { label: 'Lainnya', unit: 'unit', symbol: 'Label (mis. RDPU, DEPO, KAS)', qty: 'Jumlah unit (mis. 1 untuk deposito)', cost: 'Modal per unit' },
 };
 const NUM = ['qty', 'avgCost', 'price', 'costIdr'];
-const TXT = ['symbol', 'name', 'coingeckoId', 'currency', 'yahoo'];
+const TXT = ['symbol', 'name', 'coingeckoId', 'currency', 'yahoo', 'buyDate'];
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const fNum = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 8 });
+const fDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+const today = () => dateInTz(Date.now(), 'Asia/Jakarta');
 
 let creds = readCreds();
 let assets = [];
 let editing = null; // indeks yang diubah, atau null = tambah
+let oldScript = false; // kode Apps Script di Sheet belum mengenal kolom baru (mis. tanggal beli)
 
 const status = (m) => { $('status').textContent = m; };
 
-function banner(html) {
+function banner(html, error = true) {
   const b = $('banner');
   b.hidden = false;
-  b.className = 'banner error';
+  b.className = error ? 'banner error' : 'banner';
   b.innerHTML = html;
 }
 
@@ -39,7 +42,7 @@ function renderList() {
     const t = TYPE[a.type] || { label: a.type, unit: '' };
     const qty = `${fNum.format(a.qty)}${t.unit ? ` ${t.unit}` : ''}`;
     return `<li><div class="asset-info"><strong>${esc(a.name || a.symbol)}</strong>
-        <small>${esc(t.label)} · ${esc(a.symbol)} · ${esc(qty)} · beli rata-rata ${fNum.format(a.avgCost)}${a.type === 'us' ? ' US$' : ''}</small></div>
+        <small>${esc(t.label)} · ${esc(a.symbol)} · ${esc(qty)} · beli rata-rata ${fNum.format(a.avgCost)}${a.type === 'us' ? ' US$' : ''}${a.buyDate ? ` · dibeli ${fDate.format(Date.parse(`${a.buyDate}T00:00:00Z`))}` : ''}</small></div>
       <div class="row"><button class="btn" type="button" data-edit="${i}">Ubah</button><button class="btn" type="button" data-del="${i}">Hapus</button></div></li>`;
   }).join('') || '<li class="muted">Belum ada aset. Tekan “Tambah aset”.</li>';
   status(`${assets.length} aset tersimpan di Sheet`);
@@ -88,6 +91,7 @@ function openForm(i) {
   if (!$('f-currency').value) $('f-currency').value = 'IDR';
   $('f-err').hidden = true;
   $('save').disabled = false;
+  $('f-buyDate').max = today(); // pemilih tanggal tidak menawarkan masa depan
   $('form').querySelector('.adv').open = a.costIdr != null || !!a.yahoo;
   syncType();
   $('dlg').showModal();
@@ -102,6 +106,7 @@ function readForm() {
   if (a.type !== 'crypto') delete a.coingeckoId;
   if (a.type !== 'manual') { delete a.price; delete a.currency; }
   if (a.type === 'gold' && !a.symbol) a.symbol = 'XAU';
+  if (oldScript) delete a.buyDate; // skrip lama membuang kolom ini diam-diam; jangan berpura-pura menyimpannya
   return a;
 }
 
@@ -111,8 +116,10 @@ $('cancel').addEventListener('click', () => $('dlg').close());
 
 $('form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const next = editing == null ? [...assets, readForm()] : assets.map((a, i) => (i === editing ? readForm() : a));
+  const item = readForm();
   const err = (m) => { $('f-err').hidden = false; $('f-err').textContent = m; };
+  if (item.buyDate && item.buyDate > today()) return err('Tanggal beli tidak boleh di masa depan.');
+  const next = editing == null ? [...assets, item] : assets.map((a, i) => (i === editing ? item : a));
   $('save').disabled = true; // cegah kirim dobel
   try {
     await save(next);
@@ -131,7 +138,9 @@ async function start() {
     return banner('Belum tersambung ke Sheet. <a href="index.html">Buka dasbor</a> dan sambungkan dulu.');
   }
   try {
-    assets = (await call(creds.url, creds.token, 'list')).assets;
+    const d = await call(creds.url, creds.token, 'list');
+    assets = d.assets;
+    oldScript = !(d.version >= 2);
   } catch (e) {
     status('Gagal memuat');
     return banner(e.message === 'unauthorized'
@@ -139,6 +148,10 @@ async function start() {
       : `Data tidak bisa dibaca (${esc(e.message)}). Periksa koneksi, lalu muat ulang.`);
   }
   $('list-card').hidden = false;
+  if (oldScript) {
+    $('buy-field').hidden = true;
+    banner('Kode Apps Script di Sheet-mu masih versi lama, jadi <strong>tanggal beli belum bisa disimpan</strong>. Tempel <code>Code.gs</code> terbaru, lalu <em>Deploy → Manage deployments → Edit → New version → Deploy</em> (langkahnya ada di README).', false);
+  }
   renderList();
 }
 

@@ -26,6 +26,8 @@ Robot harian (GitHub Actions) ┘
 Aset yang kamu tambah muncul di dasbor setelah update harga berikutnya (maksimal 1 hari, atau langsung bila kamu menekan *Run workflow*).
 
 > **Mengubah kode Apps Script nanti?** Perubahan baru aktif setelah *Deploy → Manage deployments → Edit (ikon pensil) → Version: New version → Deploy*. URL-nya tetap sama.
+>
+> Bila fitur baru butuh kode Apps Script yang lebih baru (mis. tanggal beli), halaman **Kelola aset** menampilkan banner kuning "masih versi lama" dan menyembunyikan kolom yang belum didukung, supaya tidak ada data yang hilang diam-diam. Tempel `Code.gs` terbaru lalu deploy versi baru; data di Sheet tidak berubah.
 
 ## Mengisi aset
 
@@ -43,6 +45,7 @@ Lewat halaman **Kelola aset** (tombol di dasbor). Kolom yang tampil menyesuaikan
 | `currency` | Hanya `manual`: `IDR` (default) atau `USD` |
 | `costIdr` | Opsional: total modal dalam rupiah. Isi untuk aset dolar bila ingin untung/rugi memperhitungkan kurs saat beli |
 | `yahoo` | Opsional: paksa simbol Yahoo Finance untuk ticker yang tidak biasa (mis. `BRK-B`) |
+| `buyDate` | Opsional: tanggal beli `YYYY-MM-DD`. Bila beli beberapa kali, isi **tanggal beli pertama**. Hanya dicatat dan ditampilkan ("dibeli 3 Mar 2025 · 8 bln"); belum dipakai untuk menghitung kurs saat beli |
 
 Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara termudah mencatat sesuatu yang tidak punya harga pasar.
 

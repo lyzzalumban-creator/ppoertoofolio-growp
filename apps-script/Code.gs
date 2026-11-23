@@ -5,8 +5,10 @@
 // Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone.
 // Tab "Aset" dan "Riwayat" dibuat otomatis.
 
-const COLS = ['type', 'symbol', 'name', 'qty', 'avgCost', 'coingeckoId', 'price', 'currency', 'costIdr', 'yahoo'];
-const TEXT = ['type', 'symbol', 'name', 'coingeckoId', 'currency', 'yahoo'];
+const COLS = ['type', 'symbol', 'name', 'qty', 'avgCost', 'coingeckoId', 'price', 'currency', 'costIdr', 'yahoo', 'buyDate'];
+const TEXT = ['type', 'symbol', 'name', 'coingeckoId', 'currency', 'yahoo', 'buyDate'];
+// Naikkan bila format data berubah; web memeriksanya agar tidak mengirim kolom yang belum dikenal skrip lama.
+const VERSION = 2;
 
 // shortcut: kata sandi dibandingkan biasa (bukan constant-time) dan tanpa batas percobaan, cukup untuk
 // satu pemilik dengan kata sandi panjang; tambahkan penundaan/penguncian bila URL ini bocor.
@@ -26,12 +28,12 @@ function doPost(e) {
 
 const ACTIONS = {
   // Dasbor dan robot membaca semuanya sekaligus.
-  list: () => ({ assets: readAssets(), history: readHistory() }),
+  list: () => ({ version: VERSION, assets: readAssets(), history: readHistory() }),
 
   // Halaman Kelola mengirim seluruh daftar aset. shortcut: yang terakhir menyimpan menang (satu pengguna).
   saveAssets: (req) => {
     if (!Array.isArray(req.assets) || req.assets.length > 500) throw new Error('assets harus berupa daftar (maks 500)');
-    const rows = req.assets.map((a) => COLS.map((c) => safe(a[c])));
+    const rows = req.assets.map((a) => COLS.map((c) => safe(a[c], c)));
     put(tab('Aset', COLS), [COLS].concat(rows), COLS.length);
     return { saved: rows.length };
   },
@@ -60,8 +62,9 @@ function readAssets() {
     .map((r) => {
       const a = {};
       COLS.forEach((c, i) => {
-        if (r[i] === '' || r[i] === null) return;
-        a[c] = TEXT.indexOf(c) >= 0 ? String(r[i]) : r[i];
+        const v = r[i];
+        if (v === '' || v == null) return; // kosong, atau kolom yang belum ada di baris lama (undefined)
+        a[c] = c === 'buyDate' ? dateText(v) : TEXT.indexOf(c) >= 0 ? String(v) : v;
       });
       return a;
     });
@@ -90,8 +93,18 @@ function put(sh, values, width) {
   if (old > values.length) sh.getRange(values.length + 1, 1, old - values.length, width).clearContent();
 }
 
-// Teks yang diawali = + - @ akan dibaca Sheets sebagai rumus; beri apostrof agar tetap teks.
-function safe(v) {
-  if (v === undefined || v === null) return '';
+// Tanggal yang diketik langsung di Sheet menjadi objek Date; kembalikan ke teks YYYY-MM-DD (zona waktu Sheet).
+function dateText(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, SpreadsheetApp.getActive().getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(v);
+}
+
+// Teks berawalan = + - @ dibaca Sheets sebagai rumus, dan teks mirip tanggal diubah jadi tanggal;
+// apostrof di depan menjaganya tetap teks (apostrofnya sendiri tidak tersimpan).
+function safe(v, col) {
+  if (v === undefined || v === null || v === '') return '';
+  if (col === 'buyDate') return "'" + v;
   return typeof v === 'string' && /^[=+\-@]/.test(v) ? "'" + v : v;
 }

@@ -30,6 +30,15 @@ const fMonth = new Intl.DateTimeFormat('id-ID', { month: 'short', year: '2-digit
 const toMs = (iso) => Date.parse(`${iso}T00:00:00Z`);
 const longDate = (iso) => fDate.format(toMs(iso));
 
+// Lama dimiliki sampai tanggal data terakhir, dalam satuan yang enak dibaca.
+function heldText(buyDate) {
+  const d = Math.floor((toMs(latest().date) - toMs(buyDate)) / DAY);
+  if (d < 0) return '';
+  if (d === 0) return ' (hari ini)';
+  const t = d < 60 ? `${d} hari` : d < 730 ? `${Math.floor(d / 30.44)} bln` : `${(d / 365.25).toLocaleString('id-ID', { maximumFractionDigits: 1 })} thn`;
+  return ` (${t})`;
+}
+
 const state = { snapshots: [], hidden: false, range: 'Semua', filter: null };
 
 try { state.hidden = localStorage.getItem('pf-hidden') === '1'; } catch { /* penyimpanan diblokir: abaikan */ }
@@ -244,7 +253,8 @@ function renderTable() {
   const body = rows.map((p) => {
     const priceFmt = p.currency === 'USD' ? fUsd : fIdr;
     const qty = state.hidden ? null : `${fNum.format(p.qty)}${TYPE[p.type].unit ? ` ${TYPE[p.type].unit}` : ''}`;
-    const sub = [p.symbol, qty].filter(Boolean).join(' · ');
+    const buy = p.buyDate ? `dibeli ${longDate(p.buyDate)}${heldText(p.buyDate)}` : null;
+    const sub = [p.symbol, qty, buy].filter(Boolean).join(' · ');
     const stale = p.stale ? `<span class="chip" title="Gagal diambil hari ini; memakai harga per ${esc(p.asOf)}">harga lama</span>` : '';
     return `<tr>
       <td class="asset"><i class="dot" style="background:var(--c-${p.type})"></i><div><strong>${esc(p.name)}</strong><small>${esc(sub)}</small></div></td>

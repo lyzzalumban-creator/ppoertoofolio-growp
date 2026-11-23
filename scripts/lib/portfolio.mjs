@@ -8,6 +8,13 @@ const DEFAULT_CURRENCY = { idx: 'IDR', us: 'USD', crypto: 'IDR', gold: 'IDR', ma
 export const currencyOf = (a) => (a.type === 'manual' ? a.currency || 'IDR' : DEFAULT_CURRENCY[a.type]);
 export const keyOf = (a) => `${a.type}:${a.symbol}`;
 
+/** Tanggal kalender nyata berformat YYYY-MM-DD (menolak 2025-02-30, 03/03/2025, dst). */
+export function isIsoDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 const round = (n, d) => {
   if (n == null || !Number.isFinite(n)) return null;
   const f = 10 ** d;
@@ -34,6 +41,7 @@ export function validateHoldings(h) {
     if (!(typeof a.qty === 'number' && a.qty > 0)) errs.push(`${where}: qty harus angka lebih dari 0`);
     if (!(typeof a.avgCost === 'number' && a.avgCost >= 0)) errs.push(`${where}: avgCost harus angka 0 atau lebih`);
     if (a.costIdr != null && !(typeof a.costIdr === 'number' && a.costIdr >= 0)) errs.push(`${where}: costIdr harus angka 0 atau lebih`);
+    if (a.buyDate != null && !isIsoDate(a.buyDate)) errs.push(`${where}: buyDate harus tanggal yang valid berformat YYYY-MM-DD`);
     if (a.type === 'crypto' && !a.coingeckoId) errs.push(`${where}: aset kripto butuh coingeckoId (mis. "bitcoin")`);
     if (a.type === 'manual' && !(typeof a.price === 'number' && a.price >= 0)) errs.push(`${where}: aset manual butuh price (harga per unit)`);
     if (a.type === 'manual' && a.currency && !['IDR', 'USD'].includes(a.currency)) errs.push(`${where}: currency harus IDR atau USD`);
@@ -90,6 +98,7 @@ export function buildSnapshot({ date, assets, quotes, fx, prev }) {
       type: a.type,
       symbol: a.symbol,
       name: a.name || a.symbol,
+      ...(a.buyDate ? { buyDate: a.buyDate } : {}),
       qty: a.qty,
       price: q.price,
       currency: cur,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSnapshot, dateInTz, keyOf, validateHoldings } from '../scripts/lib/portfolio.mjs';
+import { buildSnapshot, dateInTz, isIsoDate, keyOf, validateHoldings } from '../scripts/lib/portfolio.mjs';
 
 const assets = [
   { type: 'idx', symbol: 'BBCA', qty: 1000, avgCost: 9000 },
@@ -90,4 +90,24 @@ test('dateInTz memakai zona waktu yang diminta', () => {
   assert.equal(dateInTz(ms, 'Asia/Jakarta'), '2026-11-24');
   assert.equal(dateInTz(ms, 'UTC'), '2026-11-23');
   assert.equal(keyOf({ type: 'idx', symbol: 'BBCA' }), 'idx:BBCA');
+});
+
+test('isIsoDate: hanya tanggal kalender nyata berformat YYYY-MM-DD', () => {
+  for (const ok of ['2025-03-03', '2024-02-29', '2000-12-31']) assert.equal(isIsoDate(ok), true, ok);
+  for (const bad of ['2025-02-30', '2025-02-29', '2025-13-01', '2025-00-10', '03/03/2025', '2025-3-3', '20250303', '2025-03-03T00:00', '', null, undefined, 20250303]) {
+    assert.equal(isIsoDate(bad), false, String(bad));
+  }
+});
+
+test('validateHoldings memeriksa buyDate bila ada, dan menamai asetnya', () => {
+  assert.doesNotThrow(() => validateHoldings({ assets: [{ ...assets[0], buyDate: '2025-03-03' }] }));
+  assert.throws(() => validateHoldings({ assets: [{ ...assets[0], buyDate: '2025-02-30' }] }), /BBCA.*buyDate/);
+  assert.throws(() => validateHoldings({ assets: [{ ...assets[0], buyDate: '03/03/2025' }] }), /buyDate/);
+});
+
+test('buildSnapshot membawa buyDate ke posisi, dan tidak menambahkannya bila kosong', () => {
+  const a = assets.map((x) => (x.symbol === 'BBCA' ? { ...x, buyDate: '2025-03-03' } : x));
+  const s = buildSnapshot({ date: '2026-11-24', assets: a, quotes, fx: 16_000 });
+  assert.equal(s.positions.find((p) => p.symbol === 'BBCA').buyDate, '2025-03-03');
+  assert.ok(!('buyDate' in s.positions.find((p) => p.symbol === 'AAPL')));
 });
