@@ -45,7 +45,7 @@ Lewat halaman **Kelola aset** (tombol di dasbor). Kolom yang tampil menyesuaikan
 | `currency` | Hanya `manual`: `IDR` (default) atau `USD` |
 | `costIdr` | Opsional: total modal dalam rupiah. Isi untuk aset dolar bila ingin untung/rugi memperhitungkan kurs saat beli |
 | `yahoo` | Opsional: paksa simbol Yahoo Finance untuk ticker yang tidak biasa (mis. `BRK-B`) |
-| `buyDate` | Opsional: tanggal beli `YYYY-MM-DD`. Bila beli beberapa kali, isi **tanggal beli pertama**. Hanya dicatat dan ditampilkan ("dibeli 3 Mar 2025 · 8 bln"); belum dipakai untuk menghitung kurs saat beli |
+| `buyDate` | Opsional: tanggal beli `YYYY-MM-DD`. Bila beli beberapa kali, isi **tanggal beli pertama**. Ditampilkan ("dibeli 3 Mar 2025 · 8 bln") dan dipakai untuk [membangun riwayat mundur](#riwayat-mundur-dari-tanggal-beli); belum dipakai untuk menghitung kurs saat beli |
 
 Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara termudah mencatat sesuatu yang tidak punya harga pasar.
 
@@ -73,6 +73,18 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 - Untung/rugi aset dolar memakai kurs hari ini untuk modal, kecuali kamu mengisi `costIdr`.
 - Rincian per aset hanya disimpan 2 hari terakhir (cukup untuk perubahan harian dan harga cadangan); total, modal, dan alokasi harian disimpan terus. Satu sel Sheet maksimal 50.000 karakter, sekitar 150 aset.
 - Dua perangkat yang menyimpan daftar aset bersamaan: yang terakhir menyimpan menang.
+
+## Riwayat mundur dari tanggal beli
+
+Grafik digambar dari snapshot harian, dan robot baru membuat satu snapshot per hari. Supaya grafik tidak menunggu berminggu-minggu, robot **mengisi riwayat ke belakang** dari harga penutupan historis Yahoo Finance, sejak `buyDate` paling awal.
+
+- **Cara kerja:** isi **Tanggal beli** di Kelola aset, lalu jalankan *Run workflow*. Run itu mengisi semua hari dari tanggal beli sampai kemarin (satu panggilan per hari; puluhan hari = 1-3 menit). Bila riwayat sudah lengkap, tidak ada yang diulang.
+- **Asumsi:** jumlah (`qty`) tiap aset dianggap **tetap sejak tanggal belinya**. Kalau kamu menambah beli di tengah jalan, nilai sebelum itu terlalu besar; ini keterbatasan satu-tanggal-per-aset.
+- **Aset tanpa `buyDate` tidak ikut** (kapan mulai dimiliki tidak diketahui). Ia baru muncul sejak snapshot nyata pertama, jadi grafik nilai bisa melonjak pada hari itu. Begitu juga saat aset kedua "dibeli": nilai total naik karena aset itu mulai dihitung, bukan karena untung.
+- **Batas:** maksimal 366 hari ke belakang (tanggal salah ketik seperti 2015 tidak membuat ribuan panggilan).
+- **Hanya mengisi celah di depan.** Snapshot nyata yang sudah ada tidak pernah ditimpa. Mengubah tanggal beli ke tanggal yang **lebih awal** menambah riwayat di depan; mengubahnya **lebih lambat** tidak menghapus apa pun yang sudah ada.
+- **Kripto** memakai harga Yahoo `<SIMBOL>-USD` × kurs pada hari itu, sedangkan snapshot harian memakai CoinGecko; selisih kecil bisa terlihat di sambungan keduanya. Akhir pekan dan libur memakai penutupan terakhir.
+- **Gagal tidak menghalangi snapshot hari ini.** Bila pengambilan atau penyimpanan riwayat mundur gagal, robot memberi peringatan lalu tetap membuat snapshot hari ini; run berikutnya melanjutkan dari yang tertinggal.
 
 ## Bila ada masalah
 

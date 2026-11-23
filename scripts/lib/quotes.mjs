@@ -3,7 +3,16 @@
 
 import { currencyOf, keyOf } from './portfolio.mjs';
 
-const OZ_GRAM = 31.1034768; // gram per troy ons
+export const OZ_GRAM = 31.1034768; // gram per troy ons
+
+/** Simbol Yahoo Finance sebuah aset: idx -> BBCA.JK, kripto -> BTC-USD, emas -> GC=F; field `yahoo` menimpa. */
+export function yahooSymbol(a) {
+  if (a.yahoo) return a.yahoo;
+  if (a.type === 'idx') return a.symbol.endsWith('.JK') ? a.symbol : `${a.symbol}.JK`;
+  if (a.type === 'crypto') return `${a.symbol}-USD`;
+  if (a.type === 'gold') return 'GC=F';
+  return a.symbol;
+}
 
 /**
  * @param {object}   p
@@ -77,17 +86,17 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
         q = cg.get(a.coingeckoId);
         if (!q) {
           // Cadangan: harga USD dari Yahoo (mis. BTC-USD) dikali kurs.
-          const ySym = a.yahoo || `${a.symbol}-USD`;
+          const ySym = yahooSymbol(a);
           warn(`${key}: tidak ada harga dari CoinGecko, mencoba Yahoo ${ySym}`);
           const y = await src.yahoo(ySym);
           if (y.currency && y.currency !== 'USD') throw new Error(`Yahoo ${ySym} bermata uang ${y.currency}, bukan USD`);
           q = { price: y.price * requireFx(), asOf: y.asOf };
         }
       } else if (a.type === 'gold') {
-        const oz = await firstOk(key, [['Yahoo GC=F', () => src.yahoo(a.yahoo || 'GC=F')], ['Stooq xauusd', () => src.stooq('xauusd')]]);
+        const oz = await firstOk(key, [['Yahoo GC=F', () => src.yahoo(yahooSymbol(a))], ['Stooq xauusd', () => src.stooq('xauusd')]]);
         q = { price: (oz.price * requireFx()) / OZ_GRAM, asOf: oz.asOf }; // USD/ons -> IDR/gram
       } else {
-        const ySym = a.yahoo || (a.type === 'idx' ? (a.symbol.endsWith('.JK') ? a.symbol : `${a.symbol}.JK`) : a.symbol);
+        const ySym = yahooSymbol(a);
         const attempts = [['Yahoo', () => src.yahoo(ySym)]];
         if (a.type === 'us') attempts.push(['Stooq', () => src.stooq(`${a.symbol.toLowerCase().replace('.', '-')}.us`)]);
         q = await firstOk(key, attempts);

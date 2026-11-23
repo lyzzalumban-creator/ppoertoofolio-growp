@@ -133,7 +133,7 @@ function renderChart() {
   box.innerHTML = '';
 
   if (pts.length < 2) {
-    box.innerHTML = `<div class="empty">${pts.length ? 'Grafik muncul setelah ada data minimal 2 hari.' : 'Belum ada data untuk rentang ini.'}</div>`;
+    box.innerHTML = `<div class="empty">${pts.length ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> di <a href="kelola.html">Kelola aset</a>, lalu jalankan workflow: riwayat langsung terisi sejak tanggal beli.' : 'Belum ada data untuk rentang ini.'}</div>`;
     return;
   }
 
@@ -149,7 +149,9 @@ function renderChart() {
   let hi = Math.max(...pts.map((p) => p.y));
   if (lo === hi) { lo -= 1; hi += 1; }
   const pad = (hi - lo) * 0.08;
-  const ticks = niceTicks(lo - pad, hi + pad);
+  // Bila semua nilai >= 0 (mis. nilai portofolio), bantalan tidak boleh memunculkan sumbu di bawah nol.
+  const floor = lo >= 0 ? Math.max(0, lo - pad) : lo - pad;
+  const ticks = niceTicks(floor, hi + pad);
   const y0 = ticks[0], y1 = ticks[ticks.length - 1];
 
   const X = (t) => ml + ((t - t0) / (t1 - t0)) * iw;

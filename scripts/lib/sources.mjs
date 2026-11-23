@@ -71,6 +71,41 @@ export async function fetchYahooClose(symbol, { get = getUrl } = {}) {
   throw lastErr;
 }
 
+/** Semua penutupan harian dalam respons Yahoo (yang null dilewati), tanggalnya menurut zona waktu bursa. */
+export function parseYahooSeries(data, symbol) {
+  const r = data && data.chart && data.chart.result && data.chart.result[0];
+  if (!r) {
+    const why = data && data.chart && data.chart.error && data.chart.error.description;
+    throw new Error(`Yahoo: tidak ada data untuk ${symbol}${why ? ` (${why})` : ' (simbol salah?)'}`);
+  }
+  const tz = (r.meta && r.meta.exchangeTimezoneName) || 'UTC';
+  const closes = (r.indicators && r.indicators.quote && r.indicators.quote[0] && r.indicators.quote[0].close) || [];
+  const ts = r.timestamp || [];
+  const byDate = new Map(); // satu titik per tanggal; bila dobel, yang terakhir menang
+  closes.forEach((c, i) => {
+    if (typeof c === 'number' && Number.isFinite(c)) byDate.set(dateInTz(ts[i] * 1000, tz), c);
+  });
+  if (!byDate.size) throw new Error(`Yahoo: tidak ada riwayat harga untuk ${symbol}`);
+  const points = [...byDate].map(([date, close]) => ({ date, close })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { points, currency: r.meta && r.meta.currency };
+}
+
+/** Penutupan harian dari tanggal `from` sampai `to` (YYYY-MM-DD, keduanya termasuk). */
+export async function fetchYahooSeries(symbol, from, to, { get = getUrl } = {}) {
+  const p1 = Math.floor(Date.parse(`${from}T00:00:00Z`) / 1000);
+  const p2 = Math.floor(Date.parse(`${to}T00:00:00Z`) / 1000) + 86_400;
+  let lastErr;
+  for (const host of ['query1', 'query2']) {
+    try {
+      const url = `https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${p1}&period2=${p2}&interval=1d`;
+      return parseYahooSeries(await get(url), symbol);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
+
 // ---------- Stooq (cadangan) ----------
 
 export function parseStooq(csv, symbol) {
