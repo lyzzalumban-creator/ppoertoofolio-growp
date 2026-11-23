@@ -4,3 +4,5 @@ node_modules/
 .DS_Store
 # holdings pribadi untuk dites lokal; jangan sampai ikut ter-commit
 holdings-pribadi.json
+# tangkapan layar tes browser (E2E_SHOTS=1)
+test/e2e/shots/
