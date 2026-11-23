@@ -116,8 +116,10 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await connect(page, { token: fake.token });
     await page.waitForSelector('#dash:not([hidden])');
     check('B1 3 kartu KPI (utama + 2), 9 baris aset, 5 jenis di legenda', (await page.locator('.kpi').count()) === 3 && (await page.locator('#holdings > li').count()) === 9 && (await page.locator('.lg').count()) === 5);
+    await page.locator('#tab-aset').click();
     const bbcaRow = await page.locator('#holdings > li', { hasText: 'BBCA' }).innerText();
     check('B13 dasbor menampilkan tanggal beli dan lama dimiliki', /dibeli 3 Mar 2025 \(20 bln\)/.test(bbcaRow), bbcaRow.replace(/\n/g, ' | ').slice(0, 110));
+    await page.locator('#tab-ringkasan').click();
     const total = await page.locator('.kpi').first().innerText();
     check('B2 total berformat rupiah', /Rp\s?\d{1,3}(\.\d{3})+/.test(total), total.replace(/\n/g, ' | '));
     check('B3 tombol Kelola aset di header, Keluar di bawah', (await page.locator('#actions').getByRole('link', { name: 'Kelola aset' }).isVisible()) && (await page.locator('#foot-actions').getByRole('button', { name: 'Keluar' }).isVisible()));
@@ -128,21 +130,28 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     check('B5 rentang waktu berfungsi', (await page.getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
     await page.getByRole('button', { name: 'Semua' }).click();
     await page.locator('.lg[data-type="crypto"]').click();
-    check('B6 filter legenda', (await page.locator('#holdings > li').count()) === 2);
-    await page.locator('.lg[data-type="crypto"]').click();
-    await shot(page, 'v2-dash.png', { fullPage: true });
+    check('B6 ketuk jenis di Alokasi -> tab Aset terbuka, hanya jenis itu', (await page.locator('#tab-aset').getAttribute('aria-selected')) === 'true' && (await page.locator('#panel-aset').isVisible()) && (await page.locator('#holdings > li').count()) === 2 && /Hanya Kripto/.test(await page.locator('#filter-note').innerText()));
+    await page.getByRole('button', { name: 'Tampilkan semua jenis' }).click();
+    check('B6b "Tampilkan semua jenis" melepas filter, fokus pindah ke Urutkan', (await page.locator('#holdings > li').count()) === 9 && (await page.evaluate(() => document.activeElement.id)) === 'sort');
+    await page.locator('#tab-ringkasan').click();
+    await shot(page, 'v4-dash.png', { fullPage: true });
+    for (const t of ['aset', 'kinerja']) { await page.locator(`#tab-${t}`).click(); await shot(page, `v4-dash-${t}.png`, { fullPage: true }); }
+    await page.locator('#tab-ringkasan').click();
 
+    // textContent (bukan innerText): ikut memeriksa tab yang sedang tertutup dan rincian yang belum dibuka.
     const secrets = secretsOf(fake);
-    const openAll = async () => { await page.evaluate(() => document.querySelectorAll('#holdings details').forEach((d) => { d.open = true; })); await page.waitForTimeout(80); };
-    await openAll(); // rincian (harga, jumlah, modal) ikut diperiksa, bukan hanya ringkasan
-    const normal = await page.locator('main').innerText();
+    const normal = await page.locator('main').textContent();
     check('B7 kontrol: mode normal menampilkan angka milikmu', secrets.filter((s) => normal.includes(s)).length >= 2);
+    await page.locator('#tab-aset').click(); // sembunyikan saat grafik tertutup: grafik rupiah lama tidak boleh tertinggal
     await page.getByRole('button', { name: 'Sembunyikan nominal' }).click();
-    const hidden = await page.locator('main').innerText();
+    const hidden = await page.locator('main').textContent();
     const leaked = secrets.filter((s) => hidden.includes(s));
-    check('B8 sembunyikan nominal: tidak ada angka milikmu (termasuk harga aset manual)', leaked.length === 0, leaked.join(','));
+    check('B8 sembunyikan nominal: tidak ada angka milikmu di tab mana pun (termasuk harga aset manual)', leaked.length === 0, leaked.join(','));
+    check('B8b saat tersembunyi grafik tidak menyimpan sumbu rupiah ("jt")', !/\d+ jt/.test(hidden));
     check('B9 jumlah unit tersembunyi, persentase tetap', !/lembar/.test(hidden) && /[+−]\d+,\d{2}%/.test(hidden));
-    await shot(page, 'v2-hidden.png', { fullPage: true });
+    await page.locator('#tab-ringkasan').click();
+    check('B9b kembali ke Ringkasan: grafik digambar ulang dalam persen', (await page.locator('#chart svg').count()) === 1 && /%/.test(await page.locator('#chart .axis').textContent()));
+    await shot(page, 'v4-hidden.png', { fullPage: true });
     check('B10 tanpa error konsol', errors.length === 0, errors.join(' | '));
 
     await page.locator('#foot-actions').getByRole('button', { name: 'Keluar' }).click();
@@ -333,7 +342,7 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await connect(page, { token: fake.token });
     await page.waitForSelector('#dash:not([hidden])');
     const secrets = secretsOf(fake);
-    const t0 = await page.locator('main').innerText();
+    const t0 = await page.locator('main').textContent();
     check('H1 kunjungan pertama: nominal tersembunyi (tanpa pernah menekan apa pun)', (await page.locator('#privacy').getAttribute('aria-label')) === 'Tampilkan nominal' && /••••••/.test(await page.locator('.kpi.hero .value').innerText()) && secrets.every((x) => !t0.includes(x)));
     await page.getByRole('button', { name: 'Tampilkan nominal' }).click();
     check('H2a setelah diketuk: nominal tampil dan tombol berganti nama', /Rp\s?\d/.test(await page.locator('.kpi.hero .value').innerText()) && (await page.locator('#privacy').getAttribute('aria-label')) === 'Sembunyikan nominal');
@@ -352,15 +361,19 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.goto(`${BASE}/index.html`);
     await connect(page, { token: fake.token });
     await page.waitForSelector('#dash:not([hidden])');
-    check('H3 kartu utama punya mini-grafik tanpa teks/angka (aman saat nominal disembunyikan)', (await page.locator('.kpi.hero svg.spark path.line').count()) === 1 && (await page.locator('.kpi.hero svg.spark text').count()) === 0);
-    check('H4 kartu utama menampilkan perubahan hari ini', /hari ini/.test(await page.locator('.kpi.hero .pill').innerText()), (await page.locator('.kpi.hero .pill').innerText()).replace(/\n/g, ' '));
+    check('H3 kartu utama punya mini-grafik tanpa teks/angka (aman saat nominal disembunyikan), berlabel "30 hari"', (await page.locator('.kpi.hero svg.spark path.line').count()) === 1 && (await page.locator('.kpi.hero svg.spark text').count()) === 0 && (await page.locator('.kpi.hero .spark-label').innerText()) === '30 hari');
+    const heroTxt = (await page.locator('.kpi.hero').innerText()).replace(/\n/g, ' ');
+    check('H4 kartu utama menampilkan "Hari ini" dan "Sejak beli" dengan panah dan tanda', /Hari ini\s*[▲▼]\s*[+−]\d+,\d{2}%/.test(heroTxt) && /Sejak beli\s*[▲▼]\s*[+−]\d+,\d{2}%/.test(heroTxt), heroTxt);
+    await page.locator('#tab-aset').click();
     const row = page.locator('#holdings > li', { hasText: 'BBCA' });
     check('H5a baris aset tertutup: rincian tidak terlihat', !(await row.locator('dd[data-label="Harga"]').isVisible()));
     await row.locator('summary').click();
     check('H5b ketuk baris -> rincian terbuka (harga, jumlah, untung/rugi, modal)', (await row.locator('dd[data-label="Harga"]').isVisible()) && /Jumlah/.test(await row.innerText()) && /Modal/.test(await row.innerText()));
     await page.locator('#privacy').click(); // render ulang
     check('H5c baris yang terbuka tetap terbuka setelah render ulang', await row.locator('dd[data-label="Harga"]').isVisible());
-    await page.locator('.lg[data-type="idx"]').click(); await page.locator('.lg[data-type="idx"]').click();
+    await page.locator('#tab-ringkasan').click();
+    await page.locator('.lg[data-type="idx"]').click();
+    await page.getByRole('button', { name: 'Tampilkan semua jenis' }).click();
     check('H5d dan tetap terbuka setelah filter dipasang-dilepas', await row.locator('dd[data-label="Harga"]').isVisible());
 
     // muat ulang: panggilan baru ke Sheet, dan jam pembaruan ikut berganti
@@ -402,7 +415,60 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.waitForSelector('#dash:not([hidden])');
     const list = await page.locator('#holdings').innerText();
     check('H8 "panw" tampil PANW; label manual "Depo Bca" tidak diubah', /PANW/.test(list) && !/panw/.test(list) && /Depo Bca/.test(list), list.replace(/\n/g, ' | ').slice(0, 120));
-    check('H8b hanya satu hari data: kartu utama tanpa mini-grafik dan memberi tahu "belum ada pembanding"', (await page.locator('.kpi.hero svg.spark').count()) === 0 && /belum ada pembanding/.test(await page.locator('.kpi.hero .pill').innerText()));
+    check('H8b hanya satu hari data: kartu utama tanpa mini-grafik dan memberi tahu "belum ada pembanding"', (await page.locator('.kpi.hero svg.spark').count()) === 0 && /belum ada pembanding/.test(await page.locator('.kpi.hero .today').innerText()));
+    await page.locator('#tab-kinerja').click();
+    check('H8c hanya satu hari data: tab Kinerja memberi tahu butuh 2 hari, tanpa metrik palsu', /minimal 2 hari/.test(await page.locator('#months').innerText()) && (await page.locator('#metrics .tile').count()) === 0);
+    await ctx.close();
+  }
+
+  // ============ I. identitas, tab, urutan, garis modal, kinerja ============
+  {
+    const { ctx, page, fake, errors } = await newPage();
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fake.token });
+    await page.waitForSelector('#dash:not([hidden])');
+    check('I0 identitas: judul halaman dan nama Lumbung', (await page.title()) === 'Lumbung' && (await page.locator('h1').innerText()) === 'Lumbung');
+
+    const sel = () => page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((t) => `${t.id}:${t.getAttribute('aria-selected')}:${t.tabIndex}:${document.getElementById(t.getAttribute('aria-controls')).hidden}`).join(' '));
+    check('I1 awal: Ringkasan terpilih, panel lain tertutup, hanya tab terpilih yang bisa dicapai dengan Tab', (await sel()) === 'tab-ringkasan:true:0:false tab-aset:false:-1:true tab-kinerja:false:-1:true', await sel());
+    await page.locator('#tab-ringkasan').focus();
+    const keys = [];
+    for (const k of ['ArrowRight', 'End', 'ArrowRight', 'ArrowLeft', 'Home']) { await page.keyboard.press(k); keys.push(await page.evaluate(() => document.activeElement.id)); }
+    check('I2 papan ketik: panah (memutar), Home, End memindah fokus dan tab sekaligus', keys.join() === 'tab-aset,tab-kinerja,tab-ringkasan,tab-kinerja,tab-ringkasan' && (await page.locator('#panel-ringkasan').isVisible()), keys.join());
+
+    // urutan aset
+    const L = fake.call({ token: fake.token, action: 'list' }).history.at(-1);
+    const want = (f) => [...L.positions].sort(f).map((p) => p.symbol).join();
+    const order = () => page.evaluate(() => [...document.querySelectorAll('#holdings details')].map((d) => d.dataset.key.split(':')[1]).join());
+    await page.locator('#tab-aset').click();
+    const byVal = await order();
+    await page.selectOption('#sort', 'pnlPct');
+    const byPnl = await order();
+    await page.selectOption('#sort', 'name');
+    const byName = await order();
+    check('I3 Urutkan: nilai, untung/rugi, nama', byVal === want((a, b) => b.value - a.value) && byPnl === want((a, b) => b.pnlPct - a.pnlPct) && byName === want((a, b) => a.name.localeCompare(b.name, 'id')), `${byPnl} | ${byName}`);
+    await page.selectOption('#sort', 'value');
+
+    // garis modal
+    await page.locator('#tab-ringkasan').click();
+    check('I4 grafik nominal punya garis modal putus-putus dan keterangannya', (await page.locator('#chart path.cost').count()) === 1 && /Modal/.test(await page.locator('#chart-key').innerText()));
+    await page.locator('#privacy').click();
+    check('I4b saat tersembunyi (grafik persen): tanpa garis modal', (await page.locator('#chart path.cost').count()) === 0 && (await page.locator('#chart-key').innerText()) === '');
+    await page.locator('#privacy').click();
+
+    // kinerja, dibandingkan dengan hitungan dari riwayat tiruan
+    const { returnIndex, monthlyReturns } = await load('assets/stats.js');
+    const hist = fake.call({ token: fake.token, action: 'list' }).history;
+    const months = monthlyReturns(hist);
+    const p2 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v * 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    await page.locator('#tab-kinerja').click();
+    const tiles = await page.locator('#metrics .tile').allInnerTexts();
+    check('I5 Kinerja: 4 metrik; return tertimbang waktu = hitungan berantai dari dayPct', tiles.length === 4 && tiles[0].includes(p2(returnIndex(hist).at(-1).idx - 1)), tiles[0].replace(/\n/g, ' '));
+    check('I6 kalender: satu kotak per bulan (maks. 12) dengan panah dan tanda', (await page.locator('#months .mo').count()) === Math.min(12, months.length) && (await page.locator('#months .mo').last().innerText()).includes(p2(months.at(-1).ret)));
+    const prOrder = (await page.locator('#perf .pr-n').allInnerTexts()).join();
+    check('I7 untung/rugi per aset: satu batang per aset, terurut dari tertinggi', prOrder === want((a, b) => b.pnlPct - a.pnlPct), prOrder);
+    check('I8 kartu "Bulan ini" sama dengan bulan terakhir di kalender', (await page.locator('.kpi', { hasText: 'Bulan ini' }).innerText()).includes(p2(months.at(-1).ret)));
+    check('I9 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 
@@ -442,7 +508,20 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.waitForSelector('#dash:not([hidden])');
     const ov = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
     check('E1 HP dasbor: tanpa scroll horizontal', ov.sw <= ov.iw, JSON.stringify(ov));
-    await shot(page, 'v2-m-dash.png', { fullPage: true });
+    await shot(page, 'v4-m-ringkasan.png', { fullPage: true });
+    // Target sentuh: aturan proyek minimal 44 px (HP dulu).
+    const tooSmall = (sel) => page.evaluate((s) => [...document.querySelectorAll(s)].filter((el) => { const r = el.getBoundingClientRect(); return r.width && (r.height < 44 || r.width < 44); }).map((el) => `${el.id || el.textContent.trim()} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`), sel);
+    const small = await tooSmall('[role="tab"], .seg button, .lg, #reload, #logout, #privacy, #actions .btn');
+    const over = [];
+    for (const t of ['aset', 'kinerja']) {
+      await page.locator(`#tab-${t}`).click();
+      const o = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+      if (o > 0) over.push(`${t}:${o}px`);
+      if (t === 'aset') small.push(...await tooSmall('#sort, .asset-row summary'));
+      await shot(page, `v4-m-${t}.png`, { fullPage: true });
+    }
+    check('E1b HP: tab Aset dan Kinerja juga tanpa scroll horizontal', over.length === 0, over.join());
+    check('E5 HP: tombol, tab, tautan, dan pilihan minimal 44×44 px', small.length === 0, small.join(', '));
     await page.goto(`${BASE}/kelola.html`);
     await page.waitForSelector('#list-card:not([hidden])');
     const ov2 = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));

@@ -1,6 +1,6 @@
-# Portofolio: pegangan untuk sesi kerja
+# Lumbung: pegangan untuk sesi kerja
 
-Dasbor portofolio investasi **pribadi**. HTML/CSS/JS murni, **tanpa framework, tanpa build, tanpa library eksternal**.
+Dasbor portofolio investasi **pribadi** bernama **Lumbung**. HTML/CSS/JS murni, **tanpa framework, tanpa build, tanpa library eksternal**.
 Data ada di Google Sheet milik pengguna (lewat Apps Script); harga diambil robot GitHub Actions 4 kali sehari.
 Repo ini **publik**, jadi tidak boleh ada data pribadi di dalamnya (kode, URL, kata sandi, nominal).
 
@@ -15,6 +15,7 @@ Robot (scripts/update.mjs) ─────┘
 | Berkas | Peran |
 |---|---|
 | `index.html`, `assets/app.js`, `assets/style.css` | Dasbor. `app.js` mengambil data (`list`) dan merender semuanya |
+| `assets/stats.js` | Hitungan kinerja murni (tanpa DOM): indeks return berantai dari `dayPct`, return bulanan, penurunan terdalam, urutan aset. Dites di `test/stats.test.mjs` |
 | `kelola.html`, `assets/kelola.js` | Tambah/ubah/hapus aset. Validasi memakai `scripts/lib/portfolio.mjs` yang sama dengan robot |
 | `assets/creds.js`, `scripts/lib/api.mjs` | URL + kata sandi di localStorage (hanya dikirim ke `script.google.com`); klien API |
 | `apps-script/Code.gs` | Ditempel **manual** oleh pengguna di Sheet-nya. Mengubahnya butuh deploy versi baru oleh pengguna; naikkan `VERSION` bila format berubah |
@@ -53,15 +54,19 @@ Snapshot (satu per tanggal): `date, fx, total, cost, pnl, pnlPct, dayPnl, dayPct
 - Semua teks dalam Bahasa Indonesia; angka rupiah `Rp 1.234.567`, persen `+1,23%`. Arah naik/turun selalu pakai panah dan tanda, bukan hanya warna.
 - Target sentuh minimal 44px; ukuran huruf input 16px (iOS tidak memperbesar layar); hormati `prefers-reduced-motion`.
 
-Keputusan desain yang sudah diambil: gaya bersih seperti aplikasi dompet/bank; kartu utama (total nilai besar, pil perubahan hari ini, mini-grafik 30 hari) + dua kartu kecil; daftar aset ringkas yang bisa dibuka (`<details>`); ikon mata untuk sembunyikan nominal (bawaan: tersembunyi); "Keluar" di bawah; tombol Muat ulang; kerangka pemuatan; subjudul "Diperbarui … (N jam lalu)" yang berubah kuning bila lebih dari 12 jam.
+Keputusan desain yang sudah diambil (identitas **Lumbung**, Nov 2026; terinspirasi Snowball Analytics dan PortfolioX tetapi sengaja tidak meniru):
+- **Warna "Nila & Sogan"**: latar krem hangat, aksen nila (indigo batik), cokelat soga untuk garis modal; tema gelap indigo malam. Semua pasangan teks/latar ≥ 4,5:1 (dicek dengan hitungan WCAG). Logo: atap lumbung di atas tiga batang naik.
+- **Kartu utama gelap** (seperti kartu bank) dengan motif kawung samar (CSS `mask`, warnanya dari token): total nilai, pil "Hari ini" dan "Sejak beli" (persen selalu tampil, rupiah hanya bila tidak disembunyikan), mini-grafik berlabel "30 hari". Dua kartu kecil: Modal, Bulan ini. Desktop: kartu kecil bertumpuk di kanan.
+- **Tab** Ringkasan / Aset / Kinerja (pola ARIA tab, panah/Home/End, menempel di atas). Ringkasan: grafik nilai + **garis modal putus-putus** (hanya saat nominal tampil) + rentang 1/3/6 bln, 1 thn, Semua; Alokasi berupa donat di samping daftar jenis, mengetuk jenis membuka tab Aset yang terfilter. Aset: daftar `<details>` + pilihan **Urutkan** (nilai, untung/rugi, naik hari ini, nama). Kinerja (semua persen): return tertimbang waktu, penurunan terdalam, bulan terbaik/terburuk, **kalender return bulanan** (kotak berwarna sesuai besar gerak), batang untung/rugi per aset berpusat di nol.
+- Tetap: ikon mata (bawaan: tersembunyi); "Keluar" di bawah; Muat ulang; kerangka pemuatan; subjudul "Diperbarui … (N jam lalu)" kuning bila lebih dari 12 jam.
 
-Ide yang belum dikerjakan (belum diputuskan pengguna): halaman Kelola aset belum disamakan gayanya dengan dasbor; audit kontras dan pembaca layar; PWA (ikon di layar utama HP); tooltip pada mini-grafik; onboarding saat pertama kali; pilihan tema/warna aksen; tata letak tablet.
+Ide yang belum dikerjakan (belum diputuskan pengguna): halaman Kelola aset baru ikut token warna, tata letaknya belum disamakan; uji pembaca layar sungguhan; PWA (ikon di layar utama HP); onboarding saat pertama kali; tata letak tablet. Butuh perubahan robot/Apps Script (kontrak data): **pembanding IHSG/S&P 500**, **target alokasi** per jenis, dividen/pendapatan pasif, kalender dividen/laporan keuangan. Paparan mata uang sengaja belum dibuat: kripto bertipe IDR walau bergerak mengikuti dolar, jadi angkanya akan menyesatkan.
 
 ## Menjalankan tes
 
 ```bash
 npm test            # unit: logika, parser, kode Apps Script di atas tiruan Google (tanpa jaringan)
-npm run test:e2e    # browser (Chromium + Playwright): ±79 cek; E2E_SHOTS=1 menyimpan tangkapan layar ke test/e2e/shots/
+npm run test:e2e    # browser (Chromium + Playwright): ±96 cek; E2E_SHOTS=1 menyimpan tangkapan layar ke test/e2e/shots/
 npm run serve       # situs di http://localhost:8080 (jangan buka index.html lewat file://)
 ```
 
