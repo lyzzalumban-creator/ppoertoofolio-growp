@@ -1,0 +1,44 @@
+name: Update harga harian
+
+on:
+  schedule:
+    # 00:30 UTC = 07:30 WIB: setelah IDX (tutup ±16.00 WIB) dan bursa AS (tutup ±03.00-04.00 WIB) sama-sama selesai.
+    - cron: "30 0 * * *"
+  workflow_dispatch: {} # tombol "Run workflow" manual
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Ambil harga & buat snapshot
+        run: node scripts/update.mjs
+        env:
+          # Opsional. Kosong = pakai data/holdings.json dari repo.
+          HOLDINGS_JSON: ${{ secrets.HOLDINGS_JSON }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+
+      - name: Simpan hasil ke repo
+        run: |
+          if git status --porcelain data/history.json | grep -q .; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add data/history.json
+            git commit -m "data: snapshot $(TZ=Asia/Jakarta date +%F)"
+            git push
+          else
+            echo "Tidak ada perubahan."
+          fi

@@ -1,0 +1,6 @@
+node_modules/
+.env
+.env.*
+.DS_Store
+# holdings pribadi untuk dites lokal; jangan sampai ikut ter-commit
+holdings-pribadi.json
