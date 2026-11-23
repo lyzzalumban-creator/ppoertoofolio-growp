@@ -1,6 +1,6 @@
 # Portofolio
 
-Dasbor pribadi yang menggabungkan semua portofolio investasimu (saham IDX, saham AS, kripto, emas, reksa dana, kas) di satu halaman. Aset diisi **lewat web**, data disimpan di **Google Sheet-mu sendiri**, dan harga diperbarui **sekali sehari** saat penutupan pasar.
+Dasbor pribadi yang menggabungkan semua portofolio investasimu (saham IDX, saham AS, kripto, emas, reksa dana, kas) di satu halaman. Aset diisi **lewat web**, data disimpan di **Google Sheet-mu sendiri**, dan harga diperbarui **4 kali sehari** (01.30, 07.30, 13.30, dan 19.30 WIB).
 
 ```
 Web: dasbor + "Kelola aset" ──┐
@@ -21,7 +21,7 @@ Robot harian (GitHub Actions) ┘
    - `APPS_SCRIPT_TOKEN`: kata sandi yang sama dengan `TOKEN`
    - (opsional) `COINGECKO_API_KEY`: demo key CoinGecko gratis, untuk batas request lebih longgar
 6. **Aktifkan GitHub Pages:** *Settings → Pages → Deploy from branch →* `main`, folder `/ (root)`. Workflow terjadwal GitHub hanya berjalan dari branch default, jadi pastikan semua file ini sudah ada di `main`.
-7. **Pakai:** buka situsmu, tempel URL dan kata sandi (sekali per perangkat), buka **Kelola aset** dan tambah asetmu. Lalu tab *Actions → Update harga harian → Run workflow*. Sesudah itu jalan sendiri tiap hari pukul 07.30 WIB.
+7. **Pakai:** buka situsmu, tempel URL dan kata sandi (sekali per perangkat), buka **Kelola aset** dan tambah asetmu. Lalu tab *Actions → Update harga harian → Run workflow*. Sesudah itu jalan sendiri 4 kali sehari.
 
 Aset yang kamu tambah muncul di dasbor setelah update harga berikutnya (maksimal 1 hari, atau langsung bila kamu menekan *Run workflow*).
 
@@ -55,7 +55,8 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 - **Satu-satunya pengaman adalah kata sandi `TOKEN`.** Siapa pun yang memegang URL Apps Script *dan* kata sandinya bisa membaca dan mengubah datamu. Tidak ada pembatasan percobaan, jadi pakai kata sandi panjang dan acak. Untuk menggantinya: ubah `TOKEN` di Script properties (langsung berlaku), perbarui secret `APPS_SCRIPT_TOKEN`, lalu masuk ulang di perangkatmu.
 - Kata sandi hanya dikirim ke `script.google.com` (halaman menolak URL lain) dan disimpan di browser perangkat itu saja. Di perangkat bersama, tekan **Keluar**.
 - Jangan bagikan Google Sheet-nya. Yang punya akses ke Sheet melihat semua datamu.
-- Log GitHub Actions hanya menampilkan persentase, tidak pernah nominal rupiah.
+- **Log GitHub Actions di repo publik bisa dibaca siapa pun yang punya akun GitHub.** Karena itu robot di sana **tidak mencetak** kode saham, bobot, untung/rugi, nominal, maupun tanggal beli; yang tampil hanya status dan jumlah ("2 aset, tersimpan"). Sebagai jaring pengaman, kode, nama, dan ID CoinGecko asetmu didaftarkan ke fitur penyamaran GitHub (`::add-mask::` → `***`), dan pesan error memakai **nomor aset** (urutan di daftar Kelola, mis. `#2 idx`) alih-alih kodenya. Kode 1–2 huruf (mis. `F`) tidak bisa didaftarkan ke GitHub karena akan mengaburkan huruf lain; untuknya robot menyamarkan sendiri. Di komputermu sendiri (`npm run update:dry`) log tetap lengkap.
+- **Jadwal otomatis bisa dimatikan GitHub:** di repo publik, bila **60 hari tanpa aktivitas** (commit), GitHub menonaktifkan workflow terjadwal. Kamu mendapat email, dan cukup mengaktifkannya lagi di tab Actions. Dasbor menampilkan "diperbarui … (N jam lalu)" dan warnanya berubah bila lebih dari 12 jam, jadi mudah terlihat bila jadwalnya berhenti.
 - Tombol "Sembunyikan nominal" hanya kosmetik (misalnya ada orang melihat layarmu); datanya tetap ada di halaman.
 - "Harga" aset `manual` adalah angka yang kamu ketik sendiri dan sering sama dengan saldomu, jadi ikut disembunyikan.
 
@@ -67,7 +68,7 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 | Kripto | CoinGecko (cadangan: Yahoo `BTC-USD` × kurs) | CoinGecko memberi harga rupiah langsung tetapi bisa membalas 429 (kena batas request); skrip menunggu sesuai `Retry-After`, lalu pindah ke Yahoo. Koin yang simbol Yahoo-nya bukan `<SIMBOL>-USD` bisa diatur lewat field `yahoo` |
 | Emas | Harga emas dunia (futures `GC=F`, cadangan XAUUSD) × kurs ÷ 31,1035 | Harga **internasional per gram**, bukan harga Antam/toko emas. Untuk harga Antam pakai `manual` |
 
-- Satu "foto" per hari pukul 07.30 WIB: IDX dan bursa AS sudah tutup, kripto diambil saat itu.
+- **4 kali sehari:** 07.30 WIB menangkap penutupan bursa AS dan kripto pagi, 19.30 WIB menangkap penutupan IDX (tutup sekitar 16.00 WIB), sedangkan 13.30 dan 01.30 memberi pembaruan di tengah sesi. Selama bursa buka, angka yang tampil adalah **harga terakhir**, bukan penutupan. Satu tanggal tetap satu snapshot: run berikutnya di hari yang sama menimpanya, jadi riwayat tidak membengkak. Jadwal GitHub bisa terlambat beberapa menit.
 - Bila satu harga gagal diambil, dipakai harga terakhir dan baris ditandai **harga lama**. Bila belum pernah ada harganya (mis. salah ketik simbol), proses **dibatalkan** dan tidak menulis apa pun, supaya total tidak diam-diam salah. Workflow gagal sehingga GitHub memberi tahumu.
 - "Hari ini" dihitung dari **pergerakan harga**, bukan selisih total, jadi setoran atau penarikan dana tidak terbaca sebagai untung/rugi.
 - Untung/rugi aset dolar memakai kurs hari ini untuk modal, kecuali kamu mengisi `costIdr`.
@@ -76,7 +77,7 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 
 ## Riwayat mundur dari tanggal beli
 
-Grafik digambar dari snapshot harian, dan robot baru membuat satu snapshot per hari. Supaya grafik tidak menunggu berminggu-minggu, robot **mengisi riwayat ke belakang** dari harga penutupan historis Yahoo Finance, sejak `buyDate` paling awal.
+Grafik digambar dari snapshot harian (satu per tanggal), dan robot baru mulai membuatnya sejak run pertama. Supaya grafik tidak menunggu berminggu-minggu, robot **mengisi riwayat ke belakang** dari harga penutupan historis Yahoo Finance, sejak `buyDate` paling awal.
 
 - **Cara kerja:** isi **Tanggal beli** di Kelola aset, lalu jalankan *Run workflow*. Run itu mengisi semua hari dari tanggal beli sampai kemarin (satu panggilan per hari; puluhan hari = 1-3 menit). Bila riwayat sudah lengkap, tidak ada yang diulang.
 - **Asumsi:** jumlah (`qty`) tiap aset dianggap **tetap sejak tanggal belinya**. Kalau kamu menambah beli di tengah jalan, nilai sebelum itu terlalu besar; ini keterbatasan satu-tanggal-per-aset.

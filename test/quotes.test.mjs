@@ -65,7 +65,7 @@ test('cadangan kripto memakai simbol Yahoo dari field "yahoo" bila ada', async (
 test('CoinGecko dan Yahoo sama-sama gagal -> masalah bila tak ada data lama', async () => {
   const r = await run([A.btc], { cgFail: true, yahooMap: { 'BTC-USD': new Error('HTTP 429') } });
   assert.equal(r.problems.length, 1);
-  assert.match(r.problems[0], /crypto:BTC/);
+  assert.match(r.problems[0], /^#1 crypto:/); // nomor aset, bukan kode saham
 });
 
 test('Yahoo gagal -> pakai harga terakhir, ditandai stale', async () => {
@@ -79,7 +79,8 @@ test('Yahoo gagal -> pakai harga terakhir, ditandai stale', async () => {
 test('Yahoo gagal dan belum pernah ada harga -> masalah (jangan diam-diam keliru)', async () => {
   const r = await run([A.bbca], { yahooMap: { 'BBCA.JK': new Error('HTTP 404') } });
   assert.equal(r.quotes.size, 0);
-  assert.match(r.problems[0], /idx:BBCA/);
+  assert.match(r.problems[0], /^#1 idx:/);
+  assert.ok(!r.problems[0].includes('BBCA'), 'kode saham tidak boleh ada di pesan');
 });
 
 test('saham AS: Yahoo gagal -> cadangan Stooq', async () => {
@@ -97,8 +98,8 @@ test('kurs gagal diambil -> pakai kurs terakhir dari snapshot lama', async () =>
 
 test('kurs gagal dan tak ada kurs lama -> aset dolar & emas jadi masalah', async () => {
   const r = await run([A.aapl, A.gold, A.bbca], { yahooMap: { 'USDIDR=X': new Error('x') } });
-  const keys = r.problems.map((p) => p.split(':').slice(0, 2).join(':')).sort();
-  assert.deepEqual(keys, ['gold:XAU', 'us:AAPL']);
+  const keys = r.problems.map((p) => p.split(':')[0]).sort();
+  assert.deepEqual(keys, ['#1 us', '#2 gold']); // urutan = urutan aset di daftar
   assert.ok(r.quotes.has('idx:BBCA')); // aset rupiah tidak ikut terseret
 });
 

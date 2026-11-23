@@ -26,9 +26,20 @@ const fCompact = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFr
 const fDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 const fDay = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const fMonth = new Intl.DateTimeFormat('id-ID', { month: 'short', year: '2-digit', timeZone: 'UTC' });
+const fAtDate = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', timeZone: 'Asia/Jakarta' });
+const fAtTime = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Jakarta' });
 
 const toMs = (iso) => Date.parse(`${iso}T00:00:00Z`);
 const longDate = (iso) => fDate.format(toMs(iso));
+
+// "2 jam lalu": penanda kesegaran; bila terlalu lama, jadwal otomatis mungkin berhenti (mis. dimatikan GitHub).
+function agoText(ms) {
+  const m = Math.floor(ms / 60_000);
+  if (m < 1) return 'baru saja';
+  if (m < 60) return `${m} menit lalu`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h} jam lalu` : `${Math.floor(h / 24)} hari lalu`;
+}
 
 // Lama dimiliki sampai tanggal data terakhir, dalam satuan yang enak dibaca.
 function heldText(buyDate) {
@@ -70,7 +81,12 @@ const weightText = (w) => `${(w * 100).toLocaleString('id-ID', { maximumFraction
 // ---------- render ----------
 
 function renderHeader() {
-  $('subtitle').textContent = `Harga penutupan · data per ${longDate(latest().date)}`;
+  const at = latest().at ? Date.parse(latest().at) : NaN;
+  const age = Date.now() - at;
+  $('subtitle').textContent = Number.isFinite(at)
+    ? `Harga terakhir · diperbarui ${fAtDate.format(at)}, ${fAtTime.format(at)} WIB (${agoText(age).replace(/ /g, '\u00a0')})`
+    : `Harga terakhir · data per ${longDate(latest().date)}`;
+  $('subtitle').classList.toggle('stale', Number.isFinite(at) && age > 12 * 3_600_000); // jadwal 6 jam: lewat 12 jam = ada yang macet
   const btn = $('privacy');
   btn.setAttribute('aria-pressed', String(state.hidden));
   btn.textContent = state.hidden ? 'Tampilkan nominal' : 'Sembunyikan nominal';
@@ -260,7 +276,7 @@ function renderTable() {
     const stale = p.stale ? `<span class="chip" title="Gagal diambil hari ini; memakai harga per ${esc(p.asOf)}">harga lama</span>` : '';
     return `<tr>
       <td class="asset"><i class="dot" style="background:var(--c-${p.type})"></i><div><strong>${esc(p.name)}</strong><small>${esc(sub)}</small></div></td>
-      <td class="num" data-label="Harga" title="Penutupan ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</td>
+      <td class="num" data-label="Harga" title="Harga per ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</td>
       <td class="num" data-label="Nilai">${money(p.value)}</td>
       <td class="num" data-label="Bobot"><span class="wt">${weightText(p.weight)}<span class="bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%"></i></span></span></td>
       <td class="num" data-label="Untung/rugi">${delta(p.pnlPct)}<small>${money(p.pnl, { sign: true })}</small></td>

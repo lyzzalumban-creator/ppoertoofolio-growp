@@ -13,9 +13,18 @@ import { collectQuotes, yahooSymbol } from './lib/quotes.mjs';
 import { addDays, backfillDates, buildBackfill } from './lib/backfill.mjs';
 import { fetchCoinGeckoIdr, fetchStooqClose, fetchYahooClose, fetchYahooSeries } from './lib/sources.mjs';
 import { call } from './lib/api.mjs';
+import { maskLines, scrub, sensitiveStrings } from './lib/privacy.mjs';
 
 const DRY = process.argv.includes('--dry-run');
-const warn = (m) => console.warn(process.env.GITHUB_ACTIONS ? `::warning::${m}` : `! ${m}`);
+
+// Di GitHub Actions log run bisa dibaca orang lain bila repo publik. Karena itu robot di sana tidak mencetak
+// rincian per aset (kode, bobot, untung/rugi, tanggal beli), dan teks yang masih memuat kode/nama aset
+// disamarkan. Di komputermu sendiri semuanya tampil lengkap.
+const QUIET = process.env.GITHUB_ACTIONS === 'true';
+let secrets = []; // diisi begitu daftar aset terbaca
+const clean = (m) => (QUIET ? scrub(m, secrets) : m);
+const log = (m) => console.log(clean(m));
+const warn = (m) => console.warn(QUIET ? `::warning::${clean(m)}` : `! ${m}`);
 
 // Penutupan harian historis semua aset yang punya tanggal beli, plus kurs USD/IDR bila dibutuhkan.
 async function loadSeries(assets, from, to) {
@@ -25,7 +34,7 @@ async function loadSeries(assets, from, to) {
     if (!a.buyDate || a.type === 'manual') continue;
     const { points, currency } = await fetchYahooSeries(yahooSymbol(a), start, to);
     const want = a.type === 'idx' ? 'IDR' : 'USD'; // us, kripto (X-USD), dan emas (GC=F) semuanya dalam dolar
-    if (currency && currency !== want) throw new Error(`${keyOf(a)}: mata uang ${currency} dari sumber tidak sama dengan ${want} yang diharapkan`);
+    if (currency && currency !== want) throw new Error(`#${assets.indexOf(a) + 1} ${a.type}: mata uang ${currency} dari sumber tidak sama dengan ${want} yang diharapkan`);
     series.set(keyOf(a), points);
   }
   const needFx = assets.some((a) => a.buyDate && (currencyOf(a) === 'USD' || a.type === 'gold' || a.type === 'crypto'));
@@ -39,6 +48,8 @@ async function main() {
 
   // shortcut: satu kali coba; bila Google sedang error, jalankan ulang workflow-nya.
   const { assets, history } = await call(url, token, 'list');
+  secrets = sensitiveStrings(assets);
+  if (QUIET) for (const l of maskLines(secrets)) console.log(l); // sebelum apa pun yang bisa memuat kode aset
   validateHoldings({ assets });
 
   const date = process.env.SNAPSHOT_DATE || dateInTz(Date.now(), 'Asia/Jakarta');
@@ -52,7 +63,8 @@ async function main() {
       const { series, fxSeries } = await loadSeries(assets, dates[0], dates[dates.length - 1]);
       const snaps = buildBackfill({ assets, dates, series, fxSeries });
       const skipped = dates.length - snaps.length;
-      console.log(`Riwayat mundur: ${snaps.length} hari (${dates[0]} → ${dates[dates.length - 1]})${skipped ? `, ${skipped} hari dilewati (tak ada harga)` : ''}${DRY ? ' [dry-run: tidak disimpan]' : ''}`);
+      // Jumlah hari riwayat = hari ini dikurangi tanggal beli paling awal, jadi di Actions angkanya tidak dicetak.
+      log(QUIET ? 'Riwayat mundur: diisi' : `Riwayat mundur: ${snaps.length} hari (${dates[0]} → ${dates[dates.length - 1]})${skipped ? `, ${skipped} hari dilewati (tak ada harga)` : ''}${DRY ? ' [dry-run: tidak disimpan]' : ''}`);
       hist = [...snaps, ...history]; // dipakai untuk "Hari ini" walau penyimpanan di bawah gagal
       if (!DRY) {
         // Terbaru dulu: bila terputus di tengah, yang tersimpan tetap menyambung ke riwayat yang ada,
@@ -83,21 +95,23 @@ async function main() {
   }
 
   const snap = buildSnapshot({ date, assets, quotes, fx, prev });
+  snap.at = new Date().toISOString(); // kapan harga diambil; dasbor menampilkannya sebagai "diperbarui ..."
 
-  // Log Actions bisa terbaca orang lain bila repo publik: tampilkan persentase saja, tanpa nominal rupiah.
-  const pct = (v) => (v == null ? '   –  ' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`.padStart(8));
-  console.log(`Snapshot ${date} — ${snap.positions.length} aset`);
-  for (const p of snap.positions) {
-    console.log(`  ${keyOf(p).padEnd(16)} bobot ${(p.weight * 100).toFixed(1).padStart(5)}%  P/L ${pct(p.pnlPct)}  hari ini ${pct(p.dayPct)}  per ${p.asOf}${p.stale ? '  (harga lama)' : ''}`);
+  log(`Snapshot ${date} — ${snap.positions.length} aset`);
+  if (!QUIET) {
+    const pct = (v) => (v == null ? '   –  ' : `${v >= 0 ? '+' : ''}${(v * 100).toFixed(2)}%`.padStart(8));
+    for (const p of snap.positions) {
+      console.log(`  ${keyOf(p).padEnd(16)} bobot ${(p.weight * 100).toFixed(1).padStart(5)}%  P/L ${pct(p.pnlPct)}  hari ini ${pct(p.dayPct)}  per ${p.asOf}${p.stale ? '  (harga lama)' : ''}`);
+    }
+    console.log(`  TOTAL P/L ${pct(snap.pnlPct).trim()}, hari ini ${pct(snap.dayPct).trim()}`);
   }
-  console.log(`  TOTAL P/L ${pct(snap.pnlPct).trim()}, hari ini ${pct(snap.dayPct).trim()}`);
 
-  if (DRY) return console.log('(dry-run: tidak disimpan)');
+  if (DRY) return log('(dry-run: tidak disimpan)');
   const { days } = await call(url, token, 'appendSnapshot', { snapshot: snap });
-  console.log(`Tersimpan di Sheet (${days} hari riwayat)`);
+  log(QUIET ? 'Tersimpan di Sheet' : `Tersimpan di Sheet (${days} hari riwayat)`);
 }
 
 main().catch((e) => {
-  console.error(`\nGAGAL: ${e.message}`);
+  console.error(`\nGAGAL: ${clean(e.message)}`);
   process.exit(1);
 });

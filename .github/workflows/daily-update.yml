@@ -2,8 +2,11 @@ name: Update harga harian
 
 on:
   schedule:
-    # 00:30 UTC = 07:30 WIB: setelah IDX (tutup ±16.00 WIB) dan bursa AS (tutup ±03.00-04.00 WIB) sama-sama selesai.
-    - cron: "30 0 * * *"
+    # 4 kali sehari. UTC -> WIB (+7): 18.30 -> 01.30, 00.30 -> 07.30, 06.30 -> 13.30, 12.30 -> 19.30.
+    # 07.30 menangkap penutupan bursa AS (tutup ±03.00-04.00 WIB) dan kripto pagi; 19.30 menangkap penutupan
+    # IDX (tutup ±16.00 WIB); 13.30 dan 01.30 memberi pembaruan di tengah sesi. Satu tanggal tetap satu snapshot:
+    # run berikutnya di hari yang sama menimpanya. GitHub boleh terlambat beberapa menit.
+    - cron: "30 0,6,12,18 * * *"
   workflow_dispatch: {} # tombol "Run workflow" manual
 
 permissions:

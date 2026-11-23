@@ -27,6 +27,8 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
   const lastPos = new Map(((lastKnown && lastKnown.positions) || []).map((p) => [`${p.type}:${p.symbol}`, p]));
   const quotes = new Map();
   const problems = [];
+  // Pesan memakai nomor aset (urutan di Sheet), bukan kode saham: log Actions di repo publik bisa dibaca orang lain.
+  const who = (a) => `#${assets.indexOf(a) + 1} ${a.type}`;
 
   const firstOk = async (label, attempts) => {
     let lastErr;
@@ -87,19 +89,19 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
         if (!q) {
           // Cadangan: harga USD dari Yahoo (mis. BTC-USD) dikali kurs.
           const ySym = yahooSymbol(a);
-          warn(`${key}: tidak ada harga dari CoinGecko, mencoba Yahoo ${ySym}`);
+          warn(`${who(a)}: tidak ada harga dari CoinGecko, mencoba Yahoo`);
           const y = await src.yahoo(ySym);
-          if (y.currency && y.currency !== 'USD') throw new Error(`Yahoo ${ySym} bermata uang ${y.currency}, bukan USD`);
+          if (y.currency && y.currency !== 'USD') throw new Error(`Yahoo bermata uang ${y.currency}, bukan USD`);
           q = { price: y.price * requireFx(), asOf: y.asOf };
         }
       } else if (a.type === 'gold') {
-        const oz = await firstOk(key, [['Yahoo GC=F', () => src.yahoo(yahooSymbol(a))], ['Stooq xauusd', () => src.stooq('xauusd')]]);
+        const oz = await firstOk(who(a), [['Yahoo GC=F', () => src.yahoo(yahooSymbol(a))], ['Stooq xauusd', () => src.stooq('xauusd')]]);
         q = { price: (oz.price * requireFx()) / OZ_GRAM, asOf: oz.asOf }; // USD/ons -> IDR/gram
       } else {
         const ySym = yahooSymbol(a);
         const attempts = [['Yahoo', () => src.yahoo(ySym)]];
         if (a.type === 'us') attempts.push(['Stooq', () => src.stooq(`${a.symbol.toLowerCase().replace('.', '-')}.us`)]);
-        q = await firstOk(key, attempts);
+        q = await firstOk(who(a), attempts);
         if (q.currency && q.currency !== cur) {
           throw new Error(`mata uang ${q.currency} dari sumber data tidak sama dengan ${cur} yang diharapkan untuk type "${a.type}"`);
         }
@@ -109,10 +111,10 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
     } catch (e) {
       const old = lastPos.get(key);
       if (old && old.price > 0) {
-        warn(`${key}: gagal diambil (${e.message}); memakai harga terakhir per ${old.asOf}`);
+        warn(`${who(a)}: gagal diambil (${e.message}); memakai harga terakhir per ${old.asOf}`);
         quotes.set(key, { price: old.price, asOf: old.asOf, stale: true });
       } else {
-        problems.push(`${key}: ${e.message}`);
+        problems.push(`${who(a)}: ${e.message}`);
       }
     }
   }
@@ -122,7 +124,7 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
     for (const a of assets) {
       if (currencyOf(a) === 'USD' && quotes.has(keyOf(a))) {
         quotes.delete(keyOf(a));
-        problems.push(`${keyOf(a)}: butuh kurs USD/IDR${fxErr ? ` (${fxErr})` : ''}`);
+        problems.push(`${who(a)}: butuh kurs USD/IDR${fxErr ? ` (${fxErr})` : ''}`);
       }
     }
   }
