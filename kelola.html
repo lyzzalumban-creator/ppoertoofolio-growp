@@ -42,21 +42,22 @@
           <option value="us">Saham AS</option>
           <option value="crypto">Kripto</option>
           <option value="gold">Emas</option>
-          <option value="manual">Lainnya (reksa dana, deposito, kas)</option>
+          <option value="cash">Kas (rekening, dompet, tunai)</option>
+          <option value="manual">Lainnya (reksa dana, deposito)</option>
         </select>
       </label>
       <label class="field"><span id="l-symbol">Kode</span><input id="f-symbol" autocomplete="off" autocapitalize="characters"></label>
       <label class="field"><span>Nama (opsional)</span><input id="f-name" autocomplete="off"></label>
       <label class="field" data-for="crypto"><span>ID CoinGecko (mis. bitcoin)</span><input id="f-coingeckoId" autocomplete="off" autocapitalize="none"></label>
       <label class="field"><span id="l-qty">Jumlah</span><input id="f-qty" type="number" step="any" min="0" inputmode="decimal"></label>
-      <label class="field"><span id="l-cost">Harga beli rata-rata</span><input id="f-avgCost" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field" data-not="cash"><span id="l-cost">Harga beli rata-rata</span><input id="f-avgCost" type="number" step="any" min="0" inputmode="decimal"></label>
       <label class="field" id="buy-field"><span>Tanggal beli (opsional; bila beli beberapa kali, isi yang pertama)</span><input id="f-buyDate" type="date"></label>
       <label class="field" data-for="manual"><span>Harga per unit saat ini (kamu perbarui sendiri)</span><input id="f-price" type="number" step="any" min="0" inputmode="decimal"></label>
-      <label class="field" data-for="manual"><span>Mata uang</span>
+      <label class="field" data-for="manual cash"><span>Mata uang</span>
         <select id="f-currency"><option value="IDR">Rupiah (IDR)</option><option value="USD">Dolar (USD)</option></select>
       </label>
 
-      <details class="adv">
+      <details class="adv" data-not="cash">
         <summary>Opsi lanjutan</summary>
         <label class="field"><span>Total modal dalam rupiah (isi bila ingin untung/rugi aset dolar memperhitungkan kurs saat beli)</span><input id="f-costIdr" type="number" step="any" min="0" inputmode="decimal"></label>
         <label class="field"><span>Simbol Yahoo Finance (hanya bila ticker tidak biasa, mis. BRK-B)</span><input id="f-yahoo" autocomplete="off" autocapitalize="characters"></label>

@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.goto(`${BASE}/index.html`);
     await connect(page, { token: fake.token });
     await page.waitForSelector('#dash:not([hidden])');
-    check('B1 3 kartu KPI (utama + 2), 9 baris aset, 5 jenis di legenda', (await page.locator('.kpi').count()) === 3 && (await page.locator('#holdings > li').count()) === 9 && (await page.locator('.lg').count()) === 5);
+    check('B1 3 kartu KPI (utama + 2), 9 baris aset, 6 jenis di legenda', (await page.locator('.kpi').count()) === 3 && (await page.locator('#holdings > li').count()) === 9 && (await page.locator('.lg').count()) === 6);
     await nav(page, 'aset');
     const bbcaRow = await page.locator('#holdings > li', { hasText: 'BBCA' }).innerText();
     check('B13 dasbor menampilkan tanggal beli dan lama dimiliki', /dibeli 3 Mar 2025 \(20 bln\)/.test(bbcaRow), bbcaRow.replace(/\n/g, ' | ').slice(0, 110));
@@ -492,7 +492,7 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     check('I8 Kinerja: 4 metrik; return tertimbang waktu = hitungan berantai dari dayPct', tiles.length === 4 && tiles[0].includes(p2(returnIndex(hist).at(-1).idx - 1)), tiles[0].replace(/\n/g, ' '));
     check('I9 kalender: satu kotak per bulan (maks. 12) dengan panah dan tanda', (await page.locator('#months .mo').count()) === Math.min(12, months.length) && (await page.locator('#months .mo').last().innerText()).includes(p2(months.at(-1).ret)));
     const prOrder = (await page.locator('#perf .pr-n').allInnerTexts()).join();
-    check('I10 untung/rugi per aset: satu batang per aset, terurut dari tertinggi', prOrder === want((a, b) => b.pnlPct - a.pnlPct), prOrder);
+    check('I10 untung/rugi per aset: satu batang per aset (tanpa Kas), terurut dari tertinggi', prOrder === [...L.positions].filter((p) => p.type !== 'cash').sort((a, b) => b.pnlPct - a.pnlPct).map((p) => p.symbol).join(), prOrder);
     await nav(page, 'beranda');
     check('I11 kartu "Bulan ini" sama dengan bulan terakhir di kalender', (await page.locator('.kpi', { hasText: 'Bulan ini' }).innerText()).includes(p2(months.at(-1).ret)));
     check('I12 tanpa error konsol', errors.length === 0, errors.join(' | '));
@@ -520,11 +520,17 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     const hrefs = await page.locator('#types a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
     check('K2 Alokasi: satu baris per jenis, urut dari nilai terbesar, tiap baris menaut ke Aset terfilter', JSON.stringify(hrefs) === JSON.stringify(tOrder.map((t) => `#/aset/${t}`)), hrefs.join());
     check('K2b untung/rugi jenis terbesar = hitungan dari posisi', (await page.locator('#types a').first().innerText()).includes(p2(ts[tOrder[0]].pnlPct)));
-    const c = stats.concentration(L.positions);
+    const c = stats.concentration(L.positions.filter((p) => p.type !== 'cash'));
+    const split = stats.cashSplit(L);
     const ct = await page.locator('#conc .tile').allInnerTexts();
-    check('K3 konsentrasi: 3 aset terbesar dan "setara N aset" sesuai hitungan', ct.length === 4 && ct[0].includes(p1(c.top3)) && ct[1].includes(`${c.effective.toLocaleString('id-ID', { maximumFractionDigits: 1 })} aset`), ct.slice(0, 2).join(' | ').replace(/\n/g, ' '));
+    check('K3 Alokasi: Kas, Diinvestasikan, lalu 3 aset terbesar dan "setara N aset" (di luar kas) sesuai hitungan', ct.length === 4 && /^Kas/.test(ct[0]) && ct[0].includes(p1(split.weight)) && /^Diinvestasikan/.test(ct[1]) && ct[2].includes(p1(c.top3)) && ct[3].includes(`${c.effective.toLocaleString('id-ID', { maximumFractionDigits: 1 })} aset`), ct.join(' | ').replace(/\n/g, ' '));
+    check('K3b baris jenis Kas tidak menampilkan untung/rugi (selalu nol)', !/[▲▼]|0,00%/.test(await page.locator('#types a[href="#/aset/cash"]').innerText()));
+
+    await goto(page, '#/analisis/kinerja');
+    check('K3c batang untung/rugi per aset tidak memuat Kas', !(await page.locator('#perf .pr-n').allInnerTexts()).includes('KAS'));
 
     // Risiko
+    await goto(page, '#/analisis/alokasi');
     await page.locator('#subnav').getByRole('link', { name: 'Risiko' }).click();
     await routed(page, 'analisis/risiko');
     const r = stats.riskStats(hist);
@@ -615,7 +621,7 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     const pctTxt = (w) => `${(w * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
 
     // Sorotan
-    const top = [...L.positions].filter((p) => p.type !== 'manual').sort((a, b) => b.weight - a.weight)[0];
+    const top = [...L.positions].filter((p) => !['manual', 'cash'].includes(p.type)).sort((a, b) => b.weight - a.weight)[0];
     const ins = await page.locator('#insight-list').innerText();
     check('J1 sorotan: aset terbesar (≥30%) diperingatkan dengan bobotnya, tanpa nominal', top.weight >= 0.3 && ins.includes(top.name) && ins.includes(pctTxt(top.weight)) && !/Rp|\d{1,3}(\.\d{3}){2,}/.test(ins), ins.replace(/\n/g, ' '));
     check('J1b sorotan punya judul tersembunyi untuk pembaca layar dan tidak menyaingi tab', (await page.locator('#ins-h').innerText()) === 'Perlu diperhatikan');
@@ -695,6 +701,105 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.waitForSelector('#dash:not([hidden])');
     check('J13 portofolio seimbang: tidak ada sorotan sama sekali', !(await page.locator('#insights').isVisible()) && (await page.locator('.insight').count()) === 0);
     check('J14 satu hari data: pergerakan hari ini memberi tahu belum ada pembanding', /Belum ada pergerakan/.test(await page.locator('#movers').innerText()) && (await page.locator('.mv-group').count()) === 0);
+    await ctx.close();
+  }
+
+  // ============ L. Kas ============
+  {
+    // Form Kelola: jenis Kas hanya label, saldo, dan mata uang
+    const { ctx, page, fake, errors } = await newPage();
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fake.token });
+    await page.waitForSelector('#dash:not([hidden])');
+    await page.locator('#nav-kelola').click();
+    await page.waitForSelector('#list-card:not([hidden])');
+    const list = () => fake.call({ token: fake.token, action: 'list' }).assets;
+    const kas = (await page.locator('#assets li', { hasText: 'KAS' }).innerText()).replace(/\s+/g, ' ');
+    check('L1 Kas contoh tampil sebagai Kas dengan saldo (bukan harga/modal)', /Kas · KAS · saldo Rp\s?3\.000\.000/.test(kas) && !/modal/.test(kas), kas);
+
+    await page.getByRole('button', { name: '+ Tambah aset' }).click();
+    // Isi dulu sebagai saham lalu ganti ke Kas: kolom yang sempat terisi tidak boleh ikut tersimpan.
+    await page.selectOption('#f-type', 'idx');
+    await page.fill('#f-avgCost', '9999');
+    await page.fill('#f-buyDate', '2025-01-01');
+    await page.selectOption('#f-type', 'cash');
+    const shown = async (sels) => Promise.all(sels.map((q) => page.locator(q).isVisible()));
+    const yes = await shown(['#f-symbol', '#f-name', '#f-qty', '#f-currency']);
+    const no = await shown(['#f-avgCost', '#f-buyDate', '#f-price', '#f-coingeckoId', '#form .adv']);
+    check('L2 jenis Kas: hanya label, nama, saldo, mata uang; harga beli, tanggal, harga, ID CoinGecko, opsi lanjutan tersembunyi', yes.every(Boolean) && no.every((v) => !v), `tampil ${yes} | tersembunyi ${no}`);
+    check('L2b label menyesuaikan jenis: "Label" dan "Saldo"', /^Label/.test(await page.locator('#l-symbol').innerText()) && /^Saldo/.test(await page.locator('#l-qty').innerText()));
+    await page.fill('#f-symbol', 'dolar');
+    await page.fill('#f-qty', '0');
+    await page.selectOption('#f-currency', 'USD');
+    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.waitForSelector('#f-err:not([hidden])');
+    check('L3 saldo 0 ditolak dengan pesan jelas, dialog tetap terbuka, Sheet tidak berubah', /qty harus/.test(await page.locator('#f-err').innerText()) && (await page.locator('#dlg').evaluate((d) => d.open)) && list().length === 9);
+    await page.fill('#f-qty', '1500');
+    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    const usd = list().find((a) => a.symbol === 'dolar');
+    check('L4 Kas dolar tersimpan: label apa adanya (tidak dibesarkan), saldo, USD; tanpa harga beli, harga, tanggal', !!usd && usd.type === 'cash' && usd.qty === 1500 && usd.currency === 'USD' && !usd.avgCost && !usd.price && !usd.buyDate, JSON.stringify(usd));
+    check('L4b daftar menampilkan saldo dalam dolar', /saldo US\$\s?1\.500,00/.test((await page.locator('#assets li', { hasText: 'dolar' }).innerText()).replace(/\s+/g, ' ')));
+
+    // ubah: terisi ulang, lalu ganti jenis memunculkan kembali kolom yang disembunyikan
+    const idx = list().findIndex((a) => a.symbol === 'dolar');
+    await page.locator(`[data-edit="${idx}"]`).click();
+    check('L5 ubah Kas: jenis, saldo, dan mata uang terisi ulang', (await page.inputValue('#f-type')) === 'cash' && (await page.inputValue('#f-qty')) === '1500' && (await page.inputValue('#f-currency')) === 'USD');
+    await page.selectOption('#f-type', 'idx');
+    check('L5b ganti jenis ke Saham IDX: harga beli dan tanggal muncul lagi', (await page.locator('#f-avgCost').isVisible()) && (await page.locator('#f-buyDate').isVisible()));
+    await page.selectOption('#f-type', 'cash');
+    await page.fill('#f-qty', '2000');
+    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    const after = list().find((a) => a.symbol === 'dolar');
+    check('L5c saldo diubah dan tetap Kas dolar tanpa kolom lain', after.qty === 2000 && after.type === 'cash' && after.currency === 'USD' && !after.avgCost);
+    check('L6 tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  {
+    // Tampilan Kas: 2 kas (rupiah + dolar) dan 1 saham. Kas dikecualikan dari konsentrasi dan batang untung/rugi.
+    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+    const fk = createFake();
+    const assets = [
+      { type: 'cash', symbol: 'BCA', name: 'Rekening BCA', qty: 5_000_000 },
+      { type: 'cash', symbol: 'DOLAR', qty: 1000, currency: 'USD' },
+      { type: 'idx', symbol: 'BBCA', qty: 100, avgCost: 9000 },
+    ];
+    fk.call({ token: fk.token, action: 'saveAssets', assets });
+    const quotes = new Map([['cash:BCA', { price: 1, asOf: '2026-11-23' }], ['cash:DOLAR', { price: 1, asOf: '2026-11-23' }], ['idx:BBCA', { price: 10_000, asOf: '2026-11-23' }]]);
+    fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...buildSnapshot({ date: '2026-11-23', assets, quotes, fx: 16_000 }), at: '2026-11-23T06:30:00Z' } });
+    const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+    const usdF = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'USD' });
+    const nb = (x) => x.replace(/\s/g, ' '); // Intl memakai spasi tak-terputus; teks halaman dinormalkan, jadi harapan juga
+    const secrets = [idr.format(21_000_000), idr.format(5_000_000), usdF.format(1000), idr.format(16_000_000), idr.format(22_000_000), idr.format(1_000_000)];
+
+    const { ctx, page, errors } = await newPage({ fake: fk });
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fk.token });
+    await page.waitForSelector('#dash:not([hidden])');
+    check('L7 Beranda: Kas masuk alokasi (95,5%), dan kas yang mendominasi TIDAK memicu sorotan konsentrasi', /Kas\s*95,5%/.test((await page.locator('#legend').innerText()).replace(/\s+/g, ' ')) && !(await page.locator('#insights').isVisible()));
+
+    await goto(page, '#/aset/cash');
+    check('L8 Aset > Kas: dua baris; chip "Kas (2)" aktif', (await page.locator('#holdings details').count()) === 2 && /Kas \(2\)/.test(await page.locator('#chips a[aria-current="page"]').innerText()));
+    await page.evaluate(() => document.querySelectorAll('#holdings details').forEach((d) => { d.open = true; }));
+    const bca = (await page.locator('#holdings li', { hasText: 'Rekening BCA' }).innerText()).replace(/\s+/g, ' ');
+    const dol = (await page.locator('#holdings li', { hasText: 'DOLAR' }).innerText()).replace(/\s+/g, ' ');
+    check('L8b rincian Kas rupiah: hanya Saldo (tanpa Harga, Modal, Untung/rugi)', bca.includes(nb(`Saldo ${idr.format(5_000_000)}`)) && !/Harga|Modal|Untung/.test(bca), bca);
+    check('L8c rincian Kas dolar: saldo dalam dolar, setara rupiah, dan kurs', dol.includes(nb(`Saldo ${usdF.format(1000)}`)) && dol.includes(nb(`Setara rupiah ${idr.format(16_000_000)}`)) && dol.includes(nb(`kurs ${idr.format(16_000)}`)), dol);
+
+    await goto(page, '#/analisis/alokasi');
+    const t = (await page.locator('#conc .tile').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '));
+    check('L9 Alokasi: Kas = rekening + dolar, Diinvestasikan = saham saja', t[0].includes(nb(idr.format(21_000_000))) && t[0].includes('95,5%') && t[1].includes(nb(idr.format(1_000_000))), t.join(' | '));
+    check('L9b konsentrasi dihitung di antara yang diinvestasikan: satu saham = "setara 1 aset", 100%', t[2].includes('100%') && t[3].includes('1 aset'), t[2] + ' | ' + t[3]);
+    await goto(page, '#/analisis/kinerja');
+    check('L9c batang untung/rugi hanya saham (Kas tidak ikut)', (await page.locator('#perf .pr-n').allInnerTexts()).join() === 'BBCA');
+
+    const normal = await page.locator('main').textContent();
+    check('L10 kontrol: saat nominal tampil, saldo kas ada di halaman', secrets.filter((x) => normal.includes(x)).length >= 4);
+    await page.locator('#privacy').click();
+    const hid = await page.locator('main').textContent();
+    check('L10b nominal tersembunyi: saldo kas (rupiah dan dolar), setaranya, kas total, dan total tidak bocor di halaman mana pun', secrets.filter((x) => hid.includes(x)).length === 0, secrets.filter((x) => hid.includes(x)).join(','));
+    check('L11 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 

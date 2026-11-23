@@ -19,6 +19,7 @@
   --c-us: light-dark(#0f766e, #4fd1c5);
   --c-crypto: light-dark(#a23b72, #f08bc0);
   --c-gold: light-dark(#b7791f, #e8b04a);
+  --c-cash: light-dark(#5f7a36, #b9d072);
   --c-manual: light-dark(#7c7268, #b3aaa0);
   /* kartu utama: gelap di kedua tema */
   --hero-from: light-dark(#262d6b, #2a3175);

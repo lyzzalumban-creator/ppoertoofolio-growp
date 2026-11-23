@@ -111,3 +111,43 @@ test('buildSnapshot membawa buyDate ke posisi, dan tidak menambahkannya bila kos
   assert.equal(s.positions.find((p) => p.symbol === 'BBCA').buyDate, '2025-03-03');
   assert.ok(!('buyDate' in s.positions.find((p) => p.symbol === 'AAPL')));
 });
+
+// ---------- kas ----------
+
+test('kas: cukup label, saldo, dan (opsional) mata uang; tanpa avgCost atau price', () => {
+  assert.doesNotThrow(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 5_000_000 }] }));
+  assert.doesNotThrow(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'USD', qty: 1500, currency: 'USD' }] }));
+});
+
+test('kas: saldo harus > 0, mata uang hanya IDR/USD, label tidak boleh kembar', () => {
+  assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 0 }] }), /qty harus/);
+  assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 1, currency: 'EUR' }] }), /currency harus IDR atau USD/);
+  assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 1 }, { type: 'cash', symbol: 'BCA', qty: 2 }] }), /duplikat/);
+});
+
+test('jenis lain tetap wajib avgCost (kelonggaran hanya untuk kas)', () => {
+  assert.throws(() => validateHoldings({ assets: [{ type: 'idx', symbol: 'BBCA', qty: 1 }] }), /avgCost/);
+});
+
+test('buildSnapshot: kas rupiah = nilai sebesar saldo, untung/rugi nol, masuk byType.cash', () => {
+  const assets = [{ type: 'cash', symbol: 'BCA', qty: 5_000_000 }, { type: 'idx', symbol: 'BBCA', qty: 100, avgCost: 9000 }];
+  const q = new Map([['cash:BCA', { price: 1, asOf: '2026-11-23' }], ['idx:BBCA', { price: 10_000, asOf: '2026-11-23' }]]);
+  const s = buildSnapshot({ date: '2026-11-23', assets, quotes: q, fx: null });
+  const c = s.positions.find((p) => p.type === 'cash');
+  assert.deepEqual([c.value, c.cost, c.pnl, c.pnlPct, c.currency], [5_000_000, 5_000_000, 0, 0, 'IDR']);
+  assert.equal(s.total, 6_000_000);
+  assert.equal(s.cost, 5_900_000, 'modal total = modal kas (= saldonya) + modal saham');
+  assert.equal(s.byType.cash.value, 5_000_000);
+  assert.ok(Math.abs(s.byType.cash.weight - 5 / 6) < 1e-5);
+});
+
+test('buildSnapshot: kas dolar ikut kurs di nilai, tetap tanpa untung/rugi, dan butuh kurs', () => {
+  const assets = [{ type: 'cash', symbol: 'USD', qty: 1000, currency: 'USD' }];
+  const q = new Map([['cash:USD', { price: 1, asOf: '2026-11-24' }]]);
+  const d1 = buildSnapshot({ date: '2026-11-23', assets, quotes: q, fx: 16_000 });
+  const d2 = buildSnapshot({ date: '2026-11-24', assets, quotes: q, fx: 16_160, prev: d1 });
+  assert.equal(d2.total, 16_160_000);
+  assert.equal(d2.pnl, 0, 'kurs naik tidak dihitung sebagai untung/rugi aset kas');
+  assert.ok(Math.abs(d2.dayPct - 0.01) < 1e-9, 'perubahan harian mengikuti kurs');
+  assert.throws(() => buildSnapshot({ date: '2026-11-24', assets, quotes: q, fx: null }), /Kurs USD\/IDR dibutuhkan/);
+});

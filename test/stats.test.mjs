@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { byTypePnl, concentration, currentDrawdown, dayMovers, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, riskStats, sortPositions } from '../assets/stats.js';
+import { byTypePnl, cashSplit, concentration, currentDrawdown, dayMovers, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, riskStats, sortPositions } from '../assets/stats.js';
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ''} ${a} != ${b}`);
 const snap = (date, dayPct) => ({ date, dayPct });
@@ -176,4 +176,16 @@ test('byTypePnl: dijumlah per jenis; modal 0 = persen kosong', () => {
   near(r.us.pnlPct, -0.1);
   assert.equal(r.manual.pnlPct, null);
   assert.equal(Object.keys(r).length, 3);
+});
+
+test('insights: kas tidak dianggap konsentrasi walau mendominasi', () => {
+  const snap = { positions: [P('BCA', { type: 'cash', weight: 0.9 }), P('BBCA', { weight: 0.1 })], byType: { cash: { weight: 0.9 }, idx: { weight: 0.1 } } };
+  assert.deepEqual(insights(snap, { cash: 'Kas', idx: 'Saham IDX' }, pt), []);
+});
+
+test('cashSplit: kas, yang diinvestasikan, dan porsi kas; tanpa kas = 0', () => {
+  const r = cashSplit({ total: 1000, byType: { cash: { value: 250 }, idx: { value: 750 } } });
+  assert.deepEqual([r.cash, r.invested, r.weight], [250, 750, 0.25]);
+  assert.deepEqual(cashSplit({ total: 500, byType: { idx: { value: 500 } } }), { cash: 0, invested: 500, weight: 0 });
+  assert.deepEqual(cashSplit({ total: 0, byType: {} }), { cash: 0, invested: 0, weight: 0 });
 });

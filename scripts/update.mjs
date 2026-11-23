@@ -31,7 +31,7 @@ async function loadSeries(assets, from, to) {
   const start = addDays(from, -10); // cadangan: akhir pekan/libur tepat sebelum tanggal pertama
   const series = new Map();
   for (const a of assets) {
-    if (!a.buyDate || a.type === 'manual') continue;
+    if (!a.buyDate || a.type === 'manual' || a.type === 'cash') continue;
     const { points, currency } = await fetchYahooSeries(yahooSymbol(a), start, to);
     const want = a.type === 'idx' ? 'IDR' : 'USD'; // us, kripto (X-USD), dan emas (GC=F) semuanya dalam dolar
     if (currency && currency !== want) throw new Error(`#${assets.indexOf(a) + 1} ${a.type}: mata uang ${currency} dari sumber tidak sama dengan ${want} yang diharapkan`);

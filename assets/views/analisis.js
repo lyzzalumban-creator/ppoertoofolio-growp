@@ -1,6 +1,6 @@
 // Analisis: Kinerja, Alokasi, Risiko, Riwayat. Semua dihitung dari riwayat snapshot di browser.
 import { $, ORDER, TYPE, arrow, delta, esc, fDay, fMonth, latest, longDate, money, monthName, pct, state, symDisp, tile, toMs, tone, weightText } from '../lib.js';
-import { byTypePnl, concentration, currentDrawdown, riskStats } from '../stats.js';
+import { byTypePnl, cashSplit, concentration, currentDrawdown, riskStats } from '../stats.js';
 
 const SUBS = ['kinerja', 'alokasi', 'risiko', 'riwayat'];
 const PAGE = 30;
@@ -35,7 +35,8 @@ function renderKinerja() {
   }
 
   // Batang untung/rugi per aset, berpusat di nol bila ada yang rugi.
-  const rows = (latest().positions || []).filter((p) => p.pnlPct != null).sort((a, b) => b.pnlPct - a.pnlPct);
+  // Kas tidak ikut: untung/ruginya selalu nol, hanya mengotori batang.
+  const rows = (latest().positions || []).filter((p) => p.pnlPct != null && p.type !== 'cash').sort((a, b) => b.pnlPct - a.pnlPct);
   const lo = Math.min(0, ...rows.map((p) => p.pnlPct));
   const hi = Math.max(0, ...rows.map((p) => p.pnlPct));
   const span = hi - lo || 1;
@@ -52,19 +53,22 @@ function renderKinerja() {
 // -- Alokasi: seberapa menumpuk, dan untung/rugi per jenis --
 
 function renderAlokasi() {
-  const pos = latest().positions || [];
-  const c = concentration(pos);
-  const big = [...pos].sort((a, b) => b.weight - a.weight)[0];
+  const L = latest();
+  const pos = L.positions || [];
+  const split = cashSplit(L);
+  const invested = pos.filter((p) => p.type !== 'cash'); // konsentrasi dihitung di antara yang diinvestasikan, tanpa kas
+  const c = concentration(invested);
   const stats = byTypePnl(pos);
   const types = ORDER.filter((t) => stats[t]).sort((a, b) => stats[b].value - stats[a].value);
   const total = types.reduce((s, t) => s + stats[t].value, 0) || 1;
-  const topType = types[0];
-  $('conc').innerHTML = c ? [
-    tile('3 aset terbesar', weightText(c.top3), 'dari total nilai'),
-    tile('Setara', `${num1(c.effective)} aset`, `bila bobotnya sama rata (punya ${pos.length})`),
-    tile('Aset terbesar', weightText(big.weight), esc(big.name || big.symbol)),
-    tile('Jenis terbesar', weightText(stats[topType].value / total), esc(TYPE[topType].label)),
-  ].join('') : none('Belum ada aset.');
+  $('conc').innerHTML = [
+    tile('Kas', money(split.cash), split.cash ? `${weightText(split.weight)} dari total` : 'belum ada aset kas'),
+    tile('Diinvestasikan', money(split.invested), `${weightText(1 - split.weight)} dari total`),
+    ...(c ? [
+      tile('3 aset terbesar', weightText(c.top3), 'dari yang diinvestasikan, di luar kas'),
+      tile('Setara', `${num1(c.effective)} aset`, `bila bobotnya sama rata (punya ${invested.length})`),
+    ] : []),
+  ].join('');
 
   $('types').innerHTML = types.map((t) => {
     const s = stats[t];
@@ -72,7 +76,7 @@ function renderAlokasi() {
     return `<li><a class="ty" href="#/aset/${t}">
       <i class="dot" style="background:var(--c-${t})"></i>
       <span class="nm">${TYPE[t].label}<small>${s.count} aset · ${weightText(w)} dari total</small></span>
-      <span class="v"><b>${money(s.value)}</b>${delta(s.pnlPct)}</span>
+      <span class="v"><b>${money(s.value)}</b>${t === 'cash' ? '' : delta(s.pnlPct)}</span>
       <span class="bar" aria-hidden="true"><i style="width:${(w * 100).toFixed(1)}%;background:var(--c-${t})"></i></span></a></li>`;
   }).join('');
 }

@@ -159,3 +159,14 @@ test('yahooSymbol: idx, kripto, emas, dan penimpaan manual', () => {
   assert.equal(yahooSymbol({ type: 'gold', symbol: 'XAU' }), 'GC=F');
   assert.equal(yahooSymbol({ type: 'us', symbol: 'BRK.B', yahoo: 'BRK-B' }), 'BRK-B');
 });
+
+test('buildBackfill: kas = saldo (rupiah) atau saldo x kurs (dolar), tanpa deret harga', () => {
+  const a = [
+    { type: 'cash', symbol: 'BCA', qty: 5_000_000, buyDate: '2026-10-30' },
+    { type: 'cash', symbol: 'USD', qty: 1000, currency: 'USD', buyDate: '2026-10-30' },
+  ];
+  const [s] = buildBackfill({ assets: a, dates: ['2026-10-30'], series: new Map(), fxSeries: pts({ '2026-10-30': 16_000 }) });
+  assert.equal(s.positions.find((p) => p.symbol === 'BCA').value, 5_000_000);
+  assert.equal(s.positions.find((p) => p.symbol === 'USD').value, 16_000_000);
+  assert.equal(s.pnl, 0);
+});

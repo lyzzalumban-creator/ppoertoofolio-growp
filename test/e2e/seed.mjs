@@ -63,12 +63,10 @@ export const sampleAssets = [
     "avgCost": 4800000
   },
   {
-    "type": "manual",
+    "type": "cash",
     "symbol": "KAS",
     "name": "Kas",
-    "qty": 3000000,
-    "price": 1,
-    "avgCost": 1
+    "qty": 3000000
   }
 ].map((a) => (a.symbol === 'BBCA' ? { ...a, buyDate: '2025-03-03' } : a));
 

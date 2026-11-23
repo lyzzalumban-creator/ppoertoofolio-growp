@@ -12,6 +12,7 @@ const TYPE = {
   us: { label: 'Saham AS', unit: 'saham', symbol: 'Ticker (mis. AAPL)', qty: 'Jumlah saham (boleh pecahan)', cost: 'Harga beli rata-rata per saham (US$)' },
   crypto: { label: 'Kripto', unit: '', symbol: 'Simbol (mis. BTC)', qty: 'Jumlah koin', cost: 'Harga beli rata-rata per koin (Rp)' },
   gold: { label: 'Emas', unit: 'gram', symbol: 'Label (mis. XAU)', qty: 'Jumlah (gram)', cost: 'Harga beli rata-rata per gram (Rp)' },
+  cash: { label: 'Kas', unit: '', symbol: 'Label (mis. BCA, TUNAI, DOLAR)', qty: 'Saldo (dalam mata uang yang dipilih)', cost: '' },
   manual: { label: 'Lainnya', unit: 'unit', symbol: 'Label (mis. RDPU, DEPO, KAS)', qty: 'Jumlah unit (mis. 1 untuk deposito)', cost: 'Modal per unit' },
 };
 const NUM = ['qty', 'avgCost', 'price', 'costIdr'];
@@ -41,10 +42,12 @@ function renderList() {
   $('assets').innerHTML = assets.map((a, i) => {
     const t = TYPE[a.type] || { label: a.type, unit: '' };
     const qty = `${fNum.format(a.qty)}${t.unit ? ` ${t.unit}` : ''}`;
-    const fmt = (a.type === 'us' || (a.type === 'manual' && a.currency === 'USD')) ? fUsd : fIdr;
-    const meta = [t.label, a.symbol, qty, `modal ${fmt.format(a.avgCost)} per unit`, a.buyDate ? `dibeli ${longDate(a.buyDate)}` : null].filter(Boolean).join(' · ');
+    const fmt = (a.type === 'us' || ((a.type === 'manual' || a.type === 'cash') && a.currency === 'USD')) ? fUsd : fIdr;
+    const meta = a.type === 'cash'
+      ? [t.label, a.symbol, `saldo ${fmt.format(a.qty)}`]
+      : [t.label, a.symbol, qty, `modal ${fmt.format(a.avgCost)} per unit`, a.buyDate ? `dibeli ${longDate(a.buyDate)}` : null];
     return `<li><div class="asset-info"><i class="dot" style="background:var(--c-${esc(a.type)})"></i><div><strong>${esc(a.name || a.symbol)}</strong>
-        <small>${esc(meta)}</small></div></div>
+        <small>${esc(meta.filter(Boolean).join(' · '))}</small></div></div>
       <div class="row"><button class="btn" type="button" data-edit="${i}" aria-label="Ubah ${esc(a.name || a.symbol)}">Ubah</button><button class="btn" type="button" data-del="${i}" aria-label="Hapus ${esc(a.name || a.symbol)}">Hapus</button></div></li>`;
   }).join('') || '<li class="muted">Belum ada aset. Tekan “Tambah aset”.</li>';
   status(`${assets.length} aset tersimpan di Sheet`);
@@ -81,7 +84,10 @@ function syncType() {
   $('l-symbol').textContent = t.symbol;
   $('l-qty').textContent = t.qty;
   $('l-cost').textContent = t.cost;
-  for (const el of document.querySelectorAll('#form [data-for]')) el.hidden = el.dataset.for !== $('f-type').value;
+  const type = $('f-type').value;
+  for (const el of document.querySelectorAll('#form [data-for]')) el.hidden = !el.dataset.for.split(' ').includes(type);
+  for (const el of document.querySelectorAll('#form [data-not]')) el.hidden = el.dataset.not.split(' ').includes(type);
+  $('buy-field').hidden = oldScript || type === 'cash'; // kas tidak punya tanggal beli
 }
 
 function openForm(i) {
@@ -106,10 +112,12 @@ function readForm() {
   for (const k of NUM) { const v = $(`f-${k}`).valueAsNumber; if (Number.isFinite(v)) a[k] = v; }
   // Kolom yang tidak relevan untuk jenis ini tidak ikut disimpan.
   if (a.type !== 'crypto') delete a.coingeckoId;
-  if (a.type !== 'manual') { delete a.price; delete a.currency; }
+  if (a.type !== 'manual' && a.type !== 'cash') { delete a.price; delete a.currency; }
+  // Kas hanya label, saldo (qty), dan mata uang: kolom lain tidak ikut disimpan walau sempat terisi.
+  if (a.type === 'cash') for (const k of ['avgCost', 'price', 'costIdr', 'yahoo', 'buyDate', 'coingeckoId']) delete a[k];
   if (a.type === 'gold' && !a.symbol) a.symbol = 'XAU';
   // Kode pasar selalu huruf besar ("panw" -> PANW); label aset manual dibiarkan; ID CoinGecko huruf kecil.
-  if (a.type !== 'manual' && a.symbol) a.symbol = a.symbol.toUpperCase();
+  if (a.type !== 'manual' && a.type !== 'cash' && a.symbol) a.symbol = a.symbol.toUpperCase();
   if (a.yahoo) a.yahoo = a.yahoo.toUpperCase();
   if (a.coingeckoId) a.coingeckoId = a.coingeckoId.toLowerCase();
   if (oldScript) delete a.buyDate; // skrip lama membuang kolom ini diam-diam; jangan berpura-pura menyimpannya

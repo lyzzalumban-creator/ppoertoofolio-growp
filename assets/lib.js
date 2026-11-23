@@ -7,6 +7,7 @@ export const TYPE = {
   us: { label: 'Saham AS', unit: 'saham' },
   crypto: { label: 'Kripto', unit: '' },
   gold: { label: 'Emas', unit: 'gram' },
+  cash: { label: 'Kas', unit: '' },
   manual: { label: 'Lainnya', unit: 'unit' },
 };
 export const ORDER = Object.keys(TYPE);
@@ -94,8 +95,8 @@ export const arrow = (v) => (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '');
 export const delta = (v, digits) => (v == null ? '<span class="flat">–</span>' : `<span class="${tone(v)}">${arrow(v)}${pct(v, digits)}</span>`);
 export const weightText = (w) => `${(w * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
 
-// Kode aset pasar selalu huruf besar di tampilan (mis. "panw" -> PANW); label aset manual dibiarkan.
-export const symDisp = (p) => (p.type === 'manual' ? p.symbol : String(p.symbol).toUpperCase());
+// Kode aset pasar selalu huruf besar di tampilan (mis. "panw" -> PANW); label aset manual dan kas dibiarkan.
+export const symDisp = (p) => (p.type === 'manual' || p.type === 'cash' ? p.symbol : String(p.symbol).toUpperCase());
 export const assetName = (p) => (p.name && p.name !== p.symbol ? p.name : symDisp(p));
 
 // Lama dimiliki sampai tanggal data terakhir, dalam satuan yang enak dibaca.
