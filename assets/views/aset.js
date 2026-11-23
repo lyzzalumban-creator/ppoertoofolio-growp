@@ -39,6 +39,15 @@ function renderList() {
     const sub = [name !== sym ? sym : null, t.label, buy].filter(Boolean).join(' · ');
     const stale = p.stale ? `<span class="chip" title="Gagal diambil; memakai harga per ${esc(p.asOf)}">harga lama</span>` : '';
     const key = `${p.type}:${p.symbol}`;
+    // Kas: hanya saldo (dalam mata uangnya); harga, modal, dan untung/rugi tidak bermakna.
+    const det = p.type === 'cash'
+      ? `<div><dt>Saldo</dt><dd data-label="Saldo">${state.hidden ? MASK : priceFmt.format(p.qty)}</dd></div>
+        ${p.currency === 'USD' ? `<div><dt>Setara rupiah</dt><dd>${money(p.value)}<small>kurs ${esc(fIdr.format(latest().fx))}</small></dd></div>` : ''}`
+      : `<div><dt>Harga</dt><dd data-label="Harga" title="Harga per ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</dd></div>
+        <div><dt>Jumlah</dt><dd>${esc(qty)}</dd></div>
+        <div><dt>Untung/rugi</dt><dd>${delta(p.pnlPct)}<small>${esc(money(p.pnl, { sign: true }))}</small></dd></div>
+        <div><dt>Modal</dt><dd>${money(p.cost)}</dd></div>
+        ${p.buyDate ? `<div><dt>Dibeli</dt><dd>${esc(longDate(p.buyDate))}<small>${esc(heldText(p.buyDate).replace(/^ \(|\)$/g, ''))}</small></dd></div>` : ''}`;
     return `<li><details class="asset-row" data-key="${esc(key)}"${state.open.has(key) ? ' open' : ''}>
       <summary>
         <i class="dot" style="background:var(--c-${p.type})"></i>
@@ -48,11 +57,7 @@ function renderList() {
         <span class="a-bar"><span class="bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%"></i></span>${weightText(p.weight)} dari total</span>
       </summary>
       <dl class="a-det">
-        <div><dt>Harga</dt><dd data-label="Harga" title="Harga per ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</dd></div>
-        <div><dt>Jumlah</dt><dd>${esc(qty)}</dd></div>
-        <div><dt>Untung/rugi</dt><dd>${delta(p.pnlPct)}<small>${esc(money(p.pnl, { sign: true }))}</small></dd></div>
-        <div><dt>Modal</dt><dd>${money(p.cost)}</dd></div>
-        ${p.buyDate ? `<div><dt>Dibeli</dt><dd>${esc(longDate(p.buyDate))}<small>${esc(heldText(p.buyDate).replace(/^ \(|\)$/g, ''))}</small></dd></div>` : ''}
+        ${det}
       </dl></details></li>`;
   }).join('') || '<li class="muted">Tidak ada aset yang cocok.</li>';
 }

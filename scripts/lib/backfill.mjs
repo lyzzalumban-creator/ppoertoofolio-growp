@@ -44,6 +44,7 @@ export function closeOn(points, d) {
 
 // Harga satu aset pada satu tanggal, dalam mata uang aset itu; null bila belum bisa dihitung.
 function priceOn(a, date, series, fx) {
+  if (a.type === 'cash') return 1;
   if (a.type === 'manual') return a.price;
   const c = closeOn(series.get(keyOf(a)), date);
   if (c == null) return null;

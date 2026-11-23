@@ -69,16 +69,17 @@ export function dayMovers(rows, n = 3) {
   };
 }
 
-// Ambang konsentrasi. Aset "manual" (kas, deposito, reksa dana pasar uang) tidak dihitung: dominannya bukan risiko pasar.
+// Ambang konsentrasi. Kas dan aset "manual" (deposito, reksa dana pasar uang) tidak dihitung: dominannya bukan risiko pasar.
+const SAFE = ['cash', 'manual'];
 export const LIMIT = { asset: 0.3, type: 0.6 };
 
 /** Peringatan dari snapshot terbaru: [{ id, text }], paling penting dulu. Hanya persen, tanpa nominal. */
 export function insights(snap, labels, pctText) {
   const out = [];
-  const pos = (snap.positions || []).filter((p) => p.type !== 'manual');
+  const pos = (snap.positions || []).filter((p) => !SAFE.includes(p.type));
   const top = [...pos].sort((a, b) => b.weight - a.weight)[0];
   if (top && top.weight >= LIMIT.asset) out.push({ id: `asset:${top.type}:${top.symbol}`, text: `${top.name || top.symbol} menguasai ${pctText(top.weight)} dari total. Satu aset terlalu besar membuat portofolio mudah goyah.` });
-  const bt = Object.entries(snap.byType || {}).filter(([t]) => t !== 'manual').sort((a, b) => b[1].weight - a[1].weight)[0];
+  const bt = Object.entries(snap.byType || {}).filter(([t]) => !SAFE.includes(t)).sort((a, b) => b[1].weight - a[1].weight)[0];
   if (bt && bt[1].weight >= LIMIT.type) out.push({ id: `type:${bt[0]}`, text: `Alokasi condong ke ${labels[bt[0]] || bt[0]} (${pctText(bt[1].weight)}). Pertimbangkan jenis lain agar lebih seimbang.` });
   const stale = (snap.positions || []).filter((p) => p.stale).length; // semua jenis, termasuk manual
   if (stale) out.push({ id: 'stale', text: `${stale} aset memakai harga lama karena gagal diambil. Nilai total bisa meleset.` });
@@ -145,4 +146,10 @@ export function byTypePnl(rows) {
     t.pnlPct = t.cost > 0 ? t.pnl / t.cost : null;
   }
   return out;
+}
+
+/** Kas dan yang diinvestasikan (total di luar kas): { cash, invested, weight (porsi kas, 0..1) }. */
+export function cashSplit(snap) {
+  const cash = (snap.byType && snap.byType.cash && snap.byType.cash.value) || 0;
+  return { cash, invested: snap.total - cash, weight: snap.total > 0 ? cash / snap.total : 0 };
 }

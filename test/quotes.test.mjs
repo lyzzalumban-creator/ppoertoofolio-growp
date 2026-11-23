@@ -180,3 +180,14 @@ test('getUrl: error jaringan di-retry', async () => {
   try { assert.deepEqual(await getUrl('https://example.test/x', { wait: async () => {} }), { ok: true }); } finally { f.restore(); }
   assert.equal(f.count(), 2);
 });
+
+test('kas: harga selalu 1 tanpa menyentuh sumber data; kas dolar butuh kurs', async () => {
+  const idr = await run([{ type: 'cash', symbol: 'BCA', qty: 5_000_000 }]);
+  assert.deepEqual(idr.problems, []);
+  assert.deepEqual(idr.quotes.get('cash:BCA'), { price: 1, asOf: '2026-11-24' });
+  assert.equal(idr.fx, null, 'kas rupiah tidak memicu pengambilan kurs');
+  const usd = await run([{ type: 'cash', symbol: 'USD', qty: 1500, currency: 'USD' }]);
+  assert.deepEqual(usd.problems, []);
+  assert.equal(usd.fx, 16_000);
+  assert.deepEqual(usd.quotes.get('cash:USD'), { price: 1, asOf: '2026-11-24' });
+});

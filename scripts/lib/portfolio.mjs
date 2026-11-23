@@ -1,11 +1,12 @@
 // Logika murni (tanpa jaringan, tanpa file): validasi aset dan hitung snapshot harian.
 // Dipakai robot harian (Node) dan halaman Kelola (browser), jadi jangan impor modul Node di sini.
 
-export const TYPES = ['idx', 'us', 'crypto', 'gold', 'manual'];
+export const TYPES = ['idx', 'us', 'crypto', 'gold', 'cash', 'manual'];
 
-const DEFAULT_CURRENCY = { idx: 'IDR', us: 'USD', crypto: 'IDR', gold: 'IDR', manual: 'IDR' };
+const DEFAULT_CURRENCY = { idx: 'IDR', us: 'USD', crypto: 'IDR', gold: 'IDR', cash: 'IDR', manual: 'IDR' };
 
-export const currencyOf = (a) => (a.type === 'manual' ? a.currency || 'IDR' : DEFAULT_CURRENCY[a.type]);
+// Aset manual dan kas boleh berdolar; jenis lain mata uangnya tetap.
+export const currencyOf = (a) => (a.type === 'manual' || a.type === 'cash' ? a.currency || 'IDR' : DEFAULT_CURRENCY[a.type]);
 export const keyOf = (a) => `${a.type}:${a.symbol}`;
 
 /** Tanggal kalender nyata berformat YYYY-MM-DD (menolak 2025-02-30, 03/03/2025, dst). */
@@ -39,12 +40,13 @@ export function validateHoldings(h) {
     if (!TYPES.includes(a.type)) errs.push(`${where}: type harus salah satu dari ${TYPES.join(', ')}`);
     if (!a.symbol || typeof a.symbol !== 'string') errs.push(`${where}: symbol wajib diisi`);
     if (!(typeof a.qty === 'number' && a.qty > 0)) errs.push(`${where}: qty harus angka lebih dari 0`);
-    if (!(typeof a.avgCost === 'number' && a.avgCost >= 0)) errs.push(`${where}: avgCost harus angka 0 atau lebih`);
+    // Kas tidak punya harga beli: hanya saldo (qty) dan mata uang.
+    if (a.type !== 'cash' && !(typeof a.avgCost === 'number' && a.avgCost >= 0)) errs.push(`${where}: avgCost harus angka 0 atau lebih`);
     if (a.costIdr != null && !(typeof a.costIdr === 'number' && a.costIdr >= 0)) errs.push(`${where}: costIdr harus angka 0 atau lebih`);
     if (a.buyDate != null && !isIsoDate(a.buyDate)) errs.push(`${where}: buyDate harus tanggal yang valid berformat YYYY-MM-DD`);
     if (a.type === 'crypto' && !a.coingeckoId) errs.push(`${where}: aset kripto butuh coingeckoId (mis. "bitcoin")`);
     if (a.type === 'manual' && !(typeof a.price === 'number' && a.price >= 0)) errs.push(`${where}: aset manual butuh price (harga per unit)`);
-    if (a.type === 'manual' && a.currency && !['IDR', 'USD'].includes(a.currency)) errs.push(`${where}: currency harus IDR atau USD`);
+    if ((a.type === 'manual' || a.type === 'cash') && a.currency && !['IDR', 'USD'].includes(a.currency)) errs.push(`${where}: currency harus IDR atau USD`);
     const k = keyOf(a);
     if (seen.has(k)) errs.push(`${where}: duplikat (${k}), gabungkan jadi satu baris`);
     seen.add(k);
@@ -80,7 +82,8 @@ export function buildSnapshot({ date, assets, quotes, fx, prev }) {
     const priceIdr = toIdr(q.price, cur);
     const value = a.qty * priceIdr;
     // costIdr (opsional) = total modal dalam rupiah, memperhitungkan kurs saat beli.
-    const c = a.costIdr != null ? a.costIdr : a.qty * toIdr(a.avgCost, cur);
+    // Kas: modal = nilainya, jadi untung/ruginya selalu nol (saldo dolar ikut kurs hanya di nilai dan perubahan harian).
+    const c = a.type === 'cash' ? value : a.costIdr != null ? a.costIdr : a.qty * toIdr(a.avgCost, cur);
 
     // Perubahan harian dihitung dari pergerakan HARGA saja (bukan selisih total),
     // supaya setoran/penarikan dana tidak terbaca sebagai untung/rugi.

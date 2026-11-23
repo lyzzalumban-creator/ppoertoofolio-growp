@@ -81,9 +81,9 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
     const cur = currencyOf(a);
     try {
       let q;
-      if (a.type === 'manual') {
+      if (a.type === 'manual' || a.type === 'cash') {
         if (cur === 'USD') requireFx();
-        q = { price: a.price, asOf: date };
+        q = { price: a.type === 'cash' ? 1 : a.price, asOf: date }; // kas: 1 unit = 1 satuan mata uangnya
       } else if (a.type === 'crypto') {
         q = cg.get(a.coingeckoId);
         if (!q) {

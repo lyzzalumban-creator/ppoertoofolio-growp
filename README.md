@@ -35,17 +35,19 @@ Lewat halaman **Kelola aset** (menu **Kelola** di bawah layar). Kolom yang tampi
 
 | Field | Keterangan |
 |---|---|
-| `type` | `idx` saham Indonesia · `us` saham AS · `crypto` kripto · `gold` emas · `manual` yang lain (reksa dana, deposito, kas) |
-| `symbol` | `idx`: kode tanpa `.JK` (mis. `BBCA`). `us`: ticker (mis. `AAPL`). Lainnya: label bebas |
+| `type` | `idx` saham Indonesia · `us` saham AS · `crypto` kripto · `gold` emas · `cash` kas (rekening, dompet, tunai) · `manual` yang lain (reksa dana, deposito) |
+| `symbol` | `idx`: kode tanpa `.JK` (mis. `BBCA`). `us`: ticker (mis. `AAPL`). `cash` dan `manual`: label bebas (mis. `BCA`, `TUNAI`) |
 | `name` | Nama yang tampil (opsional) |
-| `qty` | Jumlah. **`idx` dalam LEMBAR, bukan lot** (1 lot = 100 lembar). `gold` dalam gram. `manual` dalam unit |
-| `avgCost` | Harga beli rata-rata **per unit**, dalam mata uang aset: rupiah untuk `idx`/`crypto`/`gold`/`manual`, dolar untuk `us` |
+| `qty` | Jumlah. **`idx` dalam LEMBAR, bukan lot** (1 lot = 100 lembar). `gold` dalam gram. `manual` dalam unit. **`cash` = saldo** (dalam mata uangnya) |
+| `avgCost` | Tidak dipakai untuk `cash`. Harga beli rata-rata **per unit**, dalam mata uang aset: rupiah untuk `idx`/`crypto`/`gold`/`manual`, dolar untuk `us` |
 | `coingeckoId` | Wajib untuk `crypto`. Lihat "API ID" di halaman koin di coingecko.com (mis. `bitcoin`) |
 | `price` | Wajib untuk `manual`: harga per unit saat ini. Kamu perbarui sendiri |
-| `currency` | Hanya `manual`: `IDR` (default) atau `USD` |
+| `currency` | Hanya `manual` dan `cash`: `IDR` (default) atau `USD` |
 | `costIdr` | Opsional: total modal dalam rupiah. Isi untuk aset dolar bila ingin untung/rugi memperhitungkan kurs saat beli |
 | `yahoo` | Opsional: paksa simbol Yahoo Finance untuk ticker yang tidak biasa (mis. `BRK-B`) |
 | `buyDate` | Opsional: tanggal beli `YYYY-MM-DD`. Bila beli beberapa kali, isi **tanggal beli pertama**. Ditampilkan ("dibeli 3 Mar 2025 · 8 bln") dan dipakai untuk [membangun riwayat mundur](#riwayat-mundur-dari-tanggal-beli); belum dipakai untuk menghitung kurs saat beli |
+
+**Kas** (`cash`) cukup label, saldo, dan mata uang: harganya selalu 1, tanpa harga beli, dan untung/ruginya selalu nol. Saldo dolar ikut kurs USD/IDR di nilainya. Kas tidak dihitung sebagai konsentrasi risiko, dan Analisis > Alokasi menampilkan *Kas* dan *Diinvestasikan* terpisah. Menambah jenis ini **tidak** butuh menempel ulang `Code.gs`: cukup perbarui kodenya di repo.
 
 Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara termudah mencatat sesuatu yang tidak punya harga pasar.
 
@@ -60,7 +62,7 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 - **Nominal tersembunyi secara bawaan** pada kunjungan pertama di sebuah browser; ketuk ikon mata di pojok kanan atas untuk menampilkannya (pilihanmu diingat di browser itu). Ini hanya kosmetik, misalnya bila ada orang melihat layarmu: datanya tetap ada di halaman. Mini-grafik di kartu utama hanya menampilkan bentuknya, tanpa angka.
 - **Halaman Analisis** (Kinerja, Alokasi, Risiko, Riwayat) menghitung return bulanan, return tertimbang waktu, penurunan, volatilitas, dan konsentrasi dari perubahan harga harian, jadi menambah atau menjual aset tidak terbaca sebagai untung/rugi. Hampir semuanya dalam persen, jadi tetap tampil saat nominal disembunyikan.
 - **Menu bawah** (Beranda, Analisis, Aset, Kelola, Profil) dan **tema** (Otomatis/Terang/Gelap) diatur di halaman Profil. Target nilai disimpan di browser perangkat itu saja.
-- "Harga" aset `manual` adalah angka yang kamu ketik sendiri dan sering sama dengan saldomu, jadi ikut disembunyikan.
+- "Harga" aset `manual` adalah angka yang kamu ketik sendiri dan sering sama dengan saldomu, jadi ikut disembunyikan. Saldo `cash` juga disamarkan.
 
 ## Sumber data dan batasannya
 
