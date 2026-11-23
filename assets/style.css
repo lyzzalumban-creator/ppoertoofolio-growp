@@ -1,43 +1,59 @@
+/* Lumbung: identitas "Nila & Sogan". Krem hangat, nila (indigo batik) sebagai aksen,
+   kartu utama gelap bermotif kawung. Semua warna hanya di token ini. */
 :root {
   color-scheme: light dark;
-  --bg: #f5f6f8;
-  --surface: #ffffff;
-  --surface-2: #eef1f4;
-  --text: #161b22;
-  --muted: #586271;
-  --border: #e1e5ea;
-  --accent: #0e7490;
+  --bg: #f5f1ea;
+  --surface: #fffdf9;
+  --surface-2: #efe8dc;
+  --text: #1f1a17;
+  --muted: #675d54;
+  --border: #e3dacb;
+  --accent: #33408f;
   --on-accent: #ffffff;
-  --pos: #0b7a40;
-  --neg: #c1281f;
-  --warn: #8a5a00;
-  --c-idx: #0e7490;
-  --c-us: #4f46e5;
-  --c-crypto: #db2777;
-  --c-gold: #ca8a04;
-  --c-manual: #64748b;
-  --radius: 14px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --soga: #8a5a2b;
+  --pos: #0f7a43;
+  --neg: #b42318;
+  --warn: #8f5400;
+  --c-idx: #33408f;
+  --c-us: #0f766e;
+  --c-crypto: #a23b72;
+  --c-gold: #b7791f;
+  --c-manual: #7c7268;
+  /* kartu utama: gelap di kedua tema */
+  --hero-from: #262d6b;
+  --hero-to: #303b85;
+  --hero-text: #f7f3ec;
+  --hero-muted: #c9cbe9;
+  --hero-pos: #86efac;
+  --hero-neg: #fecaca;
+  --hero-motif: #ffffff;
+  --hero-chip: rgba(255, 255, 255, 0.1);
+  --radius: 18px;
+  --shadow: 0 1px 2px rgba(31, 26, 23, 0.06), 0 6px 18px -12px rgba(31, 26, 23, 0.25);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e1117;
-    --surface: #161b24;
-    --surface-2: #1e2531;
-    --text: #e8ecf2;
-    --muted: #9aa6b6;
-    --border: #283142;
-    --accent: #38bdf8;
-    --on-accent: #08111c;
-    --pos: #34d399;
-    --neg: #f87171;
-    --warn: #fbbf24;
-    --c-idx: #22d3ee;
-    --c-us: #818cf8;
-    --c-crypto: #f472b6;
-    --c-gold: #facc15;
-    --c-manual: #94a3b8;
+    --bg: #111225;
+    --surface: #191b30;
+    --surface-2: #23263f;
+    --text: #efeae1;
+    --muted: #aaa5b5;
+    --border: #2e3150;
+    --accent: #aab4ff;
+    --on-accent: #111225;
+    --soga: #d9a46c;
+    --pos: #5ad69a;
+    --neg: #ff8f87;
+    --warn: #f2b84b;
+    --c-idx: #aab4ff;
+    --c-us: #4fd1c5;
+    --c-crypto: #f08bc0;
+    --c-gold: #e8b04a;
+    --c-manual: #b3aaa0;
+    --hero-from: #2a3175;
+    --hero-to: #1d2150;
+    --hero-chip: rgba(255, 255, 255, 0.1);
     --shadow: none;
   }
 }
@@ -54,20 +70,26 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-.wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 16px 16px 48px; }
 
-h1 { margin: 0; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.01em; }
-h2 { margin: 0; font-size: 1rem; }
-.sub-line { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px; }
-.sub { color: var(--muted); font-size: 0.9rem; }
+h1 { margin: 0; font-size: 1.35rem; line-height: 1.2; letter-spacing: -0.01em; }
+h2 { margin: 0; font-size: 1rem; letter-spacing: -0.005em; }
+.sub-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
+.sub { color: var(--muted); font-size: 0.88rem; }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .sub.stale { color: var(--warn); }
+.hint { margin: 2px 0 0; color: var(--muted); font-size: 0.8rem; }
 
-.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; margin-bottom: 16px; }
-.top h1 { grid-column: 1; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; margin-bottom: 14px; }
+.top .brand, .top > div:first-child { grid-column: 1; }
 .top .actions { grid-column: 2; grid-row: 1; }
 .top .sub-line { grid-column: 1 / -1; }
 .actions { display: flex; align-items: center; gap: 8px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mark { flex: none; width: 34px; height: 34px; }
+.mark rect { fill: var(--accent); }
+.mark path { fill: none; stroke: var(--on-accent); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.mark .bars { stroke-width: 3; }
 
 .btn {
   flex: none;
@@ -75,24 +97,24 @@ h2 { margin: 0; font-size: 1rem; }
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  min-height: 40px;
-  padding: 8px 14px;
+  min-height: 44px;
+  padding: 8px 16px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   cursor: pointer;
 }
 .btn:hover { background: var(--surface-2); }
 .btn[aria-pressed="true"] { border-color: var(--accent); }
-button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, summary:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .icon-btn { flex: none; width: 44px; height: 44px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text); cursor: pointer; }
 .icon-btn:hover { background: var(--surface-2); }
 .icon-btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .icon-btn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.link { min-height: 32px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 0.85rem; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 0.88rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .link:disabled { color: var(--muted); cursor: default; text-decoration: none; }
 
 .banner {
@@ -100,7 +122,7 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-left: 4px solid var(--warn);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--surface);
   font-size: 0.9rem;
 }
@@ -117,43 +139,83 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 }
 .card-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 
-/* KPI: kartu utama + dua kartu kecil */
+/* KPI: kartu utama gelap + dua kartu kecil */
 .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
-.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 0; }
-.kpi:not(.hero) { display: flex; flex-direction: column; justify-content: center; }
-.kpi .label { color: var(--muted); font-size: 0.8rem; }
-.kpi .value { margin-top: 2px; font-size: clamp(1.1rem, 5vw, 1.4rem); font-weight: 650; letter-spacing: -0.01em; overflow-wrap: anywhere; }
-.kpi .note { margin-top: 2px; color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
-.kpi.hero { grid-column: 1 / -1; padding: 16px 16px 12px; background: var(--surface); background: linear-gradient(165deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface) 65%); }
-.kpi.hero .value { font-size: clamp(1.8rem, 9vw, 2.4rem); line-height: 1.15; }
-.pill { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); font-size: 0.85rem; font-weight: 600; }
-.pill em { font-style: normal; font-weight: 400; color: var(--muted); }
-.spark { display: block; width: 100%; height: 48px; margin-top: 10px; }
+.kpi, .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 0; }
+.kpi:not(.hero), .tile { display: flex; flex-direction: column; justify-content: center; }
+:is(.kpi, .tile) .label { color: var(--muted); font-size: 0.8rem; }
+:is(.kpi, .tile) .value { margin-top: 2px; font-size: clamp(1.1rem, 5vw, 1.4rem); font-weight: 650; letter-spacing: -0.015em; overflow-wrap: anywhere; }
+:is(.kpi, .tile) .note { margin-top: 2px; color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
+
+.kpi.hero {
+  position: relative; overflow: hidden; isolation: isolate;
+  grid-column: 1 / -1; padding: 18px 18px 14px; border: 0; border-radius: 22px;
+  background: linear-gradient(150deg, var(--hero-from), var(--hero-to));
+  color: var(--hero-text);
+}
+/* Motif kawung, sangat samar, memudar ke kiri */
+.kpi.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.09; background: var(--hero-motif);
+  -webkit-mask: linear-gradient(to left, #000 20%, transparent 75%), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.2'%3E%3Cellipse cx='6' cy='6' rx='5' ry='2.6' transform='rotate(45 6 6)'/%3E%3Cellipse cx='18' cy='18' rx='5' ry='2.6' transform='rotate(45 18 18)'/%3E%3Cellipse cx='18' cy='6' rx='5' ry='2.6' transform='rotate(-45 18 6)'/%3E%3Cellipse cx='6' cy='18' rx='5' ry='2.6' transform='rotate(-45 6 18)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='1.2'/%3E%3C/svg%3E") 0 0 / 30px 30px;
+  -webkit-mask-composite: source-in;
+  mask: linear-gradient(to left, #000 20%, transparent 75%), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-width='1.2'%3E%3Cellipse cx='6' cy='6' rx='5' ry='2.6' transform='rotate(45 6 6)'/%3E%3Cellipse cx='18' cy='18' rx='5' ry='2.6' transform='rotate(45 18 18)'/%3E%3Cellipse cx='18' cy='6' rx='5' ry='2.6' transform='rotate(-45 18 6)'/%3E%3Cellipse cx='6' cy='18' rx='5' ry='2.6' transform='rotate(-45 6 18)'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='1.2'/%3E%3C/svg%3E") 0 0 / 30px 30px;
+  mask-composite: intersect;
+}
+.kpi.hero .label { color: var(--hero-muted); }
+.kpi.hero .value { font-size: clamp(1.9rem, 9.5vw, 2.5rem); line-height: 1.15; letter-spacing: -0.025em; }
+.kpi.hero .pos { color: var(--hero-pos); }
+.kpi.hero .neg { color: var(--hero-neg); }
+.kpi.hero .flat { color: var(--hero-muted); }
+.hrows { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 10px; }
+.hrow { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; padding: 4px 11px; border-radius: 999px; background: var(--hero-chip); font-size: 0.85rem; font-weight: 600; }
+.hrow .hl { color: var(--hero-muted); font-weight: 400; }
+.spark-wrap { position: relative; margin-top: 10px; }
+.spark-label { position: absolute; right: 0; top: -2px; color: var(--hero-muted); font-size: 0.7rem; }
+.spark { display: block; width: 100%; height: 48px; }
 .spark .line { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.spark .area { fill: currentColor; opacity: 0.12; stroke: none; }
-.spark.pos { color: var(--pos); } .spark.neg { color: var(--neg); } .spark.flat { color: var(--muted); }
+.spark .area { fill: currentColor; opacity: 0.14; stroke: none; }
+.kpi.hero .spark.flat { color: var(--hero-muted); }
 @media (min-width: 760px) {
-  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .kpi.hero { grid-column: span 2; }
+  /* kartu utama di kiri, dua kartu kecil bertumpuk di kanan */
+  .kpis { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .kpi.hero { grid-column: 1; grid-row: span 2; }
   .kpi .value { font-size: clamp(1.1rem, 2.2vw, 1.45rem); }
-  .kpi.hero .value { font-size: clamp(1.8rem, 3.4vw, 2.4rem); }
+  .kpi.hero .value { font-size: clamp(1.9rem, 3.4vw, 2.5rem); }
 }
 
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 .flat { color: var(--muted); }
 
-.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 12px; }
+/* Tab bagian: menempel di atas saat menggulir */
+.tabs {
+  position: sticky; top: 0; z-index: 5;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 -16px 12px; padding: 0 16px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.tabs [role="tab"] {
+  min-height: 48px; padding: 8px 4px; border: 0; border-bottom: 3px solid transparent; background: none;
+  color: var(--muted); font: inherit; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+}
+.tabs [role="tab"][aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+.tabs [role="tab"]:focus-visible { outline-offset: -4px; }
+@media (min-width: 760px) {
+  .tabs { margin: 0 0 12px; padding: 0; grid-template-columns: repeat(3, max-content); gap: 24px; }
+}
+.panel { display: grid; gap: 12px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 @media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
 
 /* Segmen rentang waktu */
-.seg { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 3px; }
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--surface-2); border-radius: 999px; padding: 3px; }
 .seg button {
-  min-height: 34px; min-width: 44px; padding: 4px 12px;
+  min-height: 44px; min-width: 44px; padding: 4px 10px;
   border: 0; border-radius: 999px; background: transparent; color: var(--muted);
   font: inherit; font-size: 0.82rem; cursor: pointer;
 }
-.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 
 /* Grafik garis */
 .chart-box { position: relative; min-height: 220px; }
@@ -162,40 +224,50 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .chart-box .zero-line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .chart-box .axis text { fill: var(--muted); font-size: 11px; }
 .chart-box .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-box .cost { fill: none; stroke: var(--soga); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .chart-box .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
 .chart-box .cursor line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .chart-box .tip {
   position: absolute; top: 4px; z-index: 2; pointer-events: none;
-  padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 9px; border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
   font-size: 0.8rem; line-height: 1.35; white-space: nowrap;
 }
 .chart-box .tip b { display: block; font-size: 0.9rem; }
-.empty { display: grid; place-items: center; min-height: 220px; color: var(--muted); text-align: center; padding: 0 16px; }
+.chart-key { display: flex; gap: 16px; margin-top: 6px; color: var(--muted); font-size: 0.78rem; }
+.chart-key span::before { content: ""; display: inline-block; width: 18px; margin-right: 6px; vertical-align: middle; border-top: 2px solid var(--accent); }
+.chart-key .k-cost::before { border-top: 2px dashed var(--soga); }
+.empty { display: grid; place-items: center; min-height: 160px; color: var(--muted); text-align: center; padding: 0 16px; }
 
-/* Alokasi */
-.alloc-body { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 12px; }
-.donut { position: relative; flex: none; width: 150px; height: 150px; border-radius: 50%; background: var(--surface-2); }
+/* Alokasi: donat di samping daftar jenis */
+.alloc-body { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 14px; margin-top: 10px; }
+.donut { position: relative; width: 112px; height: 112px; border-radius: 50%; background: var(--surface-2); }
 .donut .hole {
-  position: absolute; inset: 24%; display: grid; place-content: center; text-align: center;
-  border-radius: 50%; background: var(--surface); line-height: 1.15;
+  position: absolute; inset: 22%; display: grid; place-content: center; text-align: center;
+  border-radius: 50%; background: var(--surface); line-height: 1.1;
 }
-.donut .hole strong { font-size: 1.35rem; }
-.donut .hole span { color: var(--muted); font-size: 0.75rem; }
-.legend { list-style: none; margin: 0; padding: 0; width: 100%; }
+.donut .hole strong { font-size: 1.2rem; }
+.donut .hole span { color: var(--muted); font-size: 0.7rem; }
+.legend { list-style: none; margin: 0; padding: 0; min-width: 0; }
 .lg {
-  width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 10px;
-  min-height: 44px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent;
-  color: inherit; font: inherit; text-align: left; cursor: pointer;
+  width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0 8px;
+  min-height: 44px; padding: 4px 6px; border: 0; border-radius: 10px; background: transparent;
+  color: inherit; font: inherit; font-size: 0.9rem; text-align: left; cursor: pointer;
 }
 .lg:hover { background: var(--surface-2); }
 .lg[aria-pressed="true"] { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--accent); }
-.lg .sw { width: 12px; height: 12px; border-radius: 3px; }
-.lg .nm { min-width: 0; }
+.lg .sw { width: 10px; height: 10px; border-radius: 3px; }
+.lg .nm { min-width: 0; overflow-wrap: anywhere; }
 .lg .pc { font-weight: 600; }
-.lg .am { grid-column: 2 / -1; color: var(--muted); font-size: 0.8rem; margin-top: -4px; }
+.lg .am { grid-column: 2 / -1; color: var(--muted); font-size: 0.76rem; }
 
 /* Daftar aset: satu baris ringkas per aset, ketuk untuk rincian */
+.select {
+  min-height: 44px; padding: 6px 30px 6px 12px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 16px;
+}
+.sort { display: inline-flex; align-items: center; gap: 8px; }
+.note-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin: -6px 0 4px; }
 .assets-list { list-style: none; margin: 0; padding: 0; }
 .asset-row { border-top: 1px solid var(--border); }
 .assets-list li:first-child .asset-row { border-top: 0; }
@@ -204,7 +276,7 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 2px 12px;
 }
 .asset-row summary::-webkit-details-marker { display: none; }
-.asset-row .dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .a-main strong { display: block; font-weight: 600; overflow-wrap: anywhere; }
 .a-main small { display: block; color: var(--muted); font-size: 0.78rem; overflow-wrap: anywhere; }
 .a-val { text-align: right; }
@@ -212,6 +284,7 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .a-val span { font-size: 0.82rem; }
 .chev { width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
 .asset-row[open] .chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
 .a-bar { grid-column: 2 / -1; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.75rem; }
 .a-bar .bar { flex: 0 1 120px; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .a-bar .bar i { display: block; height: 100%; background: var(--accent); }
@@ -221,13 +294,44 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .a-det small { display: block; color: var(--muted); font-size: 0.78rem; }
 .chip { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--warn); border-radius: 999px; color: var(--warn); font-size: 0.68rem; vertical-align: middle; }
 
+/* Kinerja */
+.metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 760px) { .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.perf-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 900px) { .perf-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+
+.months { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 560px) { .months { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.mo {
+  min-width: 0; padding: 8px 10px; border-radius: 12px; line-height: 1.3;
+  background: color-mix(in srgb, var(--k-c, var(--muted)) var(--k, 8%), var(--surface));
+}
+.mo.pos { --k-c: var(--pos); }
+.mo.neg { --k-c: var(--neg); }
+.mo-m { display: block; color: var(--muted); font-size: 0.75rem; }
+.mo-v { display: block; font-weight: 650; font-size: 0.88rem; color: var(--text); white-space: nowrap; letter-spacing: -0.01em; }
+.mo-n { display: block; color: var(--muted); font-size: 0.68rem; }
+.months .empty { grid-column: 1 / -1; min-height: 80px; }
+
+/* subgrid: semua baris berbagi kolom, jadi garis nol lurus walau lebar angkanya beda */
+.perf { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: 76px minmax(0, 1fr) max-content; column-gap: 10px; }
+.pr { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: 32px; }
+.pr-n { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-n .dot { flex: none; width: 8px; height: 8px; }
+.pr-t { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2); }
+.pr-b { position: absolute; top: 0; bottom: 0; border-radius: 5px; background: var(--muted); }
+.pr-b.pos { background: var(--pos); }
+.pr-b.neg { background: var(--neg); }
+.pr-z { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.pr-v { font-size: 0.8rem; text-align: right; white-space: nowrap; }
+
 /* Kerangka pemuatan */
 .skel { display: grid; gap: 12px; }
 .sk { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--text) 8%, transparent), transparent); animation: shimmer 1.4s infinite; }
 @keyframes shimmer { to { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .sk::after { animation: none; } }
-.sk-hero { height: 150px; }
+.sk-hero { height: 170px; border-radius: 22px; }
 .sk-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sk-row .sk { height: 84px; }
 .sk-chart { height: 240px; }
@@ -249,13 +353,13 @@ button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px soli
 .field > span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 0.85rem; }
 .field input, .field select {
   width: 100%; min-height: 44px; padding: 8px 10px;
-  border: 1px solid var(--border); border-radius: 10px;
+  border: 1px solid var(--border); border-radius: 12px;
   background: var(--surface); color: var(--text); font: inherit; font-size: 16px; /* 16px: iOS tidak memperbesar layar saat fokus */
 }
 .field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .err { margin: 0; color: var(--neg); font-size: 0.88rem; white-space: pre-line; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.adv summary { cursor: pointer; color: var(--muted); font-size: 0.88rem; min-height: 32px; }
+.adv summary { display: flex; align-items: center; cursor: pointer; color: var(--muted); font-size: 0.88rem; min-height: 44px; }
 .adv .field { margin-top: 8px; }
 
 dialog {

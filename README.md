@@ -1,4 +1,4 @@
-# Portofolio
+# Lumbung
 
 Dasbor pribadi yang menggabungkan semua portofolio investasimu (saham IDX, saham AS, kripto, emas, reksa dana, kas) di satu halaman. Aset diisi **lewat web**, data disimpan di **Google Sheet-mu sendiri**, dan harga diperbarui **4 kali sehari** (01.30, 07.30, 13.30, dan 19.30 WIB).
 
@@ -58,6 +58,7 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 - **Log GitHub Actions di repo publik bisa dibaca siapa pun yang punya akun GitHub.** Karena itu robot di sana **tidak mencetak** kode saham, bobot, untung/rugi, nominal, maupun tanggal beli; yang tampil hanya status dan jumlah ("2 aset, tersimpan"). Sebagai jaring pengaman, kode, nama, dan ID CoinGecko asetmu didaftarkan ke fitur penyamaran GitHub (`::add-mask::` → `***`), dan pesan error memakai **nomor aset** (urutan di daftar Kelola, mis. `#2 idx`) alih-alih kodenya. Kode 1–2 huruf (mis. `F`) tidak bisa didaftarkan ke GitHub karena akan mengaburkan huruf lain; untuknya robot menyamarkan sendiri. Di komputermu sendiri (`npm run update:dry`) log tetap lengkap.
 - **Jadwal otomatis bisa dimatikan GitHub:** di repo publik, bila **60 hari tanpa aktivitas** (commit), GitHub menonaktifkan workflow terjadwal. Kamu mendapat email, dan cukup mengaktifkannya lagi di tab Actions. Dasbor menampilkan "diperbarui … (N jam lalu)" dan warnanya berubah bila lebih dari 12 jam, jadi mudah terlihat bila jadwalnya berhenti.
 - **Nominal tersembunyi secara bawaan** pada kunjungan pertama di sebuah browser; ketuk ikon mata di pojok kanan atas untuk menampilkannya (pilihanmu diingat di browser itu). Ini hanya kosmetik, misalnya bila ada orang melihat layarmu: datanya tetap ada di halaman. Mini-grafik di kartu utama hanya menampilkan bentuknya, tanpa angka.
+- **Tab Kinerja** (return bulanan, return tertimbang waktu, penurunan terdalam, untung/rugi per aset) dihitung dari perubahan harga harian, jadi menambah atau menjual aset tidak terbaca sebagai untung/rugi. Semuanya dalam persen, jadi tetap tampil saat nominal disembunyikan.
 - "Harga" aset `manual` adalah angka yang kamu ketik sendiri dan sering sama dengan saldomu, jadi ikut disembunyikan.
 
 ## Sumber data dan batasannya

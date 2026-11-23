@@ -5,14 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="robots" content="noindex, nofollow">
-  <title>Portofolio</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e7490'/%3E%3Cpath d='M6 22l7-8 5 5 8-10' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <title>Lumbung</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
   <main class="wrap">
     <header class="top">
-      <h1>Portofolio</h1>
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><rect width="32" height="32" rx="9"/><path d="M6 14.5 16 7l10 7.5"/><path class="bars" d="M11 24v-4M16 24v-7M21 24v-5"/></svg>
+        <h1>Lumbung</h1>
+      </div>
       <div class="actions" id="actions" hidden>
         <button id="privacy" class="icon-btn" type="button" aria-pressed="false" aria-label="Sembunyikan nominal" title="Sembunyikan nominal"></button>
         <a class="btn" href="kelola.html">Kelola aset</a>
@@ -46,33 +49,69 @@
     </form>
 
     <div id="dash" hidden>
-      <section class="kpis" id="kpis" aria-label="Ringkasan"></section>
+      <section class="kpis" id="kpis" aria-label="Angka utama"></section>
 
-      <div class="grid">
-        <section class="card" aria-labelledby="chart-h">
+      <div class="tabs" id="tabs" role="tablist" aria-label="Bagian dasbor">
+        <button type="button" role="tab" id="tab-ringkasan" aria-controls="panel-ringkasan" aria-selected="true">Ringkasan</button>
+        <button type="button" role="tab" id="tab-aset" aria-controls="panel-aset" aria-selected="false" tabindex="-1">Aset</button>
+        <button type="button" role="tab" id="tab-kinerja" aria-controls="panel-kinerja" aria-selected="false" tabindex="-1">Kinerja</button>
+      </div>
+
+      <div class="panel" id="panel-ringkasan" role="tabpanel" aria-labelledby="tab-ringkasan">
+        <div class="grid">
+          <section class="card" aria-labelledby="chart-h">
+            <div class="card-head">
+              <h2 id="chart-h">Nilai portofolio</h2>
+              <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
+            </div>
+            <div id="chart" class="chart-box"></div>
+            <div id="chart-key" class="chart-key" aria-hidden="true"></div>
+          </section>
+
+          <section class="card" aria-labelledby="alloc-h">
+            <h2 id="alloc-h">Alokasi</h2>
+            <p class="hint">Ketuk jenis untuk melihat asetnya.</p>
+            <div class="alloc-body">
+              <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
+              <ul id="legend" class="legend"></ul>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-aset" role="tabpanel" aria-labelledby="tab-aset" hidden>
+        <section class="card" aria-labelledby="hold-h">
           <div class="card-head">
-            <h2 id="chart-h">Nilai portofolio</h2>
-            <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
+            <h2 id="hold-h">Aset</h2>
+            <label class="sort"><span class="muted">Urutkan</span>
+              <select id="sort" class="select">
+                <option value="value">Nilai terbesar</option>
+                <option value="pnlPct">Untung/rugi tertinggi</option>
+                <option value="dayPct">Naik hari ini</option>
+                <option value="name">Nama A–Z</option>
+              </select>
+            </label>
           </div>
-          <div id="chart" class="chart-box"></div>
-        </section>
-
-        <section class="card" aria-labelledby="alloc-h">
-          <h2 id="alloc-h">Alokasi</h2>
-          <div class="alloc-body">
-            <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
-            <ul id="legend" class="legend"></ul>
-          </div>
+          <p id="filter-note" class="muted note-line"></p>
+          <ul class="assets-list" id="holdings"></ul>
         </section>
       </div>
 
-      <section class="card" aria-labelledby="hold-h">
-        <div class="card-head">
-          <h2 id="hold-h">Aset</h2>
-          <span id="filter-note" class="muted"></span>
+      <div class="panel" id="panel-kinerja" role="tabpanel" aria-labelledby="tab-kinerja" hidden>
+        <section class="metrics" id="metrics" aria-label="Metrik kinerja"></section>
+        <div class="perf-grid">
+          <section class="card" aria-labelledby="months-h">
+            <h2 id="months-h">Return bulanan</h2>
+            <p class="hint">Dari pergerakan harga saja: menambah atau menjual aset tidak dihitung sebagai untung/rugi.</p>
+            <ol class="months" id="months"></ol>
+          </section>
+          <section class="card" aria-labelledby="perf-h">
+            <h2 id="perf-h">Untung/rugi per aset</h2>
+            <p class="hint">Sejak beli, dibanding modal masing-masing.</p>
+            <ul class="perf" id="perf"></ul>
+          </section>
         </div>
-        <ul class="assets-list" id="holdings"></ul>
-      </section>
+      </div>
 
       <footer class="foot">
         <p>Harga diambil 4 kali sehari (Yahoo Finance, CoinGecko) dan bisa tertunda. Selama bursa buka angkanya harga terakhir, bukan penutupan. Saham AS memakai harga bursa AS terakhir, kripto memakai harga saat pengambilan.</p>
