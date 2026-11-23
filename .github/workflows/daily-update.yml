@@ -7,7 +7,7 @@ on:
   workflow_dispatch: {} # tombol "Run workflow" manual
 
 permissions:
-  contents: write
+  contents: read # tidak ada yang ditulis ke repo; hasilnya masuk ke Google Sheet
 
 concurrency:
   group: daily-update
@@ -24,21 +24,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Ambil harga & buat snapshot
+      - name: Ambil harga & simpan snapshot ke Sheet
         run: node scripts/update.mjs
         env:
-          # Opsional. Kosong = pakai data/holdings.json dari repo.
-          HOLDINGS_JSON: ${{ secrets.HOLDINGS_JSON }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          APPS_SCRIPT_TOKEN: ${{ secrets.APPS_SCRIPT_TOKEN }}
+          # Opsional (demo key CoinGecko gratis). Kosong = tanpa key.
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-
-      - name: Simpan hasil ke repo
-        run: |
-          if git status --porcelain data/history.json | grep -q .; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/history.json
-            git commit -m "data: snapshot $(TZ=Asia/Jakarta date +%F)"
-            git push
-          else
-            echo "Tidak ada perubahan."
-          fi

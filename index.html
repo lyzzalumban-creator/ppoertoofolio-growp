@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="description" content="Ringkasan portofolio investasi gabungan, diperbarui sekali sehari saat penutupan pasar.">
   <title>Portofolio</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230e7490'/%3E%3Cpath d='M6 22l7-8 5 5 8-10' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="assets/style.css">
@@ -14,57 +13,67 @@
   <main class="wrap">
     <header class="top">
       <div>
-        <h1 id="title">Portofolio</h1>
+        <h1>Portofolio</h1>
         <p class="sub" id="subtitle">Memuat data…</p>
       </div>
-      <button id="privacy" class="btn" type="button" aria-pressed="false" hidden>Sembunyikan nominal</button>
+      <div class="actions" id="actions" hidden>
+        <a class="btn" href="kelola.html">Kelola aset</a>
+        <button id="privacy" class="btn" type="button" aria-pressed="false">Sembunyikan nominal</button>
+        <button id="logout" class="btn" type="button">Keluar</button>
+      </div>
     </header>
 
     <div id="banner" class="banner" role="status" hidden></div>
 
-    <section class="kpis" id="kpis" aria-label="Ringkasan"></section>
+    <form id="connect" class="card form" hidden>
+      <h2>Sambungkan ke Sheet-mu</h2>
+      <p class="muted">Isi sekali per perangkat. Disimpan hanya di browser ini, tidak pernah di repo atau di server mana pun selain Google.</p>
+      <label class="field"><span>URL Apps Script</span>
+        <input id="c-url" type="url" required inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec">
+      </label>
+      <label class="field"><span>Kata sandi</span>
+        <input id="c-token" type="password" required autocomplete="current-password">
+      </label>
+      <p id="c-err" class="err" role="alert" hidden></p>
+      <button class="btn primary" type="submit">Sambungkan</button>
+    </form>
 
-    <div class="grid">
-      <section class="card" aria-labelledby="chart-h">
-        <div class="card-head">
-          <h2 id="chart-h">Nilai portofolio</h2>
-          <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
-        </div>
-        <div id="chart" class="chart-box"></div>
-      </section>
+    <div id="dash" hidden>
+      <section class="kpis" id="kpis" aria-label="Ringkasan"></section>
 
-      <section class="card" aria-labelledby="alloc-h">
-        <h2 id="alloc-h">Alokasi</h2>
-        <div class="alloc-body">
-          <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
-          <ul id="legend" class="legend"></ul>
-        </div>
-      </section>
-    </div>
+      <div class="grid">
+        <section class="card" aria-labelledby="chart-h">
+          <div class="card-head">
+            <h2 id="chart-h">Nilai portofolio</h2>
+            <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
+          </div>
+          <div id="chart" class="chart-box"></div>
+        </section>
 
-    <section class="card" aria-labelledby="hold-h">
-      <div class="card-head">
-        <h2 id="hold-h">Aset</h2>
-        <span id="filter-note" class="muted"></span>
+        <section class="card" aria-labelledby="alloc-h">
+          <h2 id="alloc-h">Alokasi</h2>
+          <div class="alloc-body">
+            <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
+            <ul id="legend" class="legend"></ul>
+          </div>
+        </section>
       </div>
-      <div class="table-wrap"><table class="holdings" id="holdings"></table></div>
-    </section>
 
-    <footer class="foot">
-      <p>Harga penutupan diambil sekali sehari setelah pasar tutup (Yahoo Finance, CoinGecko). Saham AS memakai penutupan bursa AS terakhir, kripto memakai harga saat pengambilan.</p>
-      <p>Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
-    </footer>
+      <section class="card" aria-labelledby="hold-h">
+        <div class="card-head">
+          <h2 id="hold-h">Aset</h2>
+          <span id="filter-note" class="muted"></span>
+        </div>
+        <div class="table-wrap"><table class="holdings" id="holdings"></table></div>
+      </section>
+
+      <footer class="foot">
+        <p>Harga penutupan diambil sekali sehari setelah pasar tutup (Yahoo Finance, CoinGecko). Saham AS memakai penutupan bursa AS terakhir, kripto memakai harga saat pengambilan.</p>
+        <p>Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
+      </footer>
+    </div>
   </main>
-  <script>
-    // Browser memblokir module script dari file://, jadi app.js tidak akan jalan. Beri petunjuk, bukan halaman diam.
-    if (location.protocol === 'file:') {
-      document.getElementById('subtitle').textContent = 'Dibuka langsung dari file';
-      var b = document.getElementById('banner');
-      b.hidden = false;
-      b.className = 'banner error';
-      b.innerHTML = '<strong>Halaman ini tidak bisa dibuka langsung dari file.</strong><br>Jalankan <code>npm run serve</code> lalu buka <code>http://localhost:8080</code>, atau buka lewat GitHub Pages.';
-    }
-  </script>
+  <script src="assets/nofile.js"></script>
   <script type="module" src="assets/app.js"></script>
 </body>
 </html>

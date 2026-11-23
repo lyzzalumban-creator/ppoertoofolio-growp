@@ -1,5 +1,8 @@
-// Dashboard portofolio. Tanpa framework dan tanpa library eksternal:
-// membaca data/history.json (dibuat scripts/update.mjs) lalu menggambar semuanya.
+// Dasbor portofolio. Tanpa framework dan tanpa library eksternal.
+// Data diambil dari Google Sheet lewat Apps Script (butuh URL + kata sandi); halaman ini sendiri tidak berisi data.
+
+import { call } from '../scripts/lib/api.mjs';
+import { clearCreds, readCreds, saveCreds, scriptUrlOk } from './creds.js';
 
 const TYPE = {
   idx: { label: 'Saham IDX', unit: 'lembar' },
@@ -27,12 +30,11 @@ const fMonth = new Intl.DateTimeFormat('id-ID', { month: 'short', year: '2-digit
 const toMs = (iso) => Date.parse(`${iso}T00:00:00Z`);
 const longDate = (iso) => fDate.format(toMs(iso));
 
-const state = { data: null, demo: false, hidden: false, range: 'Semua', filter: null };
+const state = { snapshots: [], hidden: false, range: 'Semua', filter: null };
 
 try { state.hidden = localStorage.getItem('pf-hidden') === '1'; } catch { /* penyimpanan diblokir: abaikan */ }
 
-const latest = () => state.data.snapshots[state.data.snapshots.length - 1];
-const hasAmounts = () => latest().total != null;
+const latest = () => state.snapshots[state.snapshots.length - 1];
 
 // ---------- pemformat ----------
 
@@ -56,55 +58,22 @@ const arrow = (v) => (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '');
 const delta = (v, digits) => (v == null ? '<span class="flat">–</span>' : `<span class="${tone(v)}">${arrow(v)}${pct(v, digits)}</span>`);
 const weightText = (w) => `${(w * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
 
-// ---------- memuat data ----------
-
-async function getJson(path) {
-  const r = await fetch(path, { cache: 'no-store' });
-  if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
-  return r.json();
-}
-
-async function load() {
-  let d = await getJson('data/history.json');
-  if (!d.snapshots || !d.snapshots.length) {
-    try {
-      const demo = await getJson('data/demo-history.json');
-      if (demo.snapshots && demo.snapshots.length) { d = demo; state.demo = true; }
-    } catch { /* tidak ada data contoh: tampilkan keadaan kosong */ }
-  }
-  state.data = d;
-}
-
 // ---------- render ----------
 
 function renderHeader() {
-  const d = state.data;
-  $('title').textContent = d.title || 'Portofolio';
-  document.title = `${d.title || 'Portofolio'}`;
   $('subtitle').textContent = `Harga penutupan · data per ${longDate(latest().date)}`;
-
   const btn = $('privacy');
-  btn.hidden = !hasAmounts();
   btn.setAttribute('aria-pressed', String(state.hidden));
   btn.textContent = state.hidden ? 'Tampilkan nominal' : 'Sembunyikan nominal';
-
-  const b = $('banner');
-  if (state.demo) {
-    b.hidden = false;
-    b.innerHTML = '<strong>Ini data contoh.</strong> Angkanya karangan. Isi <code>data/holdings.json</code> dengan asetmu lalu jalankan workflow <em>Update harga harian</em>; halaman ini otomatis beralih ke data asli.';
-  } else {
-    b.hidden = true;
-  }
 }
 
 function renderKpis() {
   const L = latest();
-  const amt = hasAmounts();
   const types = Object.keys(L.byType || {}).length;
   const cards = [
-    { label: 'Total nilai', value: amt ? money(L.total) : '–', note: amt ? `Modal ${money(L.cost)}` : 'Nominal tidak dipublikasikan' },
-    { label: 'Untung/rugi total', value: delta(L.pnlPct), note: amt ? money(L.pnl, { sign: true }) : 'dari modal' },
-    { label: 'Hari ini', value: delta(L.dayPct), note: L.dayPct == null ? 'Butuh data hari sebelumnya' : amt ? money(L.dayPnl, { sign: true }) : 'dari pergerakan harga' },
+    { label: 'Total nilai', value: money(L.total), note: `Modal ${money(L.cost)}` },
+    { label: 'Untung/rugi total', value: delta(L.pnlPct), note: money(L.pnl, { sign: true }) },
+    { label: 'Hari ini', value: delta(L.dayPct), note: L.dayPct == null ? 'Butuh data hari sebelumnya' : money(L.dayPnl, { sign: true }) },
     { label: 'Jumlah aset', value: String((L.positions || []).length), note: `${types} jenis aset` },
   ];
   $('kpis').innerHTML = cards.map((c) => `<div class="kpi"><div class="label">${esc(c.label)}</div><div class="value">${c.value}</div><div class="note">${esc(c.note)}</div></div>`).join('');
@@ -135,9 +104,10 @@ function inRange(snaps) {
   return snaps.filter((s) => end - toMs(s.date) <= days * DAY);
 }
 
+// Saat nominal disembunyikan, grafik beralih dari nilai rupiah ke untung/rugi dalam persen.
 function series() {
-  const amt = !state.hidden && hasAmounts();
-  const pts = inRange(state.data.snapshots)
+  const amt = !state.hidden;
+  const pts = inRange(state.snapshots)
     .filter((s) => (amt ? s.total != null : s.pnlPct != null))
     .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100 }));
   return { pts, amt };
@@ -234,7 +204,6 @@ function renderChart() {
 function renderAlloc() {
   const L = latest();
   const types = ORDER.filter((t) => L.byType && L.byType[t]);
-  const amt = hasAmounts();
 
   let acc = 0;
   const stops = types.map((t, i) => {
@@ -251,7 +220,7 @@ function renderAlloc() {
     const b = L.byType[t];
     return `<li><button type="button" class="lg" data-type="${t}" aria-pressed="${state.filter === t}">
       <i class="sw" style="background:var(--c-${t})"></i><span class="nm">${TYPE[t].label}</span><span class="pc">${weightText(b.weight)}</span>
-      ${amt ? `<span class="am">${money(b.value)}</span>` : ''}</button></li>`;
+      <span class="am">${money(b.value)}</span></button></li>`;
   }).join('');
 }
 
@@ -259,37 +228,35 @@ function renderAlloc() {
 
 // Harga aset manual adalah angka ketikanmu sendiri (sering = saldo), jadi diperlakukan sebagai nominal.
 function priceText(p, fmt) {
-  if (p.price == null) return '–';
   if (p.type === 'manual' && state.hidden) return MASK;
   return fmt.format(p.price);
 }
 
 function renderTable() {
   const L = latest();
-  const amt = hasAmounts();
   let rows = L.positions || [];
   if (state.filter) rows = rows.filter((p) => p.type === state.filter);
   $('filter-note').textContent = state.filter ? `Hanya ${TYPE[state.filter].label} · klik lagi untuk semua` : '';
 
   const maxW = Math.max(0.0001, ...(L.positions || []).map((p) => p.weight || 0));
-  const head = `<thead><tr><th>Aset</th><th>Harga</th>${amt ? '<th>Nilai</th>' : ''}<th>Bobot</th><th>Untung/rugi</th><th>Hari ini</th></tr></thead>`;
+  const head = '<thead><tr><th>Aset</th><th>Harga</th><th>Nilai</th><th>Bobot</th><th>Untung/rugi</th><th>Hari ini</th></tr></thead>';
 
   const body = rows.map((p) => {
     const priceFmt = p.currency === 'USD' ? fUsd : fIdr;
-    const qty = p.qty != null && !state.hidden ? `${fNum.format(p.qty)}${TYPE[p.type].unit ? ` ${TYPE[p.type].unit}` : ''}` : null;
+    const qty = state.hidden ? null : `${fNum.format(p.qty)}${TYPE[p.type].unit ? ` ${TYPE[p.type].unit}` : ''}`;
     const sub = [p.symbol, qty].filter(Boolean).join(' · ');
     const stale = p.stale ? `<span class="chip" title="Gagal diambil hari ini; memakai harga per ${esc(p.asOf)}">harga lama</span>` : '';
     return `<tr>
       <td class="asset"><i class="dot" style="background:var(--c-${p.type})"></i><div><strong>${esc(p.name)}</strong><small>${esc(sub)}</small></div></td>
       <td class="num" data-label="Harga" title="Penutupan ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</td>
-      ${amt ? `<td class="num" data-label="Nilai">${money(p.value)}</td>` : ''}
+      <td class="num" data-label="Nilai">${money(p.value)}</td>
       <td class="num" data-label="Bobot"><span class="wt">${weightText(p.weight)}<span class="bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%"></i></span></span></td>
-      <td class="num" data-label="Untung/rugi">${delta(p.pnlPct)}${amt ? `<small>${money(p.pnl, { sign: true })}</small>` : ''}</td>
+      <td class="num" data-label="Untung/rugi">${delta(p.pnlPct)}<small>${money(p.pnl, { sign: true })}</small></td>
       <td class="num" data-label="Hari ini">${delta(p.dayPct)}</td>
     </tr>`;
   }).join('');
 
-  $('holdings').innerHTML = `${head}<tbody>${body || `<tr><td colspan="6" class="muted">Tidak ada aset.</td></tr>`}</tbody>`;
+  $('holdings').innerHTML = `${head}<tbody>${body || '<tr><td colspan="6" class="muted">Tidak ada aset.</td></tr>'}</tbody>`;
 }
 
 function render() {
@@ -325,35 +292,88 @@ $('legend').addEventListener('click', (e) => {
   renderTable();
 });
 
+$('logout').addEventListener('click', () => {
+  clearCreds();
+  state.snapshots = [];
+  showConnect();
+});
+
 let raf = 0, lastW = 0;
 new ResizeObserver(() => {
   const w = Math.floor($('chart').clientWidth);
-  if (!state.data || w === lastW) return;
+  if (!state.snapshots.length || w === lastW) return;
   lastW = w;
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(renderChart);
 }).observe($('chart'));
 
-// ---------- mulai ----------
+// ---------- sambung & mulai ----------
+
+function show(view) { // 'connect' | 'dash' | 'error'
+  $('connect').hidden = view !== 'connect';
+  $('dash').hidden = view !== 'dash';
+  $('actions').hidden = view !== 'dash';
+  if (view !== 'error') $('banner').hidden = true;
+}
+
+function showConnect(err, url) {
+  show('connect');
+  $('subtitle').textContent = 'Belum tersambung';
+  if (url) $('c-url').value = url;
+  $('c-token').value = '';
+  $('c-err').hidden = !err;
+  $('c-err').textContent = err || '';
+  ($('c-url').value ? $('c-token') : $('c-url')).focus();
+}
 
 function fail(msg, hint) {
+  show('error');
   $('subtitle').textContent = 'Gagal memuat data';
   const b = $('banner');
   b.hidden = false;
-  b.classList.add('error');
+  b.className = 'banner error';
   b.innerHTML = `<strong>${esc(msg)}</strong>${hint ? `<br>${hint}` : ''}`;
-  for (const id of ['chart', 'legend', 'donut']) $(id).innerHTML = '';
-  $('holdings').innerHTML = '';
 }
 
-try {
-  await load();
-  if (!state.data.snapshots || !state.data.snapshots.length) {
-    fail('Belum ada data portofolio.', 'Jalankan workflow <em>Update harga harian</em> di tab Actions, atau <code>npm run update</code> di komputermu.');
-  } else {
-    render();
+async function start(creds, prefetched) {
+  let d = prefetched;
+  try {
+    if (!d) d = await call(creds.url, creds.token, 'list');
+  } catch (e) {
+    if (e.message === 'unauthorized') return showConnect('Kata sandi tidak cocok.', creds.url);
+    return fail(`Data tidak bisa dibaca (${e.message}).`, 'Periksa koneksi internet, lalu muat ulang. <a href="#" id="relink">Sambungkan ulang</a>');
   }
-} catch (e) {
-  const onFile = location.protocol === 'file:';
-  fail(`Data tidak bisa dibaca (${e.message}).`, onFile ? 'Halaman ini tidak bisa dibuka langsung dari file. Jalankan <code>npm run serve</code> lalu buka <code>http://localhost:8080</code>.' : '');
+  state.snapshots = d.history;
+  if (!state.snapshots.length) {
+    return fail('Belum ada data portofolio.', 'Tambah aset di <a href="kelola.html">Kelola aset</a>, lalu jalankan workflow <em>Update harga harian</em> di tab Actions GitHub.');
+  }
+  show('dash');
+  render();
 }
+
+$('connect').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url = $('c-url').value.trim();
+  const token = $('c-token').value;
+  const err = (m) => { $('c-err').hidden = false; $('c-err').textContent = m; };
+  if (!scriptUrlOk(url)) return err('URL harus berawalan https://script.google.com/… (alamat Web app dari Apps Script).');
+  let d;
+  try {
+    d = await call(url, token, 'list'); // uji dulu sebelum disimpan
+  } catch (ex) {
+    return err(ex.message === 'unauthorized' ? 'Kata sandi salah.' : `Gagal tersambung: ${ex.message}`);
+  }
+  saveCreds({ url, token });
+  start({ url, token }, d);
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.id !== 'relink') return;
+  e.preventDefault();
+  clearCreds();
+  showConnect();
+});
+
+const creds = readCreds();
+if (creds) await start(creds);
+else showConnect();

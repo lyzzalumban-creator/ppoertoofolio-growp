@@ -1,5 +1,5 @@
-// Logika murni (tanpa jaringan, tanpa file): validasi aset, hitung snapshot harian,
-// dan versi "persentase saja" untuk situs publik. Dipisah supaya mudah dites.
+// Logika murni (tanpa jaringan, tanpa file): validasi aset dan hitung snapshot harian.
+// Dipakai robot harian (Node) dan halaman Kelola (browser), jadi jangan impor modul Node di sini.
 
 export const TYPES = ['idx', 'us', 'crypto', 'gold', 'manual'];
 
@@ -23,7 +23,7 @@ export function dateInTz(ms, tz) {
 export function validateHoldings(h) {
   const errs = [];
   if (!h || !Array.isArray(h.assets) || h.assets.length === 0) {
-    throw new Error('holdings tidak valid: "assets" harus berisi minimal satu aset');
+    throw new Error('Daftar aset kosong: isi minimal satu aset lewat halaman Kelola');
   }
   const seen = new Set();
   h.assets.forEach((a, i) => {
@@ -41,8 +41,6 @@ export function validateHoldings(h) {
     if (seen.has(k)) errs.push(`${where}: duplikat (${k}), gabungkan jadi satu baris`);
     seen.add(k);
   });
-  const publish = (h.settings && h.settings.publish) || 'full';
-  if (!['full', 'percent'].includes(publish)) errs.push('settings.publish harus "full" atau "percent"');
   if (errs.length) throw new Error(`holdings tidak valid:\n- ${errs.join('\n- ')}`);
   return h;
 }
@@ -141,53 +139,4 @@ export function buildSnapshot({ date, assets, quotes, fx, prev }) {
       weight: round(p.weight, 6),
     })),
   };
-}
-
-/**
- * Versi publik tanpa nominal rupiah: tidak ada total, modal, jumlah unit, atau nilai.
- * Yang tersisa hanya harga pasar (memang publik), bobot, dan persentase.
- */
-export function redact(s) {
-  const out = {
-    date: s.date,
-    fx: s.fx,
-    pnlPct: s.pnlPct,
-    dayPct: s.dayPct,
-    byType: Object.fromEntries(Object.entries(s.byType || {}).map(([k, v]) => [k, { weight: v.weight }])),
-  };
-  if (s.positions) {
-    out.positions = s.positions.map((p) => ({
-      type: p.type,
-      symbol: p.symbol,
-      name: p.name,
-      // Harga pasar itu publik, tapi "harga" aset manual adalah angka yang kamu ketik sendiri
-      // (saldo deposito, nilai reksa dana, dst) dan sering sama persis dengan nilai kepemilikan.
-      ...(p.type === 'manual' ? {} : { price: p.price, priceIdr: p.priceIdr }),
-      currency: p.currency,
-      weight: p.weight,
-      pnlPct: p.pnlPct,
-      dayPct: p.dayPct,
-      asOf: p.asOf,
-      ...(p.stale ? { stale: true } : {}),
-    }));
-  }
-  return out;
-}
-
-/** Tambah/ganti snapshot per tanggal (aman dijalankan ulang di hari yang sama). */
-export function upsertSnapshot(snapshots, snap) {
-  const rest = snapshots.filter((s) => s.date !== snap.date);
-  rest.push(snap);
-  rest.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  return rest;
-}
-
-/** Buang rincian per aset dari snapshot lama supaya file tidak membengkak. */
-export function pruneOld(snapshots, keep = 90) {
-  const cut = snapshots.length - keep;
-  return snapshots.map((s, i) => {
-    if (i >= cut || !s.positions) return s;
-    const { positions, ...rest } = s;
-    return rest;
-  });
 }

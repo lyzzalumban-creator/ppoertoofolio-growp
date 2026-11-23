@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Dashboard portofolio investasi gabungan, diperbarui sekali sehari saat penutupan pasar.",
-  "engines": { "node": ">=22" },
+  "description": "Dasbor portofolio investasi pribadi: data di Google Sheet (lewat Apps Script), harga diperbarui sekali sehari.",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "update": "node scripts/update.mjs",
     "update:dry": "node scripts/update.mjs --dry-run",
-    "demo": "node scripts/make-demo.mjs",
     "serve": "python3 -m http.server 8080",
     "test": "node --test \"test/*.test.mjs\""
   }

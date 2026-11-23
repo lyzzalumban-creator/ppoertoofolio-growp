@@ -7,6 +7,7 @@
   --muted: #586271;
   --border: #e1e5ea;
   --accent: #0e7490;
+  --on-accent: #ffffff;
   --pos: #0b7a40;
   --neg: #c1281f;
   --warn: #8a5a00;
@@ -28,6 +29,7 @@
     --muted: #9aa6b6;
     --border: #283142;
     --accent: #38bdf8;
+    --on-accent: #08111c;
     --pos: #34d399;
     --neg: #f87171;
     --warn: #fbbf24;
@@ -59,10 +61,15 @@ h2 { margin: 0; font-size: 1rem; }
 .sub { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
 .muted { color: var(--muted); font-size: 0.85rem; }
 
-.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .btn {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   min-height: 40px;
   padding: 8px 14px;
   border: 1px solid var(--border);
@@ -204,3 +211,39 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .foot { margin-top: 20px; color: var(--muted); font-size: 0.8rem; }
 .foot p { margin: 0 0 6px; }
+
+/* Tombol utama, formulir, dialog */
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.form { display: grid; gap: 12px; }
+.form h2 { font-size: 1.1rem; }
+.form > .btn { justify-self: start; }
+@media (max-width: 560px) { .form > .btn { justify-self: stretch; } }
+.field { display: block; }
+.field > span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 0.85rem; }
+.field input, .field select {
+  width: 100%; min-height: 44px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text); font: inherit; font-size: 16px; /* 16px: iOS tidak memperbesar layar saat fokus */
+}
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.err { margin: 0; color: var(--neg); font-size: 0.88rem; white-space: pre-line; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.adv summary { cursor: pointer; color: var(--muted); font-size: 0.88rem; min-height: 32px; }
+.adv .field { margin-top: 8px; }
+
+dialog {
+  width: min(92vw, 480px); max-height: 90vh; overflow: auto; padding: 18px;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
+
+.assets { list-style: none; margin: 0; padding: 0; }
+.assets li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--border); }
+.assets li:first-child { border-top: 0; }
+.asset-info { min-width: 0; flex: 1 1 220px; }
+.asset-info strong { display: block; overflow-wrap: anywhere; }
+.asset-info small { color: var(--muted); font-size: 0.8rem; overflow-wrap: anywhere; }
