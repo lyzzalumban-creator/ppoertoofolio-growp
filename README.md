@@ -64,7 +64,7 @@ Bila repo **privat**, GitHub Pages dari repo privat butuh paket GitHub berbayar.
 | Aset | Sumber | Catatan |
 |---|---|---|
 | Saham IDX, saham AS, kurs USD/IDR | Yahoo Finance (cadangan: Stooq untuk saham AS & kurs) | Endpoint tidak resmi tanpa kontrak; bisa berubah atau menolak IP cloud |
-| Kripto | CoinGecko | Dalam rupiah langsung. Boleh pasang secret `COINGECKO_API_KEY` (demo key gratis) bila kena batas request |
+| Kripto | CoinGecko (cadangan: Yahoo `BTC-USD` × kurs) | CoinGecko memberi harga rupiah langsung tetapi bisa membalas 429 (kena batas request); skrip menunggu sesuai `Retry-After`, lalu pindah ke Yahoo. Boleh pasang secret `COINGECKO_API_KEY` (demo key gratis) untuk batas lebih longgar. Koin yang simbol Yahoo-nya bukan `<SIMBOL>-USD` bisa diatur lewat field `yahoo` |
 | Emas | Harga emas dunia (futures `GC=F`, cadangan XAUUSD) × kurs ÷ 31,1035 | Harga **internasional per gram**, bukan harga Antam/toko emas. Untuk harga Antam pakai `manual` |
 
 - Satu "foto" per hari pada 07.30 WIB: IDX dan bursa AS sudah tutup, kripto diambil saat itu.

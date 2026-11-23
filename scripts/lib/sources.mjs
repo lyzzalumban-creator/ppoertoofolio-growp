@@ -9,10 +9,15 @@ import { dateInTz } from './portfolio.mjs';
 const UA = 'Mozilla/5.0 (compatible; portfolio-updater/1.0)';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** GET dengan timeout dan retry (hanya untuk 429/5xx/gangguan jaringan). */
-export async function getUrl(url, { headers = {}, json = true, tries = 3 } = {}) {
+/**
+ * GET dengan timeout dan retry (hanya untuk 429/5xx/gangguan jaringan).
+ * Pada 429 (kena batas request) jedanya mengikuti header Retry-After, maksimal 30 detik;
+ * jeda 1-4 detik terbukti terlalu pendek untuk CoinGecko.
+ */
+export async function getUrl(url, { headers = {}, json = true, tries = 3, wait = sleep } = {}) {
   let lastErr;
   for (let i = 0; i < tries; i++) {
+    let delay = 1000 * 2 ** i;
     try {
       const res = await fetch(url, {
         headers: { 'user-agent': UA, accept: json ? 'application/json' : 'text/csv,*/*', ...headers },
@@ -21,10 +26,15 @@ export async function getUrl(url, { headers = {}, json = true, tries = 3 } = {})
       if (res.ok) return json ? await res.json() : await res.text();
       lastErr = new Error(`HTTP ${res.status} dari ${new URL(url).host}`);
       if (res.status < 500 && res.status !== 429) break; // salah di sisi kita, retry percuma
+      if (res.status === 429) {
+        const raw = res.headers.get('retry-after');
+        const ra = raw == null || raw.trim() === '' ? NaN : Number(raw); // Number(null) = 0, jadi cek dulu ada-tidaknya
+        delay = Math.min(30_000, (Number.isFinite(ra) && ra >= 0 ? ra : 5 * (i + 1)) * 1000);
+      }
     } catch (e) {
       lastErr = e;
     }
-    await sleep(1000 * 2 ** i);
+    if (i < tries - 1) await wait(delay); // jangan menunggu setelah percobaan terakhir
   }
   throw lastErr;
 }

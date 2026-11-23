@@ -1,0 +1,122 @@
+// Kumpulkan harga semua aset dengan urutan sumber + cadangan + harga lama.
+// Sumber disuntik lewat `src` supaya seluruh jalur gagalnya bisa dites tanpa jaringan.
+
+import { currencyOf, keyOf } from './portfolio.mjs';
+
+const OZ_GRAM = 31.1034768; // gram per troy ons
+
+/**
+ * @param {object}   p
+ * @param {Array}    p.assets
+ * @param {string}   p.date        tanggal snapshot (untuk aset manual)
+ * @param {object}   p.lastKnown   snapshot terakhir (cadangan harga & kurs), opsional
+ * @param {object}   p.src         { yahoo(sym), stooq(sym), coingecko(ids) }
+ * @param {Function} p.warn
+ * @returns {{ quotes: Map, fx: number|null, problems: string[] }}
+ */
+export async function collectQuotes({ assets, date, lastKnown, src, warn = () => {} }) {
+  const lastPos = new Map(((lastKnown && lastKnown.positions) || []).map((p) => [`${p.type}:${p.symbol}`, p]));
+  const quotes = new Map();
+  const problems = [];
+
+  const firstOk = async (label, attempts) => {
+    let lastErr;
+    for (const [name, fn] of attempts) {
+      try {
+        return await fn();
+      } catch (e) {
+        lastErr = e;
+        warn(`${label}: ${name} gagal (${e.message})`);
+      }
+    }
+    throw lastErr;
+  };
+
+  // --- kurs USD/IDR: dibutuhkan aset dolar, emas, dan cadangan kripto ---
+  const needFx = assets.some((a) => currencyOf(a) === 'USD' || a.type === 'gold' || a.type === 'crypto');
+  let fx = null;
+  let fxErr = null;
+  if (needFx) {
+    try {
+      fx = (await firstOk('USD/IDR', [['Yahoo', () => src.yahoo('USDIDR=X')], ['Stooq', () => src.stooq('usdidr')]])).price;
+    } catch (e) {
+      if (lastKnown && lastKnown.fx > 0) {
+        fx = lastKnown.fx;
+        warn(`Kurs USD/IDR memakai nilai terakhir (${fx}) karena gagal diambil`);
+      } else {
+        fxErr = e.message;
+      }
+    }
+  }
+  // Baru dianggap masalah bila ada aset yang benar-benar butuh kurs (portofolio tanpa aset dolar tetap jalan).
+  const requireFx = () => {
+    if (!(fx > 0)) throw new Error(`butuh kurs USD/IDR${fxErr ? ` (${fxErr})` : ''}`);
+    return fx;
+  };
+
+  // --- kripto: satu request CoinGecko untuk semua koin ---
+  let cg = new Map();
+  const cryptos = assets.filter((a) => a.type === 'crypto');
+  if (cryptos.length) {
+    try {
+      cg = await src.coingecko([...new Set(cryptos.map((a) => a.coingeckoId))]);
+    } catch (e) {
+      warn(`CoinGecko gagal (${e.message})`);
+    }
+  }
+
+  for (const a of assets) {
+    const key = keyOf(a);
+    const cur = currencyOf(a);
+    try {
+      let q;
+      if (a.type === 'manual') {
+        if (cur === 'USD') requireFx();
+        q = { price: a.price, asOf: date };
+      } else if (a.type === 'crypto') {
+        q = cg.get(a.coingeckoId);
+        if (!q) {
+          // Cadangan: harga USD dari Yahoo (mis. BTC-USD) dikali kurs.
+          const ySym = a.yahoo || `${a.symbol}-USD`;
+          warn(`${key}: tidak ada harga dari CoinGecko, mencoba Yahoo ${ySym}`);
+          const y = await src.yahoo(ySym);
+          if (y.currency && y.currency !== 'USD') throw new Error(`Yahoo ${ySym} bermata uang ${y.currency}, bukan USD`);
+          q = { price: y.price * requireFx(), asOf: y.asOf };
+        }
+      } else if (a.type === 'gold') {
+        const oz = await firstOk(key, [['Yahoo GC=F', () => src.yahoo(a.yahoo || 'GC=F')], ['Stooq xauusd', () => src.stooq('xauusd')]]);
+        q = { price: (oz.price * requireFx()) / OZ_GRAM, asOf: oz.asOf }; // USD/ons -> IDR/gram
+      } else {
+        const ySym = a.yahoo || (a.type === 'idx' ? (a.symbol.endsWith('.JK') ? a.symbol : `${a.symbol}.JK`) : a.symbol);
+        const attempts = [['Yahoo', () => src.yahoo(ySym)]];
+        if (a.type === 'us') attempts.push(['Stooq', () => src.stooq(`${a.symbol.toLowerCase().replace('.', '-')}.us`)]);
+        q = await firstOk(key, attempts);
+        if (q.currency && q.currency !== cur) {
+          throw new Error(`mata uang ${q.currency} dari sumber data tidak sama dengan ${cur} yang diharapkan untuk type "${a.type}"`);
+        }
+        if (cur === 'USD') requireFx();
+      }
+      quotes.set(key, { price: q.price, asOf: q.asOf });
+    } catch (e) {
+      const old = lastPos.get(key);
+      if (old && old.price > 0) {
+        warn(`${key}: gagal diambil (${e.message}); memakai harga terakhir per ${old.asOf}`);
+        quotes.set(key, { price: old.price, asOf: old.asOf, stale: true });
+      } else {
+        problems.push(`${key}: ${e.message}`);
+      }
+    }
+  }
+
+  // Harga lama beraset dolar tetap butuh kurs untuk dikonversi.
+  if (!(fx > 0)) {
+    for (const a of assets) {
+      if (currencyOf(a) === 'USD' && quotes.has(keyOf(a))) {
+        quotes.delete(keyOf(a));
+        problems.push(`${keyOf(a)}: butuh kurs USD/IDR${fxErr ? ` (${fxErr})` : ''}`);
+      }
+    }
+  }
+
+  return { quotes, fx, problems };
+}
