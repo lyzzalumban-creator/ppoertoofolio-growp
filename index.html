@@ -2,11 +2,12 @@
 <html lang="id">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <script src="assets/theme.js"></script>
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -18,13 +19,11 @@
       </div>
       <div class="actions" id="actions" hidden>
         <button id="privacy" class="icon-btn" type="button" aria-pressed="false" aria-label="Sembunyikan nominal" title="Sembunyikan nominal"></button>
-        <a class="btn" href="kelola.html">Kelola aset</a>
+        <button id="reload" class="icon-btn" type="button" aria-label="Muat ulang" title="Muat ulang"></button>
       </div>
-      <p class="sub-line">
-        <span class="sub" id="subtitle">Memuat data…</span>
-        <button id="reload" class="link" type="button" hidden>Muat ulang</button>
-      </p>
+      <p class="sub-line"><span class="sub" id="subtitle" role="status">Memuat data…</span></p>
     </header>
+    <!-- menu utama dipasang di sini oleh assets/nav.js -->
 
     <div id="banner" class="banner" role="status" hidden></div>
 
@@ -48,18 +47,20 @@
       <button class="btn primary" type="submit">Sambungkan</button>
     </form>
 
+    <!-- Halaman yang butuh data -->
     <div id="dash" hidden>
-      <section class="kpis" id="kpis" aria-label="Angka utama"></section>
+      <!-- BERANDA -->
+      <section class="view" id="v-beranda" hidden>
+        <h2 class="vh" id="vt-beranda" tabindex="-1">Beranda</h2>
+        <section class="kpis" id="kpis" aria-label="Angka utama"></section>
 
-      <div class="tabs" id="tabs" role="tablist" aria-label="Bagian dasbor">
-        <button type="button" role="tab" id="tab-ringkasan" aria-controls="panel-ringkasan" aria-selected="true">Ringkasan</button>
-        <button type="button" role="tab" id="tab-aset" aria-controls="panel-aset" aria-selected="false" tabindex="-1">Aset</button>
-        <button type="button" role="tab" id="tab-kinerja" aria-controls="panel-kinerja" aria-selected="false" tabindex="-1">Kinerja</button>
-      </div>
+        <section id="insights" class="insights" aria-labelledby="ins-h" hidden>
+          <h2 id="ins-h" class="vh">Perlu diperhatikan</h2>
+          <ul id="insight-list"></ul>
+        </section>
 
-      <div class="panel" id="panel-ringkasan" role="tabpanel" aria-labelledby="tab-ringkasan">
         <div class="grid">
-          <section class="card" aria-labelledby="chart-h">
+          <section class="card g-chart" aria-labelledby="chart-h">
             <div class="card-head">
               <h2 id="chart-h">Nilai portofolio</h2>
               <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
@@ -68,7 +69,12 @@
             <div id="chart-key" class="chart-key" aria-hidden="true"></div>
           </section>
 
-          <section class="card" aria-labelledby="alloc-h">
+          <section class="card g-moves" aria-labelledby="mv-h">
+            <h2 id="mv-h">Pergerakan hari ini</h2>
+            <div id="movers"></div>
+          </section>
+
+          <section class="card g-alloc" aria-labelledby="alloc-h">
             <h2 id="alloc-h">Alokasi</h2>
             <p class="hint">Ketuk jenis untuk melihat asetnya.</p>
             <div class="alloc-body">
@@ -76,13 +82,86 @@
               <ul id="legend" class="legend"></ul>
             </div>
           </section>
-        </div>
-      </div>
 
-      <div class="panel" id="panel-aset" role="tabpanel" aria-labelledby="tab-aset" hidden>
+          <section class="card g-goal" aria-labelledby="goal-h">
+            <h2 id="goal-h">Target</h2>
+            <div id="goal"></div>
+          </section>
+        </div>
+        <p class="foot">Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
+      </section>
+
+      <!-- ANALISIS -->
+      <section class="view" id="v-analisis" hidden>
+        <h2 class="vh" id="vt-analisis" tabindex="-1">Analisis</h2>
+        <nav class="subnav" id="subnav" aria-label="Bagian analisis">
+          <a href="#/analisis/kinerja">Kinerja</a>
+          <a href="#/analisis/alokasi">Alokasi</a>
+          <a href="#/analisis/risiko">Risiko</a>
+          <a href="#/analisis/riwayat">Riwayat</a>
+        </nav>
+
+        <div class="panel" id="an-kinerja">
+          <section class="metrics" id="metrics" aria-label="Metrik kinerja"></section>
+          <div class="perf-grid">
+            <section class="card" aria-labelledby="months-h">
+              <h2 id="months-h">Return bulanan</h2>
+              <p class="hint">Dari pergerakan harga saja: menambah atau menjual aset tidak dihitung sebagai untung/rugi.</p>
+              <ol class="months" id="months"></ol>
+            </section>
+            <section class="card" aria-labelledby="perf-h">
+              <h2 id="perf-h">Untung/rugi per aset</h2>
+              <p class="hint">Sejak beli, dibanding modal masing-masing.</p>
+              <ul class="perf" id="perf"></ul>
+            </section>
+          </div>
+        </div>
+
+        <div class="panel" id="an-alokasi" hidden>
+          <section class="metrics" id="conc" aria-label="Konsentrasi"></section>
+          <section class="card" aria-labelledby="types-h">
+            <h2 id="types-h">Per jenis aset</h2>
+            <p class="hint">Bobot dari total, nilai, dan untung/rugi sejak beli. Ketuk untuk melihat asetnya.</p>
+            <ul class="types" id="types"></ul>
+          </section>
+        </div>
+
+        <div class="panel" id="an-risiko" hidden>
+          <section class="metrics" id="risk" aria-label="Metrik risiko"></section>
+          <section class="card prose" aria-labelledby="risk-h">
+            <h2 id="risk-h">Cara membacanya</h2>
+            <p><b>Volatilitas</b> menunjukkan seberapa liar nilai portofolio bergoyang, disetahunkan dari perubahan harga harian. Makin tinggi, makin tidak tenang.</p>
+            <p><b>Penurunan saat ini</b> adalah jarak nilai sekarang dari puncaknya. Nol berarti sedang di puncak.</p>
+            <p>Dihitung dari snapshot tiap hari kalender, jadi akhir pekan ikut dihitung (harga saham tidak bergerak saat bursa tutup, kripto tetap). Butuh minimal 14 hari data agar angkanya layak dipercaya.</p>
+          </section>
+        </div>
+
+        <div class="panel" id="an-riwayat" hidden>
+          <section class="card" aria-labelledby="hist-h">
+            <h2 id="hist-h">Riwayat harian</h2>
+            <p class="hint">Nilai portofolio tiap hari, terbaru di atas.</p>
+            <div class="table-wrap">
+              <table class="hist" id="hist">
+                <thead><tr><th scope="col">Tanggal</th><th scope="col">Nilai</th><th scope="col">Hari itu</th><th scope="col">Sejak beli</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="more"><button id="hist-more" class="btn" type="button">Tampilkan lebih banyak</button></div>
+          </section>
+        </div>
+      </section>
+
+      <!-- ASET -->
+      <section class="view" id="v-aset" hidden>
+        <h2 class="vh" id="vt-aset" tabindex="-1">Aset</h2>
         <section class="card" aria-labelledby="hold-h">
           <div class="card-head">
             <h2 id="hold-h">Aset</h2>
+          </div>
+          <div class="aset-tools">
+            <label class="field"><span class="vh">Cari aset</span>
+              <input id="q" type="search" placeholder="Cari nama atau kode" autocomplete="off" enterkeyhint="search">
+            </label>
             <label class="sort"><span class="muted">Urutkan</span>
               <select id="sort" class="select">
                 <option value="value">Nilai terbesar</option>
@@ -92,35 +171,80 @@
               </select>
             </label>
           </div>
-          <p id="filter-note" class="muted note-line"></p>
+          <nav class="chips" id="chips" aria-label="Jenis aset"></nav>
+          <p id="filter-note" class="muted note-line" role="status"></p>
           <ul class="assets-list" id="holdings"></ul>
         </section>
-      </div>
-
-      <div class="panel" id="panel-kinerja" role="tabpanel" aria-labelledby="tab-kinerja" hidden>
-        <section class="metrics" id="metrics" aria-label="Metrik kinerja"></section>
-        <div class="perf-grid">
-          <section class="card" aria-labelledby="months-h">
-            <h2 id="months-h">Return bulanan</h2>
-            <p class="hint">Dari pergerakan harga saja: menambah atau menjual aset tidak dihitung sebagai untung/rugi.</p>
-            <ol class="months" id="months"></ol>
-          </section>
-          <section class="card" aria-labelledby="perf-h">
-            <h2 id="perf-h">Untung/rugi per aset</h2>
-            <p class="hint">Sejak beli, dibanding modal masing-masing.</p>
-            <ul class="perf" id="perf"></ul>
-          </section>
-        </div>
-      </div>
-
-      <footer class="foot">
-        <p>Harga diambil 4 kali sehari (Yahoo Finance, CoinGecko) dan bisa tertunda. Selama bursa buka angkanya harga terakhir, bukan penutupan. Saham AS memakai harga bursa AS terakhir, kripto memakai harga saat pengambilan.</p>
-        <p>Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
-      </footer>
+      </section>
     </div>
 
-    <p class="foot foot-actions" id="foot-actions" hidden><button id="logout" class="link" type="button">Keluar</button></p>
+    <!-- PROFIL: tetap bisa dibuka walau data belum ada atau gagal dimuat -->
+    <section class="view" id="v-profil" hidden>
+      <h2 class="vh" id="vt-profil" tabindex="-1">Profil</h2>
+      <div class="settings">
+        <section class="card" aria-labelledby="set-view-h">
+          <h2 id="set-view-h">Tampilan</h2>
+          <div class="set-row">
+            <div><b id="set-hide-l">Sembunyikan nominal</b><p class="hint">Rupiah disamarkan, persen tetap tampil. Aman bila layarmu dilihat orang.</p></div>
+            <button id="set-hide" class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="set-hide-l"></button>
+          </div>
+          <div class="set-row">
+            <label for="set-theme"><b>Tema</b></label>
+            <select id="set-theme" class="select">
+              <option value="auto">Otomatis (ikut perangkat)</option>
+              <option value="light">Terang</option>
+              <option value="dark">Gelap</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="set-goal-h">
+          <h2 id="set-goal-h">Target</h2>
+          <div class="set-row">
+            <p id="set-goal" class="muted"></p>
+            <button class="btn" type="button" data-goal="open">Atur target</button>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="set-data-h">
+          <h2 id="set-data-h">Data</h2>
+          <p id="set-data" class="muted"></p>
+          <div class="set-actions">
+            <button id="set-reload" class="btn" type="button">Muat ulang data</button>
+            <a class="btn" href="kelola.html">Kelola aset</a>
+          </div>
+        </section>
+
+        <section class="card prose" aria-labelledby="set-about-h">
+          <h2 id="set-about-h">Tentang</h2>
+          <p>Harga diambil 4 kali sehari (Yahoo Finance, CoinGecko) dan bisa tertunda. Selama bursa buka angkanya harga terakhir, bukan penutupan. Saham AS memakai harga bursa AS terakhir, kripto memakai harga saat pengambilan.</p>
+          <p>Datamu ada di Google Sheet milikmu sendiri. URL dan kata sandi hanya tersimpan di browser ini dan hanya dikirim ke script.google.com.</p>
+          <p>Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
+        </section>
+
+        <section class="card" aria-labelledby="set-acc-h">
+          <h2 id="set-acc-h">Akun</h2>
+          <p class="muted">Menghapus URL dan kata sandi dari browser ini. Datamu di Sheet tidak berubah.</p>
+          <div class="set-actions"><button id="logout" class="btn danger" type="button">Keluar dari perangkat ini</button></div>
+        </section>
+      </div>
+    </section>
   </main>
+
+  <dialog id="goal-dlg" aria-labelledby="goal-dlg-h">
+    <form id="goal-form" class="form" novalidate>
+      <h2 id="goal-dlg-h">Target nilai portofolio</h2>
+      <p class="muted">Disimpan hanya di browser ini, tidak dikirim ke mana pun.</p>
+      <label class="field"><span>Target nilai (Rp)</span><input id="goal-input" type="number" step="any" min="1" inputmode="decimal"></label>
+      <p id="goal-err" class="err" role="alert" hidden></p>
+      <div class="row">
+        <button id="goal-del" class="btn" type="button">Hapus target</button>
+        <button id="goal-cancel" class="btn" type="button">Batal</button>
+        <button class="btn primary" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="assets/nofile.js"></script>
   <script type="module" src="assets/app.js"></script>
 </body>
