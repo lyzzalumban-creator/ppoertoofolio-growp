@@ -12,18 +12,25 @@
 <body>
   <main class="wrap">
     <header class="top">
-      <div>
-        <h1>Portofolio</h1>
-        <p class="sub" id="subtitle">Memuat data…</p>
-      </div>
+      <h1>Portofolio</h1>
       <div class="actions" id="actions" hidden>
+        <button id="privacy" class="icon-btn" type="button" aria-pressed="false" aria-label="Sembunyikan nominal" title="Sembunyikan nominal"></button>
         <a class="btn" href="kelola.html">Kelola aset</a>
-        <button id="privacy" class="btn" type="button" aria-pressed="false">Sembunyikan nominal</button>
-        <button id="logout" class="btn" type="button">Keluar</button>
       </div>
+      <p class="sub-line">
+        <span class="sub" id="subtitle">Memuat data…</span>
+        <button id="reload" class="link" type="button" hidden>Muat ulang</button>
+      </p>
     </header>
 
     <div id="banner" class="banner" role="status" hidden></div>
+
+    <!-- Kerangka selama data diambil (Apps Script bisa butuh beberapa detik) -->
+    <div id="skeleton" class="skel" aria-hidden="true">
+      <div class="sk sk-hero"></div>
+      <div class="sk-row"><div class="sk"></div><div class="sk"></div></div>
+      <div class="sk sk-chart"></div>
+    </div>
 
     <form id="connect" class="card form" hidden>
       <h2>Sambungkan ke Sheet-mu</h2>
@@ -64,7 +71,7 @@
           <h2 id="hold-h">Aset</h2>
           <span id="filter-note" class="muted"></span>
         </div>
-        <div class="table-wrap"><table class="holdings" id="holdings"></table></div>
+        <ul class="assets-list" id="holdings"></ul>
       </section>
 
       <footer class="foot">
@@ -72,6 +79,8 @@
         <p>Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
       </footer>
     </div>
+
+    <p class="foot foot-actions" id="foot-actions" hidden><button id="logout" class="link" type="button">Keluar</button></p>
   </main>
   <script src="assets/nofile.js"></script>
   <script type="module" src="assets/app.js"></script>

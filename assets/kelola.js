@@ -106,6 +106,10 @@ function readForm() {
   if (a.type !== 'crypto') delete a.coingeckoId;
   if (a.type !== 'manual') { delete a.price; delete a.currency; }
   if (a.type === 'gold' && !a.symbol) a.symbol = 'XAU';
+  // Kode pasar selalu huruf besar ("panw" -> PANW); label aset manual dibiarkan; ID CoinGecko huruf kecil.
+  if (a.type !== 'manual' && a.symbol) a.symbol = a.symbol.toUpperCase();
+  if (a.yahoo) a.yahoo = a.yahoo.toUpperCase();
+  if (a.coingeckoId) a.coingeckoId = a.coingeckoId.toLowerCase();
   if (oldScript) delete a.buyDate; // skrip lama membuang kolom ini diam-diam; jangan berpura-pura menyimpannya
   return a;
 }

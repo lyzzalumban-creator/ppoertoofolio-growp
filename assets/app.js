@@ -16,6 +16,12 @@ const RANGES = [['1 bln', 31], ['3 bln', 92], ['1 thn', 366], ['Semua', Infinity
 const MASK = '••••••';
 const DAY = 86_400_000;
 
+const ICON = {
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.7 8.4 2 12 2 12s3.5 7 10 7a9.8 9.8 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  chev: '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+};
+
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -50,9 +56,10 @@ function heldText(buyDate) {
   return ` (${t})`;
 }
 
-const state = { snapshots: [], hidden: false, range: 'Semua', filter: null };
+const state = { snapshots: [], hidden: true, range: 'Semua', filter: null, open: new Set() };
 
-try { state.hidden = localStorage.getItem('pf-hidden') === '1'; } catch { /* penyimpanan diblokir: abaikan */ }
+// Privasi dulu: pada kunjungan pertama nominal tersembunyi; pilihanmu diingat di browser ini.
+try { const v = localStorage.getItem('pf-hidden'); state.hidden = v === null ? true : v === '1'; } catch { state.hidden = true; }
 
 const latest = () => state.snapshots[state.snapshots.length - 1];
 
@@ -84,24 +91,39 @@ function renderHeader() {
   const at = latest().at ? Date.parse(latest().at) : NaN;
   const age = Date.now() - at;
   $('subtitle').textContent = Number.isFinite(at)
-    ? `Harga terakhir · diperbarui ${fAtDate.format(at)}, ${fAtTime.format(at)} WIB (${agoText(age).replace(/ /g, '\u00a0')})`
-    : `Harga terakhir · data per ${longDate(latest().date)}`;
+    ? `Diperbarui ${fAtDate.format(at)}, ${fAtTime.format(at)} WIB (${agoText(age).replace(/ /g, '\u00a0')})`
+    : `Data per ${longDate(latest().date)}`;
   $('subtitle').classList.toggle('stale', Number.isFinite(at) && age > 12 * 3_600_000); // jadwal 6 jam: lewat 12 jam = ada yang macet
   const btn = $('privacy');
+  const label = state.hidden ? 'Tampilkan nominal' : 'Sembunyikan nominal';
   btn.setAttribute('aria-pressed', String(state.hidden));
-  btn.textContent = state.hidden ? 'Tampilkan nominal' : 'Sembunyikan nominal';
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  btn.innerHTML = state.hidden ? ICON.eye : ICON.eyeOff; // ikon = aksi yang akan terjadi bila diketuk
+}
+
+// Mini-grafik 30 hari terakhir: hanya bentuknya (tanpa angka), jadi aman walau nominal disembunyikan.
+function sparkline() {
+  const pts = state.snapshots.slice(-30).filter((s) => s.total != null).map((s) => s.total);
+  if (pts.length < 2) return '';
+  const lo = Math.min(...pts);
+  const hi = Math.max(...pts);
+  const span = hi - lo || 1;
+  const line = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 100).toFixed(2)},${(29 - ((v - lo) / span) * 27).toFixed(2)}`).join('');
+  const dir = pts[pts.length - 1] > pts[0] ? 'pos' : pts[pts.length - 1] < pts[0] ? 'neg' : 'flat';
+  return `<svg class="spark ${dir}" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="area" d="${line}L100,32L0,32Z"/><path class="line" d="${line}"/></svg>`;
 }
 
 function renderKpis() {
   const L = latest();
   const types = Object.keys(L.byType || {}).length;
-  const cards = [
-    { label: 'Total nilai', value: money(L.total), note: `Modal ${money(L.cost)}` },
-    { label: 'Untung/rugi total', value: delta(L.pnlPct), note: money(L.pnl, { sign: true }) },
-    { label: 'Hari ini', value: delta(L.dayPct), note: L.dayPct == null ? 'Butuh data hari sebelumnya' : money(L.dayPnl, { sign: true }) },
-    { label: 'Jumlah aset', value: String((L.positions || []).length), note: `${types} jenis aset` },
-  ];
-  $('kpis').innerHTML = cards.map((c) => `<div class="kpi"><div class="label">${esc(c.label)}</div><div class="value">${c.value}</div><div class="note">${esc(c.note)}</div></div>`).join('');
+  const day = L.dayPct == null
+    ? '<span class="pill flat">Hari ini: belum ada pembanding</span>'
+    : `<span class="pill ${tone(L.dayPct)}">${arrow(L.dayPct)}${pct(L.dayPct)}${state.hidden ? '' : ` · ${money(L.dayPnl, { sign: true })}`} <em>hari ini</em></span>`;
+  $('kpis').innerHTML = `
+    <div class="kpi hero"><div class="label">Total nilai</div><div class="value">${money(L.total)}</div>${day}${sparkline()}</div>
+    <div class="kpi"><div class="label">Untung/rugi total</div><div class="value">${delta(L.pnlPct)}</div><div class="note">${esc(money(L.pnl, { sign: true }))}</div></div>
+    <div class="kpi"><div class="label">Modal</div><div class="value">${money(L.cost)}</div><div class="note">${(L.positions || []).length} aset · ${types} jenis</div></div>`;
 }
 
 // -- grafik --
@@ -251,7 +273,10 @@ function renderAlloc() {
   }).join('');
 }
 
-// -- tabel --
+// -- daftar aset --
+
+// Kode aset pasar selalu huruf besar di tampilan (mis. "panw" -> PANW); label aset manual dibiarkan.
+const symDisp = (p) => (p.type === 'manual' ? p.symbol : String(p.symbol).toUpperCase());
 
 // Harga aset manual adalah angka ketikanmu sendiri (sering = saldo), jadi diperlakukan sebagai nominal.
 function priceText(p, fmt) {
@@ -259,32 +284,39 @@ function priceText(p, fmt) {
   return fmt.format(p.price);
 }
 
-function renderTable() {
+function renderList() {
   const L = latest();
   let rows = L.positions || [];
   if (state.filter) rows = rows.filter((p) => p.type === state.filter);
-  $('filter-note').textContent = state.filter ? `Hanya ${TYPE[state.filter].label} · klik lagi untuk semua` : '';
+  $('filter-note').textContent = state.filter ? `Hanya ${TYPE[state.filter].label} · ketuk jenisnya lagi untuk semua` : 'Nilai dan perubahan hari ini · ketuk untuk rincian';
 
   const maxW = Math.max(0.0001, ...(L.positions || []).map((p) => p.weight || 0));
-  const head = '<thead><tr><th>Aset</th><th>Harga</th><th>Nilai</th><th>Bobot</th><th>Untung/rugi</th><th>Hari ini</th></tr></thead>';
-
-  const body = rows.map((p) => {
+  $('holdings').innerHTML = rows.map((p) => {
     const priceFmt = p.currency === 'USD' ? fUsd : fIdr;
-    const qty = state.hidden ? null : `${fNum.format(p.qty)}${TYPE[p.type].unit ? ` ${TYPE[p.type].unit}` : ''}`;
+    const t = TYPE[p.type];
+    const sym = symDisp(p);
+    const name = p.name && p.name !== p.symbol ? p.name : sym;
+    const qty = state.hidden ? MASK : `${fNum.format(p.qty)}${t.unit ? ` ${t.unit}` : ''}`;
     const buy = p.buyDate ? `dibeli ${longDate(p.buyDate)}${heldText(p.buyDate)}` : null;
-    const sub = [p.symbol, qty, buy].filter(Boolean).join(' · ');
-    const stale = p.stale ? `<span class="chip" title="Gagal diambil hari ini; memakai harga per ${esc(p.asOf)}">harga lama</span>` : '';
-    return `<tr>
-      <td class="asset"><i class="dot" style="background:var(--c-${p.type})"></i><div><strong>${esc(p.name)}</strong><small>${esc(sub)}</small></div></td>
-      <td class="num" data-label="Harga" title="Harga per ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</td>
-      <td class="num" data-label="Nilai">${money(p.value)}</td>
-      <td class="num" data-label="Bobot"><span class="wt">${weightText(p.weight)}<span class="bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%"></i></span></span></td>
-      <td class="num" data-label="Untung/rugi">${delta(p.pnlPct)}<small>${money(p.pnl, { sign: true })}</small></td>
-      <td class="num" data-label="Hari ini">${delta(p.dayPct)}</td>
-    </tr>`;
-  }).join('');
-
-  $('holdings').innerHTML = `${head}<tbody>${body || '<tr><td colspan="6" class="muted">Tidak ada aset.</td></tr>'}</tbody>`;
+    const sub = [name !== sym ? sym : null, t.label, buy].filter(Boolean).join(' · ');
+    const stale = p.stale ? `<span class="chip" title="Gagal diambil; memakai harga per ${esc(p.asOf)}">harga lama</span>` : '';
+    const key = `${p.type}:${p.symbol}`;
+    return `<li><details class="asset-row" data-key="${esc(key)}"${state.open.has(key) ? ' open' : ''}>
+      <summary>
+        <i class="dot" style="background:var(--c-${p.type})"></i>
+        <span class="a-main"><strong>${esc(name)}</strong><small>${esc(sub)}</small></span>
+        <span class="a-val"><b>${money(p.value)}</b>${delta(p.dayPct)}</span>
+        ${ICON.chev}
+        <span class="a-bar"><span class="bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%"></i></span>${weightText(p.weight)} dari total</span>
+      </summary>
+      <dl class="a-det">
+        <div><dt>Harga</dt><dd data-label="Harga" title="Harga per ${p.asOf ? longDate(p.asOf) : ''}">${priceText(p, priceFmt)}${stale}</dd></div>
+        <div><dt>Jumlah</dt><dd>${esc(qty)}</dd></div>
+        <div><dt>Untung/rugi</dt><dd>${delta(p.pnlPct)}<small>${esc(money(p.pnl, { sign: true }))}</small></dd></div>
+        <div><dt>Modal</dt><dd>${money(p.cost)}</dd></div>
+        ${p.buyDate ? `<div><dt>Dibeli</dt><dd>${esc(longDate(p.buyDate))}<small>${esc(heldText(p.buyDate).replace(/^ \(|\)$/g, ''))}</small></dd></div>` : ''}
+      </dl></details></li>`;
+  }).join('') || '<li class="muted">Tidak ada aset.</li>';
 }
 
 function render() {
@@ -293,7 +325,7 @@ function render() {
   renderRanges();
   renderChart();
   renderAlloc();
-  renderTable();
+  renderList();
 }
 
 // ---------- interaksi ----------
@@ -317,7 +349,26 @@ $('legend').addEventListener('click', (e) => {
   if (!b) return;
   state.filter = state.filter === b.dataset.type ? null : b.dataset.type;
   renderAlloc();
-  renderTable();
+  renderList();
+});
+
+// 'toggle' tidak menggelembung, jadi didengarkan di fase tangkap.
+$('holdings').addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!d.matches || !d.matches('details[data-key]')) return;
+  if (d.open) state.open.add(d.dataset.key);
+  else state.open.delete(d.dataset.key);
+}, true);
+
+$('reload').addEventListener('click', async () => {
+  const c = readCreds();
+  if (!c) return showConnect();
+  const b = $('reload');
+  b.disabled = true;
+  b.textContent = 'Memuat…';
+  await start(c);
+  b.disabled = false;
+  b.textContent = 'Muat ulang';
 });
 
 $('logout').addEventListener('click', () => {
@@ -338,10 +389,13 @@ new ResizeObserver(() => {
 // ---------- sambung & mulai ----------
 
 function show(view) { // 'connect' | 'dash' | 'empty' | 'error'
+  $('skeleton').hidden = true;
   $('connect').hidden = view !== 'connect';
   $('dash').hidden = view !== 'dash';
   $('actions').hidden = view !== 'dash' && view !== 'empty';
   $('privacy').hidden = view !== 'dash';
+  $('reload').hidden = view === 'connect';
+  $('foot-actions').hidden = view === 'connect';
   if (view !== 'error' && view !== 'empty') $('banner').hidden = true;
 }
 
