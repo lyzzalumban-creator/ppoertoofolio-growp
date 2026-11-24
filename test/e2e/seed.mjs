@@ -101,4 +101,8 @@ export function seedFake(fake, { days = 150, end = '2026-11-23', withHistory = t
     const r = fake.call({ token: t, action: 'appendSnapshot', snapshot: snap });
     if (!r.ok) throw new Error(`seed gagal: ${r.error}`);
   }
+  // Robot menghargai aset manual dari kolom price di Sheet (diperbarui pengguna sendiri). Samakan dengan hari terakhir
+  // agar tampilan langsung di web = snapshot robot, seperti di dunia nyata.
+  const assets = sampleAssets.map((a) => (a.type === 'manual' ? { ...a, price: Math.round(px[keyOf(a)] * 1e4) / 1e4 } : a));
+  fake.call({ token: t, action: 'saveAssets', assets });
 }

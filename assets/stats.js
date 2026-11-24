@@ -1,4 +1,5 @@
 // Hitungan kinerja dari riwayat snapshot. Murni (tanpa DOM), jadi bisa dites di Node.
+import { buildSnapshot, currencyOf, keyOf } from '../scripts/lib/portfolio.mjs';
 // dayPct tiap snapshot = perubahan HARGA aset yang dipegang sejak snapshot sebelumnya, jadi
 // menambah atau menjual aset tidak terbaca sebagai untung/rugi (return tertimbang waktu).
 
@@ -49,7 +50,6 @@ const SORTS = {
   dayPct: byPct('dayPct'),
   name: (a, b) => label(a).localeCompare(label(b), 'id', { sensitivity: 'base' }),
 };
-export const SORT_KEYS = Object.keys(SORTS);
 
 /** Salinan terurut; kunci tak dikenal = urut nilai. */
 export function sortPositions(rows, key) {
@@ -57,17 +57,6 @@ export function sortPositions(rows, key) {
 }
 
 // ---------- halaman depan ----------
-
-/** Perubahan hari ini per aset (rupiah, dari dayPct); naik/turun terbanyak, maks. n per sisi. */
-export function dayMovers(rows, n = 3) {
-  const moved = rows
-    .filter((p) => Number.isFinite(p.dayPct) && p.dayPct !== 0)
-    .map((p) => ({ ...p, dayAmt: p.value - p.value / (1 + p.dayPct) }));
-  return {
-    gainers: moved.filter((p) => p.dayPct > 0).sort((a, b) => b.dayPct - a.dayPct).slice(0, n),
-    losers: moved.filter((p) => p.dayPct < 0).sort((a, b) => a.dayPct - b.dayPct).slice(0, n),
-  };
-}
 
 // Ambang konsentrasi. Kas dan aset "manual" (deposito, reksa dana pasar uang) tidak dihitung: dominannya bukan risiko pasar.
 const SAFE = ['cash', 'manual'];
@@ -152,4 +141,36 @@ export function byTypePnl(rows) {
 export function cashSplit(snap) {
   const cash = (snap.byType && snap.byType.cash && snap.byType.cash.value) || 0;
   return { cash, invested: snap.total - cash, weight: snap.total > 0 ? cash / snap.total : 0 };
+}
+
+// ---------- tampilan langsung ----------
+
+/**
+ * Snapshot "sekarang" dari daftar aset di Sheet + harga terakhir yang diketahui, memakai fungsi yang sama dengan robot.
+ * Dengan ini aset yang baru ditambah, dibeli, atau dijual langsung tampil tanpa menunggu robot berikutnya.
+ * Aset tanpa harga (baru ditambah, robot belum jalan) dikembalikan di `pending`.
+ * @returns {{ snap: object|null, pending: object[] }}
+ */
+export function liveView(assets, snaps, today) {
+  const L = snaps[snaps.length - 1];
+  const P = snaps[snaps.length - 2];
+  const known = new Map(((L && L.positions) || []).map((p) => [keyOf(p), p]));
+  const fx = L ? L.fx : null;
+  const priced = [];
+  const pending = [];
+  for (const a of assets) {
+    const cur = currencyOf(a);
+    const p = known.get(keyOf(a));
+    let q = null;
+    if (a.type === 'cash') q = { price: 1 };
+    else if (a.type === 'manual' && Number.isFinite(a.price)) q = { price: a.price };
+    else if (p && Number.isFinite(p.price) && (p.currency || cur) === cur) q = { price: p.price, asOf: p.asOf, ...(p.stale ? { stale: true } : {}) };
+    if (q && cur === 'USD' && !(fx > 0)) q = null; // aset dolar butuh kurs
+    if (q) priced.push([a, { asOf: L ? L.date : today, ...q }]);
+    else pending.push(a);
+  }
+  if (!priced.length) return { snap: null, pending };
+  const snap = buildSnapshot({ date: L ? L.date : today, assets: priced.map((x) => x[0]), quotes: new Map(priced.map(([a, q]) => [keyOf(a), q])), fx, prev: P });
+  if (L && L.at) snap.at = L.at;
+  return { snap, pending };
 }

@@ -25,8 +25,8 @@ test('JSON rusak -> error, bukan crash', () => {
 test('list pada Sheet kosong: tab dibuat otomatis, hasil kosong', () => {
   const f = createFake();
   const r = f.call({ token: f.token, action: 'list' });
-  assert.deepEqual(r, { ok: true, version: 2, assets: [], history: [] });
-  assert.deepEqual([...f.sheets.keys()].sort(), ['Aset', 'Riwayat']);
+  assert.deepEqual(r, { ok: true, version: 3, assets: [], history: [], transactions: [] });
+  assert.deepEqual([...f.sheets.keys()].sort(), ['Aset', 'Riwayat', 'Transaksi']);
 });
 
 test('saveAssets lalu list: bolak-balik utuh, kolom kosong tidak ikut', () => {
@@ -141,4 +141,56 @@ test('menyimpan ulang menaikkan header lama ke 11 kolom dan menjaga data', () =>
   assert.strictEqual(rows[0].length, 11);
   assert.strictEqual(rows[0][10], 'buyDate');
   assert.deepEqual(f.call({ token: f.token, action: 'list' }).assets[0], { type: 'idx', symbol: 'CUAN', qty: 1000, avgCost: 200, buyDate: '2025-01-15' });
+});
+
+// ---------- transaksi (versi 3) ----------
+
+const tx = (id, extra = {}) => ({ id, date: '2026-11-23', kind: 'sell', type: 'idx', symbol: 'BBCA', name: 'BCA', qty: 400, price: 10_000, currency: 'IDR', costIdr: 3_600_000, pnl: 400_000, pnlIdr: 400_000, at: '2026-11-23T05:00:00Z', ...extra });
+
+test('trade: daftar aset tersimpan DAN catatan jual tercatat sekaligus; tanggal tetap teks', () => {
+  const f = createFake();
+  const r = f.call({ token: f.token, action: 'trade', assets: [{ type: 'idx', symbol: 'BBCA', qty: 600, avgCost: 9000 }], tx: tx('tx-00000001') });
+  assert.deepEqual(r, { ok: true, saved: 1, recorded: true });
+  const l = f.call({ token: f.token, action: 'list' });
+  assert.equal(l.assets[0].qty, 600);
+  assert.deepEqual(l.transactions, [tx('tx-00000001')]);
+  assert.equal(typeof l.transactions[0].date, 'string');
+  assert.equal(f.locks.held, 0, 'kunci dilepas');
+});
+
+test('trade dikirim ulang dengan id sama: catatan tidak dobel, daftar aset tetap benar', () => {
+  const f = createFake();
+  const req = { token: f.token, action: 'trade', assets: [{ type: 'idx', symbol: 'BBCA', qty: 600, avgCost: 9000 }], tx: tx('tx-00000002') };
+  f.call(req);
+  assert.deepEqual(f.call(req), { ok: true, saved: 1, recorded: false });
+  assert.equal(f.call({ token: f.token, action: 'list' }).transactions.length, 1);
+});
+
+test('trade menolak isian cacat tanpa menyentuh Sheet', () => {
+  const f = createFake();
+  const assets = [{ type: 'idx', symbol: 'BBCA', qty: 1, avgCost: 1 }];
+  for (const [bad, msg] of [[{ ...tx('pendek'), id: 'x' }, /tx.id/], [{ ...tx('tx-00000003'), kind: 'tukar' }, /kind/], [{ ...tx('tx-00000004'), date: '23/11/2026' }, /date/], [{ ...tx('tx-00000005'), qty: 0 }, /qty/]]) {
+    assert.match(f.call({ token: f.token, action: 'trade', assets, tx: bad }).error, msg);
+  }
+  assert.match(f.call({ token: f.token, action: 'trade', assets }).error, /tx.id/);
+  assert.ok(!f.sheets.has('Aset') && !f.sheets.has('Transaksi'));
+});
+
+test('deleteTx menghapus satu catatan saja; daftar aset tidak berubah', () => {
+  const f = createFake();
+  const assets = [{ type: 'idx', symbol: 'BBCA', qty: 600, avgCost: 9000 }];
+  f.call({ token: f.token, action: 'trade', assets, tx: tx('tx-0000000a') });
+  f.call({ token: f.token, action: 'trade', assets, tx: tx('tx-0000000b', { kind: 'buy', pnlIdr: undefined, pnl: undefined, costIdr: undefined }) });
+  assert.deepEqual(f.call({ token: f.token, action: 'deleteTx', id: 'tx-0000000a' }), { ok: true, deleted: 1 });
+  const l = f.call({ token: f.token, action: 'list' });
+  assert.deepEqual(l.transactions.map((t) => t.id), ['tx-0000000b']);
+  assert.deepEqual(l.assets, assets);
+  assert.deepEqual(f.call({ token: f.token, action: 'deleteTx', id: 'tidak-ada' }), { ok: true, deleted: 0 });
+  assert.equal(f.locks.held, 0);
+});
+
+test('nama transaksi berawalan = tetap teks (bukan rumus)', () => {
+  const f = createFake();
+  f.call({ token: f.token, action: 'trade', assets: [], tx: tx('tx-0000000c', { name: '=IMPORTXML("http://x")' }) });
+  assert.equal(f.call({ token: f.token, action: 'list' }).transactions[0].name, '=IMPORTXML("http://x")');
 });

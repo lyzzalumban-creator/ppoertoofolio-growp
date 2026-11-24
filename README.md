@@ -3,16 +3,16 @@
 Dasbor pribadi yang menggabungkan semua portofolio investasimu (saham IDX, saham AS, kripto, emas, reksa dana, kas) di satu halaman. Aset diisi **lewat web**, data disimpan di **Google Sheet-mu sendiri**, dan harga diperbarui **4 kali sehari** (01.30, 07.30, 13.30, dan 19.30 WIB).
 
 ```
-Web: dasbor + "Kelola aset" ──┐
-                              ├──► Apps Script ──► Google Sheet (tab "Aset" dan "Riwayat")
-Robot harian (GitHub Actions) ┘
+Web: dasbor, tambah/ubah aset, jual-beli ──┐
+                                           ├──► Apps Script ──► Google Sheet (tab "Aset", "Riwayat", "Transaksi")
+Robot harian (GitHub Actions) ─────────────┘
 ```
 
 **Repo dan situs ini tidak berisi data sama sekali.** Tanpa URL dan kata sandimu, halamannya kosong. Alasannya ada di bagian [Privasi](#privasi).
 
 ## Pasang (sekali, ±15 menit)
 
-1. **Buat Google Sheet kosong.** Namanya bebas. Tab `Aset` dan `Riwayat` dibuat otomatis.
+1. **Buat Google Sheet kosong.** Namanya bebas. Tab `Aset`, `Riwayat`, dan `Transaksi` dibuat otomatis.
 2. **Pasang kode:** di Sheet buka *Extensions → Apps Script*, hapus isi bawaan, tempel seluruh isi [`apps-script/Code.gs`](apps-script/Code.gs), simpan.
 3. **Pasang kata sandi:** *Project Settings* (ikon roda gigi) → *Script properties* → *Add script property*: nama `TOKEN`, nilai kata sandi **panjang (20 karakter atau lebih)**. Simpan di pengelola kata sandi, karena tidak bisa dipulihkan, hanya diganti.
 4. **Deploy:** *Deploy → New deployment →* jenis *Web app*, isi **Execute as: Me** dan **Who has access: Anyone**, lalu *Deploy*. Izinkan aksesnya saat diminta; peringatan *"Google hasn't verified this app"* wajar karena kamu pembuatnya sendiri (*Advanced → Go to … (unsafe) → Allow*). Salin **Web app URL** (berakhiran `/exec`).
@@ -21,17 +21,17 @@ Robot harian (GitHub Actions) ┘
    - `APPS_SCRIPT_TOKEN`: kata sandi yang sama dengan `TOKEN`
    - (opsional) `COINGECKO_API_KEY`: demo key CoinGecko gratis, untuk batas request lebih longgar
 6. **Aktifkan GitHub Pages:** *Settings → Pages → Deploy from branch →* `main`, folder `/ (root)`. Workflow terjadwal GitHub hanya berjalan dari branch default, jadi pastikan semua file ini sudah ada di `main`.
-7. **Pakai:** buka situsmu, tempel URL dan kata sandi (sekali per perangkat), buka **Kelola aset** dan tambah asetmu. Lalu tab *Actions → Update harga harian → Run workflow*. Sesudah itu jalan sendiri 4 kali sehari.
+7. **Pakai:** buka situsmu, tempel URL dan kata sandi (sekali per perangkat), lalu tambah asetmu lewat tombol **+** (di tengah menu bawah; di desktop tombol **Tambah**). Lalu tab *Actions → Update harga harian → Run workflow*. Sesudah itu jalan sendiri 4 kali sehari.
 
-Aset yang kamu tambah muncul di dasbor setelah update harga berikutnya (maksimal 1 hari, atau langsung bila kamu menekan *Run workflow*).
+Aset yang kamu tambah langsung tampil di daftar. Kas dan aset `manual` langsung terhitung; saham, kripto, dan emas bertanda **Menunggu harga** sampai update harga berikutnya (maksimal 6 jam, atau langsung bila kamu menekan *Run workflow*). Mengubah jumlah, membeli, dan menjual langsung terhitung dengan harga terakhir yang diketahui.
 
 > **Mengubah kode Apps Script nanti?** Perubahan baru aktif setelah *Deploy → Manage deployments → Edit (ikon pensil) → Version: New version → Deploy*. URL-nya tetap sama.
 >
-> Bila fitur baru butuh kode Apps Script yang lebih baru (mis. tanggal beli), halaman **Kelola aset** menampilkan banner kuning "masih versi lama" dan menyembunyikan kolom yang belum didukung, supaya tidak ada data yang hilang diam-diam. Tempel `Code.gs` terbaru lalu deploy versi baru; data di Sheet tidak berubah.
+> Bila fitur baru butuh kode Apps Script yang lebih baru, dasbor memberi tahu dan menahan fitur itu, supaya tidak ada data yang hilang diam-diam: tanggal beli butuh versi 2 (lembar Tambah aset memberi catatan), **Beli/Jual butuh versi 3** (tombolnya redup dengan catatan). Versi yang terpasang tertulis di Profil > Data. Tempel `Code.gs` terbaru lalu deploy versi baru; data di Sheet tidak berubah.
 
 ## Mengisi aset
 
-Lewat halaman **Kelola aset** (menu **Kelola** di bawah layar). Kolom yang tampil menyesuaikan jenis aset. Isinya sama dengan tab `Aset` di Sheet, yang juga boleh kamu edit langsung.
+Tambah lewat tombol **+**. Ketuk aset di Beranda untuk halamannya: grafik harga, rincian, dan tombol **Beli**, **Jual**, **Ubah**, **Hapus**. Kolom yang tampil menyesuaikan jenis aset. Isinya sama dengan tab `Aset` di Sheet, yang juga boleh kamu edit langsung.
 
 | Field | Keterangan |
 |---|---|
@@ -51,17 +51,28 @@ Lewat halaman **Kelola aset** (menu **Kelola** di bawah layar). Kolom yang tampi
 
 Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara termudah mencatat sesuatu yang tidak punya harga pasar.
 
+## Jual dan beli (keuntungan terealisasi)
+
+Di halaman aset, **Jual** mencatat penjualan: isi jumlah (atau *Jual semua*), harga per unit, dan tanggal; untuk aset dolar juga kurs saat itu. Sebelum menyimpan, lembarnya menampilkan hasil jual, modal porsi yang dijual, **keuntungan terealisasi** (rupiah dan persen), dan sisa. Setelah disimpan, jumlah di tab `Aset` berkurang (aset hilang dari daftar bila terjual habis) dan satu baris masuk ke tab `Transaksi`. **Beli** menambah jumlah dan menimbang ulang harga beli rata-rata.
+
+- **Dasar modal: harga beli rata-rata** saat dijual (satu-satunya yang disimpan per aset, bukan FIFO). Menjual tidak mengubah harga rata-rata sisanya.
+- **Aset dolar:** modal memakai `costIdr` bila diisi (kurs saat beli), selain itu harga rata-rata × kurs yang kamu isi saat menjual. Tab `Transaksi` menyimpan untung/rugi dalam rupiah (`pnlIdr`) dan dolar (`pnl`).
+- **Aktivitas** (menu bawah) menampilkan total keuntungan terealisasi, total tahun ini, dan semua transaksi per bulan. Ketuk satu baris untuk rinciannya; **Hapus catatan** hanya menghapus catatannya (untuk salah input), jumlah aset tidak ikut berubah.
+- **Aman diulang:** bila sinyal putus setelah menekan Jual, tekan lagi. Setiap transaksi punya id, jadi Sheet tidak menjual atau mencatat dua kali.
+- Kas tidak dijual-beli; ubah saldonya saja. Untuk mencatat aset yang terjual tanpa keuntungannya, pakai **Hapus**.
+- Kinerja (return tertimbang waktu) tetap dari pergerakan harga, jadi menjual tidak terbaca sebagai untung/rugi portofolio.
+
 ## Privasi
 
 - **Repo dan situs tidak berisi data.** GitHub Pages dapat dibuka siapa saja yang tahu URL-nya, **bahkan dari repo privat** (kecuali paket Enterprise). Karena itu asetmu dan riwayatmu hanya ada di Google Sheet milikmu, dan situs mengambilnya lewat Apps Script setelah kamu memasukkan kata sandi.
 - **Satu-satunya pengaman adalah kata sandi `TOKEN`.** Siapa pun yang memegang URL Apps Script *dan* kata sandinya bisa membaca dan mengubah datamu. Tidak ada pembatasan percobaan, jadi pakai kata sandi panjang dan acak. Untuk menggantinya: ubah `TOKEN` di Script properties (langsung berlaku), perbarui secret `APPS_SCRIPT_TOKEN`, lalu masuk ulang di perangkatmu.
 - Kata sandi hanya dikirim ke `script.google.com` (halaman menolak URL lain) dan disimpan di browser perangkat itu saja. Di perangkat bersama, tekan **Keluar**.
 - Jangan bagikan Google Sheet-nya. Yang punya akses ke Sheet melihat semua datamu.
-- **Log GitHub Actions di repo publik bisa dibaca siapa pun yang punya akun GitHub.** Karena itu robot di sana **tidak mencetak** kode saham, bobot, untung/rugi, nominal, maupun tanggal beli; yang tampil hanya status dan jumlah ("2 aset, tersimpan"). Sebagai jaring pengaman, kode, nama, dan ID CoinGecko asetmu didaftarkan ke fitur penyamaran GitHub (`::add-mask::` → `***`), dan pesan error memakai **nomor aset** (urutan di daftar Kelola, mis. `#2 idx`) alih-alih kodenya. Kode 1–2 huruf (mis. `F`) tidak bisa didaftarkan ke GitHub karena akan mengaburkan huruf lain; untuknya robot menyamarkan sendiri. Di komputermu sendiri (`npm run update:dry`) log tetap lengkap.
+- **Log GitHub Actions di repo publik bisa dibaca siapa pun yang punya akun GitHub.** Karena itu robot di sana **tidak mencetak** kode saham, bobot, untung/rugi, nominal, maupun tanggal beli; yang tampil hanya status dan jumlah ("2 aset, tersimpan"). Sebagai jaring pengaman, kode, nama, dan ID CoinGecko asetmu didaftarkan ke fitur penyamaran GitHub (`::add-mask::` → `***`), dan pesan error memakai **nomor aset** (urutan di tab `Aset`, mis. `#2 idx`) alih-alih kodenya. Kode 1–2 huruf (mis. `F`) tidak bisa didaftarkan ke GitHub karena akan mengaburkan huruf lain; untuknya robot menyamarkan sendiri. Di komputermu sendiri (`npm run update:dry`) log tetap lengkap.
 - **Jadwal otomatis bisa dimatikan GitHub:** di repo publik, bila **60 hari tanpa aktivitas** (commit), GitHub menonaktifkan workflow terjadwal. Kamu mendapat email, dan cukup mengaktifkannya lagi di tab Actions. Dasbor menampilkan "diperbarui … (N jam lalu)" dan warnanya berubah bila lebih dari 12 jam, jadi mudah terlihat bila jadwalnya berhenti.
-- **Nominal tersembunyi secara bawaan** pada kunjungan pertama di sebuah browser; ketuk ikon mata di pojok kanan atas untuk menampilkannya (pilihanmu diingat di browser itu). Ini hanya kosmetik, misalnya bila ada orang melihat layarmu: datanya tetap ada di halaman. Mini-grafik di kartu utama hanya menampilkan bentuknya, tanpa angka.
+- **Nominal tersembunyi secara bawaan** pada kunjungan pertama di sebuah browser; ketuk ikon mata di pojok kanan atas untuk menampilkannya (pilihanmu diingat di browser itu). Ini hanya kosmetik, misalnya bila ada orang melihat layarmu: datanya tetap ada di halaman. Mini-grafik di kartu aset hanya menampilkan bentuknya, tanpa angka. Jumlah unit dan rupiah di Aktivitas ikut disamarkan.
 - **Halaman Analisis** (Kinerja, Alokasi, Risiko, Riwayat) menghitung return bulanan, return tertimbang waktu, penurunan, volatilitas, dan konsentrasi dari perubahan harga harian, jadi menambah atau menjual aset tidak terbaca sebagai untung/rugi. Hampir semuanya dalam persen, jadi tetap tampil saat nominal disembunyikan.
-- **Menu bawah** (Beranda, Analisis, Aset, Kelola, Profil) dan **tema** (Otomatis/Terang/Gelap) diatur di halaman Profil. Target nilai disimpan di browser perangkat itu saja.
+- **Menu bawah** berisi Beranda, Analisis, tombol **+**, Aktivitas, dan Profil (di desktop menjadi bilah atas). **Tema** (Otomatis/Terang/Gelap) diatur di halaman Profil. Target nilai disimpan di browser perangkat itu saja.
 - "Harga" aset `manual` adalah angka yang kamu ketik sendiri dan sering sama dengan saldomu, jadi ikut disembunyikan. Saldo `cash` juga disamarkan.
 
 ## Sumber data dan batasannya
@@ -83,7 +94,7 @@ Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara ter
 
 Grafik digambar dari snapshot harian (satu per tanggal), dan robot baru mulai membuatnya sejak run pertama. Supaya grafik tidak menunggu berminggu-minggu, robot **mengisi riwayat ke belakang** dari harga penutupan historis Yahoo Finance, sejak `buyDate` paling awal.
 
-- **Cara kerja:** isi **Tanggal beli** di Kelola aset, lalu jalankan *Run workflow*. Run itu mengisi semua hari dari tanggal beli sampai kemarin (satu panggilan per hari; puluhan hari = 1-3 menit). Bila riwayat sudah lengkap, tidak ada yang diulang.
+- **Cara kerja:** isi **Tanggal beli** di lembar Tambah/Ubah aset, lalu jalankan *Run workflow*. Run itu mengisi semua hari dari tanggal beli sampai kemarin (satu panggilan per hari; puluhan hari = 1-3 menit). Bila riwayat sudah lengkap, tidak ada yang diulang.
 - **Asumsi:** jumlah (`qty`) tiap aset dianggap **tetap sejak tanggal belinya**. Kalau kamu menambah beli di tengah jalan, nilai sebelum itu terlalu besar; ini keterbatasan satu-tanggal-per-aset.
 - **Aset tanpa `buyDate` tidak ikut** (kapan mulai dimiliki tidak diketahui). Ia baru muncul sejak snapshot nyata pertama, jadi grafik nilai bisa melonjak pada hari itu. Begitu juga saat aset kedua "dibeli": nilai total naik karena aset itu mulai dihitung, bukan karena untung.
 - **Batas:** maksimal 366 hari ke belakang (tanggal salah ketik seperti 2015 tidak membuat ribuan panggilan).
@@ -97,7 +108,8 @@ Grafik digambar dari snapshot harian (satu per tanggal), dan robot baru mulai me
 |---|---|
 | `unauthorized` / "Kata sandi salah" | `TOKEN` di Script properties tidak sama dengan yang kamu ketik atau isi di secret |
 | "Respons bukan JSON" | URL salah, atau deploy belum *Who has access: Anyone*, atau kode diubah tanpa *New version* |
-| "Daftar aset kosong" (robot) | Belum ada aset: tambah lewat **Kelola aset** |
+| "Daftar aset kosong" (robot) | Belum ada aset: tambah lewat tombol **+** |
+| Tombol Beli/Jual redup | Kode Apps Script belum versi 3: tempel `Code.gs` terbaru lalu *New version* |
 | Workflow merah dengan daftar aset | Simbol salah ketik / sumber harga menolak. Baca daftarnya di log Actions |
 
 ## Perintah lokal
@@ -115,7 +127,7 @@ Halaman tidak bisa dibuka dengan klik dua kali `index.html` (browser memblokir p
 ## Struktur
 
 ```
-index.html, kelola.html, assets/   situs statis (HTML, CSS, JS murni, tanpa data)
+index.html, assets/                situs statis (HTML, CSS, JS murni, tanpa data); kelola.html hanya meneruskan tautan lama
 apps-script/Code.gs                pintu data yang ditempel di Google Sheet
 scripts/update.mjs                 robot harian: baca aset, ambil harga, simpan snapshot
 scripts/lib/                       hitung (dipakai juga browser), sumber harga, klien API

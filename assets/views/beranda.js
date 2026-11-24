@@ -1,86 +1,146 @@
-// Beranda: angka utama, sorotan, grafik, pergerakan hari ini, alokasi ringkas, target.
-import { $, ICON, ORDER, TYPE, arrow, delta, esc, fMonthLong, latest, money, notify, pct, state, symDisp, toMs, tone, weightText } from '../lib.js';
-import { dayMovers, goalProgress, insights } from '../stats.js';
-import { drawChart, initChart, renderChart, renderRanges } from './chart.js';
+// Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
+// ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
+import { $, ICON, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fCompact, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { goalProgress, insights, sortPositions } from '../stats.js';
+import { realized } from '../../scripts/lib/trade.mjs';
+import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
+import { openAssetForm } from './sheets.js';
 
-// Mini-grafik 30 hari terakhir: hanya bentuknya (tanpa angka), jadi aman walau nominal disembunyikan.
-function sparkline() {
-  const pts = state.snapshots.slice(-30).filter((s) => s.total != null).map((s) => s.total);
-  if (pts.length < 2) return '';
-  const lo = Math.min(...pts);
-  const hi = Math.max(...pts);
-  const span = hi - lo || 1;
-  const line = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 100).toFixed(2)},${(29 - ((v - lo) / span) * 27).toFixed(2)}`).join('');
-  const dir = pts[pts.length - 1] > pts[0] ? 'pos' : pts[pts.length - 1] < pts[0] ? 'neg' : 'flat';
-  return `<svg class="spark ${dir}" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="area" d="${line}L100,32L0,32Z"/><path class="line" d="${line}"/></svg>`;
-}
+const keyOf = (p) => `${p.type}:${p.symbol}`;
 
-// Baris di kartu utama: persen selalu tampil, nominal hanya bila tidak disembunyikan.
-function heroRow(cls, label, p, amt) {
-  const body = p == null
-    ? '<span class="flat">belum ada pembanding</span>'
-    : `<span class="${tone(p)}">${arrow(p)}${pct(p)}${state.hidden ? '' : ` · ${money(amt, { sign: true })}`}</span>`;
-  return `<div class="hrow ${cls}"><span class="hl">${label}</span>${body}</div>`;
-}
+// ---------- ringkasan ----------
 
-function renderKpis() {
+function renderSummary() {
   const L = latest();
-  const types = Object.keys(L.byType || {}).length;
-  const mtd = state.snapshots.length > 1 ? state.perf.months.at(-1) : null;
-  const spark = sparkline();
-  $('kpis').innerHTML = `
-    <div class="kpi hero"><div class="label">Total nilai</div><div class="value">${money(L.total)}</div>
-      <div class="hrows">${heroRow('today', 'Hari ini', L.dayPct, L.dayPnl)}${heroRow('all', 'Sejak beli', L.pnlPct, L.pnl)}</div>
-      ${spark ? `<div class="spark-wrap">${spark}<span class="spark-label">30 hari</span></div>` : ''}</div>
-    <div class="kpi"><div class="label">Modal</div><div class="value">${money(L.cost)}</div><div class="note">${(L.positions || []).length} aset · ${types} jenis</div></div>
-    <div class="kpi"><div class="label">Bulan ini</div><div class="value">${delta(mtd && mtd.ret)}</div><div class="note">${mtd ? `${esc(fMonthLong.format(toMs(mtd.to)))}, dari harga saja` : 'belum ada pembanding'}</div></div>`;
+  const box = $('summary');
+  if (!state.assets.length && !L) {
+    box.innerHTML = `<div class="onboard"><h2>Mulai catat portofoliomu</h2>
+      <p class="muted">Tambah aset pertamamu: saham IDX atau AS, kripto, emas, kas, atau lainnya. Harga diperbarui otomatis 4 kali sehari.</p>
+      <button type="button" class="btn primary" data-add>Tambah aset pertama</button></div>`;
+    return;
+  }
+  if (!L) {
+    box.innerHTML = `<div class="sum-top"><span class="label">Total nilai</span></div><div class="sum-value">–</div>
+      <p class="muted">Menunggu harga pertama dari robot (4 kali sehari). Asetmu sudah tersimpan.</p>`;
+    return;
+  }
+  const mtd = state.series.length > 1 && state.perf ? state.perf.months.at(-1) : null;
+  const real = realized(state.txs);
+  const f = goalProgress(L.total, state.goal);
+  const n = (L.positions || []).length + state.pending.length;
+  box.innerHTML = `
+    <div class="sum-top"><span class="label">Total nilai</span><span class="muted">${n} aset</span></div>
+    <div class="sum-value">${money(L.total)}</div>
+    <div class="sum-day today">${L.dayPct == null
+      ? '<span class="flat">Hari ini: belum ada pembanding</span>'
+      : `<span class="pill ${tone(L.dayPct)}">${arrow(L.dayPct)}${pct(L.dayPct)}</span><span class="${tone(L.dayPnl)}">${state.hidden ? '' : `${money(L.dayPnl, { sign: true })} `}</span><span class="muted">hari ini</span>`}</div>
+    <dl class="stats">
+      <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
+      <div><dt>Untung</dt><dd>${delta(L.pnlPct)}<small>${money(L.pnl, { sign: true })}</small></dd></div>
+      <div><dt>Terealisasi</dt><dd class="${tone(real)}">${state.txs.some((t) => t.kind === 'sell') ? money(real, { sign: true }) : '–'}</dd></div>
+      <div><dt>Bulan ini</dt><dd>${delta(mtd && mtd.ret)}</dd></div>
+    </dl>
+    ${state.pending.length ? `<p class="muted pend">${state.pending.length} aset menunggu harga pertama dan belum masuk total.</p>` : ''}
+    ${f == null ? '' : `<div class="goal-line"><span class="bar" aria-hidden="true"><i style="width:${(f * 100).toFixed(1)}%"></i></span><span class="muted">${Math.floor(f * 100)}% dari target</span></div>`}`;
 }
 
 function renderInsights() {
-  const list = insights(latest(), Object.fromEntries(ORDER.map((t) => [t, TYPE[t].label])), weightText);
+  const L = latest();
+  const list = L ? insights(L, Object.fromEntries(ORDER.map((t) => [t, TYPE[t].label])), weightText) : [];
   $('insights').hidden = !list.length;
   $('insight-list').innerHTML = list.map((i) => `<li class="insight">${ICON.warn}<div><b>Perhatian</b><p>${esc(i.text)}</p></div></li>`).join('');
 }
 
-function moverList(title, rows) {
-  if (!rows.length) return '';
-  return `<div class="mv-group"><h3>${title}</h3><ul class="mv">${rows.map((p) => `<li><i class="dot" style="background:var(--c-${p.type})"></i>
-    <span class="n">${esc(symDisp(p))}<small>${esc(p.name && p.name !== p.symbol ? p.name : TYPE[p.type].label)}</small></span>
-    <span class="v">${delta(p.dayPct)}<small class="flat">${esc(money(p.dayAmt, { sign: true }))}</small></span></li>`).join('')}</ul></div>`;
+// ---------- grafik portofolio ----------
+
+function drawChart() {
+  const amt = !state.hidden;
+  const pts = inRange(state.series, state.range)
+    .filter((s) => (amt ? Number.isFinite(s.total) : Number.isFinite(s.pnlPct)))
+    .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100, c: amt && Number.isFinite(s.cost) ? s.cost : null }));
+  $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
+  $('chart-key').innerHTML = amt && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
+  lineChart($('chart'), pts, {
+    fmtY: (v) => (amt ? fCompact.format(v) : `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`),
+    fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `Modal ${esc(fIdr.format(p.c))}<br>` : ''}${longDate(p.date)}`,
+    label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
+    empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',
+  });
+  chartDrawn();
+}
+const chartDrawn = watch($('chart'), () => { if (state.series.length) drawChart(); });
+
+// ---------- daftar aset ----------
+
+// Riwayat harga satu aset (rupiah) dari snapshot; untuk mini-grafik dan grafik di halaman aset.
+export const priceSeries = (key, n) => state.series.slice(-n).map((s) => (s.px ? s.px[key] : undefined)).filter(Number.isFinite);
+
+function holdingRow(p, maxW) {
+  const name = assetName(p);
+  const sym = symDisp(p);
+  const spark = p.type === 'cash' ? '' : sparkline(priceSeries(keyOf(p), 30));
+  return `<li><a class="hold" href="${assetHref(p)}">
+    <i class="h-dot" style="background:${colorOf(p.type)}"></i>
+    <span class="h-id"><b>${esc(sym)}</b><small>${esc(name !== sym ? name : typeOf(p.type).label)}</small></span>
+    <span class="h-spark">${spark}</span>
+    <span class="h-val"><b>${money(p.value)}</b>${p.type === 'cash' && !Number.isFinite(p.dayPct) ? `<span class="muted">${weightText(p.weight)}</span>` : delta(p.dayPct)}</span>
+    <span class="h-bar" aria-hidden="true"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%;background:${colorOf(p.type)}"></i></span>
+  </a></li>`;
 }
 
-function renderMovers() {
-  const { gainers, losers } = dayMovers(latest().positions || []);
-  $('movers').innerHTML = gainers.length || losers.length
-    ? moverList('Naik terbanyak', gainers) + moverList('Turun terbanyak', losers)
-    : '<p class="muted">Belum ada pergerakan hari ini, atau belum ada hari pembanding.</p>';
+function pendingRow(a) {
+  return `<li><a class="hold wait" href="${assetHref(a)}">
+    <i class="h-dot" style="background:${colorOf(a.type)}"></i>
+    <span class="h-id"><b>${esc(symDisp(a))}</b><small>${esc(a.name && a.name !== a.symbol ? a.name : typeOf(a.type).label)}</small></span>
+    <span class="h-spark"></span>
+    <span class="h-val"><b>–</b><span class="chip-wait">Menunggu harga</span></span>
+  </a></li>`;
 }
 
-// Alokasi ringkas: tiap jenis adalah tautan ke daftar Aset yang sudah terfilter.
+function renderHoldings() {
+  const L = latest();
+  const all = (L && L.positions) || [];
+  const types = typesIn([...new Set([...all.map((p) => p.type), ...state.pending.map((a) => a.type)])]);
+  if (state.filter && !types.includes(state.filter)) state.filter = '';
+  const chip = (t, label, on) => `<button type="button" data-filter="${esc(t)}" aria-pressed="${on}">${t ? `<i class="dot" style="background:${colorOf(t)}"></i>` : ''}${esc(label)}</button>`;
+  $('chips').innerHTML = types.length > 1 ? chip('', 'Semua', !state.filter) + types.map((t) => chip(t, typeOf(t).label, state.filter === t)).join('') : '';
+
+  const q = state.q.trim().toLowerCase();
+  const match = (a) => (!state.filter || a.type === state.filter) && (!q || `${a.name || ''} ${a.symbol}`.toLowerCase().includes(q));
+  const rows = sortPositions(all, state.sort).filter(match);
+  const wait = state.pending.filter(match);
+  const total = all.length + state.pending.length;
+  $('hold-count').textContent = total ? `${total} aset` : '';
+  $('sort').value = state.sort;
+  $('filter-note').textContent = state.filter || q ? `${rows.length + wait.length} dari ${total} aset` : '';
+  const maxW = Math.max(0.0001, ...all.map((p) => p.weight || 0));
+  $('holdings').innerHTML = rows.map((p) => holdingRow(p, maxW)).join('') + wait.map(pendingRow).join('')
+    || `<li class="empty-row">${total ? 'Tidak ada aset yang cocok.' : 'Belum ada aset.'}</li>`;
+  $('hold-tools').hidden = total < 2;
+}
+
+// ---------- samping: alokasi ringkas dan target ----------
+
 function renderAlloc() {
   const L = latest();
-  const types = ORDER.filter((t) => L.byType && L.byType[t]);
+  const types = L ? typesIn(Object.keys(L.byType || {})) : [];
+  $('alloc-card').hidden = !types.length;
   let acc = 0;
   const stops = types.map((t, i) => {
     const from = acc;
     acc += L.byType[t].weight * 100;
-    const to = i === types.length - 1 ? 100 : acc;
-    return `var(--c-${t}) ${from.toFixed(3)}% ${to.toFixed(3)}%`;
+    return `${colorOf(t)} ${from.toFixed(3)}% ${(i === types.length - 1 ? 100 : acc).toFixed(3)}%`;
   });
-  const donut = $('donut');
-  donut.style.background = stops.length ? `conic-gradient(${stops.join(',')})` : '';
-  donut.innerHTML = `<div class="hole"><strong>${(L.positions || []).length}</strong><span>aset</span></div>`;
-  $('legend').innerHTML = types.map((t) => {
-    const b = L.byType[t];
-    return `<li><a class="lg" href="#/aset/${t}" data-type="${t}">
-      <i class="sw" style="background:var(--c-${t})"></i><span class="nm">${TYPE[t].label}</span><span class="pc">${weightText(b.weight)}</span>
-      <span class="am">${money(b.value)}</span></a></li>`;
-  }).join('');
+  $('donut').style.background = stops.length ? `conic-gradient(${stops.join(',')})` : '';
+  $('donut').innerHTML = `<div class="hole"><strong>${L ? (L.positions || []).length : 0}</strong><span>aset</span></div>`;
+  $('legend').innerHTML = types.map((t) => `<li><button type="button" class="lg" data-filter="${esc(t)}" aria-pressed="${state.filter === t}">
+      <i class="sw" style="background:${colorOf(t)}"></i><span class="nm">${esc(typeOf(t).label)}</span><span class="pc">${weightText(L.byType[t].weight)}</span>
+      <span class="am">${money(L.byType[t].value)}</span></button></li>`).join('');
 }
 
 function renderGoal() {
   const L = latest();
-  const f = goalProgress(L.total, state.goal);
+  const f = L ? goalProgress(L.total, state.goal) : null;
   if (f == null) {
     $('goal').innerHTML = '<div class="goal-empty"><p>Tetapkan target nilai portofolio untuk melihat kemajuanmu.</p><button type="button" class="btn" data-goal="open">Atur target</button></div>';
     return;
@@ -97,20 +157,52 @@ function setGoal(v) {
   state.goal = v > 0 ? v : null;
   try { if (state.goal) localStorage.setItem('pf-goal', String(state.goal)); else localStorage.removeItem('pf-goal'); } catch { /* abaikan */ }
   $('goal-dlg').close();
-  notify(); // Beranda dan Profil sama-sama menampilkan target
+  notify();
 }
 
 export function render() {
-  renderKpis();
+  renderSummary();
   renderInsights();
-  renderMovers();
+  renderHoldings();
   renderAlloc();
   renderGoal();
-  renderRanges();
-  renderChart();
+  $('ranges').innerHTML = rangesHtml(state.range);
+  $('chart-card').hidden = !state.series.length;
+  if (state.series.length) drawChart();
 }
 
-export const show = drawChart;
+export function show() {
+  if (state.series.length) drawChart();
+}
+
+// ---------- interaksi ----------
+
+$('ranges').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-range]');
+  if (!b) return;
+  state.range = b.dataset.range;
+  $('ranges').innerHTML = rangesHtml(state.range);
+  drawChart();
+});
+
+// Saring jenis: chip di atas daftar dan baris alokasi; ketuk lagi untuk melepas.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('#chips [data-filter], #legend [data-filter], #types [data-filter]');
+  if (!b) return;
+  const t = b.dataset.filter;
+  const fromTypes = !!b.closest('#types'); // dari Analisis: selalu pasang (tautannya juga pindah ke Beranda)
+  state.filter = fromTypes ? t : state.filter === t || !t ? '' : t;
+  renderHoldings();
+  renderAlloc();
+  if (b.closest('#legend')) $('holdings-sec').scrollIntoView({ block: 'start' });
+});
+
+$('q').addEventListener('input', (e) => { state.q = e.target.value; renderHoldings(); });
+$('sort').addEventListener('change', (e) => { state.sort = e.target.value; renderHoldings(); });
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-add]')) openAssetForm(null);
+});
 
 // Tombol "Atur/Ubah target" ada di Beranda dan di Profil, jadi didengarkan di level dokumen.
 document.addEventListener('click', (e) => {
@@ -129,5 +221,3 @@ $('goal-form').addEventListener('submit', (e) => {
 });
 $('goal-del').addEventListener('click', () => setGoal(null));
 $('goal-cancel').addEventListener('click', () => $('goal-dlg').close());
-
-initChart();

@@ -7,8 +7,30 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <script src="assets/theme.js"></script>
-  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/theme.js?v=73fe310b34"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "./assets/app.js": "./assets/app.js?v=73fe310b34",
+      "./assets/creds.js": "./assets/creds.js?v=73fe310b34",
+      "./assets/data.js": "./assets/data.js?v=73fe310b34",
+      "./assets/lib.js": "./assets/lib.js?v=73fe310b34",
+      "./assets/nav.js": "./assets/nav.js?v=73fe310b34",
+      "./assets/stats.js": "./assets/stats.js?v=73fe310b34",
+      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=73fe310b34",
+      "./assets/views/analisis.js": "./assets/views/analisis.js?v=73fe310b34",
+      "./assets/views/beranda.js": "./assets/views/beranda.js?v=73fe310b34",
+      "./assets/views/chart.js": "./assets/views/chart.js?v=73fe310b34",
+      "./assets/views/detail.js": "./assets/views/detail.js?v=73fe310b34",
+      "./assets/views/profil.js": "./assets/views/profil.js?v=73fe310b34",
+      "./assets/views/sheets.js": "./assets/views/sheets.js?v=73fe310b34",
+      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=73fe310b34",
+      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=73fe310b34",
+      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=73fe310b34"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="assets/style.css?v=73fe310b34">
 </head>
 <body>
   <main class="wrap">
@@ -26,12 +48,13 @@
     <!-- menu utama dipasang di sini oleh assets/nav.js -->
 
     <div id="banner" class="banner" role="status" hidden></div>
+    <div id="render-err" class="banner error" role="alert" hidden></div>
 
     <!-- Kerangka selama data diambil (Apps Script bisa butuh beberapa detik) -->
     <div id="skeleton" class="skel" aria-hidden="true">
       <div class="sk sk-hero"></div>
-      <div class="sk-row"><div class="sk"></div><div class="sk"></div></div>
       <div class="sk sk-chart"></div>
+      <div class="sk sk-row"></div><div class="sk sk-row"></div><div class="sk sk-row"></div>
     </div>
 
     <form id="connect" class="card form" hidden>
@@ -49,49 +72,70 @@
 
     <!-- Halaman yang butuh data -->
     <div id="dash" hidden>
-      <!-- BERANDA -->
+      <!-- BERANDA: ringkasan, grafik, daftar aset -->
       <section class="view" id="v-beranda" hidden>
         <h2 class="vh" id="vt-beranda" tabindex="-1">Beranda</h2>
-        <section class="kpis" id="kpis" aria-label="Angka utama"></section>
+        <div class="home">
+          <div class="home-main">
+            <section class="card summary" id="summary" aria-label="Ringkasan portofolio"></section>
 
-        <section id="insights" class="insights" aria-labelledby="ins-h" hidden>
-          <h2 id="ins-h" class="vh">Perlu diperhatikan</h2>
-          <ul id="insight-list"></ul>
-        </section>
+            <section id="insights" class="insights" aria-labelledby="ins-h" hidden>
+              <h2 id="ins-h" class="vh">Perlu diperhatikan</h2>
+              <ul id="insight-list"></ul>
+            </section>
 
-        <div class="grid">
-          <section class="card g-chart" aria-labelledby="chart-h">
-            <div class="card-head">
-              <h2 id="chart-h">Nilai portofolio</h2>
-              <div class="seg" id="ranges" role="group" aria-label="Rentang waktu"></div>
-            </div>
-            <div id="chart" class="chart-box"></div>
-            <div id="chart-key" class="chart-key" aria-hidden="true"></div>
-          </section>
+            <section class="card" id="chart-card" aria-labelledby="chart-h">
+              <div class="card-head"><h2 id="chart-h">Nilai portofolio</h2></div>
+              <div id="chart" class="chart-box"></div>
+              <div class="seg seg-ranges" id="ranges" role="group" aria-label="Rentang waktu"></div>
+              <div id="chart-key" class="chart-key" aria-hidden="true"></div>
+            </section>
 
-          <section class="card g-moves" aria-labelledby="mv-h">
-            <h2 id="mv-h">Pergerakan hari ini</h2>
-            <div id="movers"></div>
-          </section>
+            <section id="holdings-sec" class="holdings" aria-labelledby="hold-h">
+              <div class="sec-head"><h2 id="hold-h">Aset</h2><span id="hold-count" class="muted"></span></div>
+              <div id="hold-tools" class="hold-tools">
+                <label class="search"><span class="vh">Cari aset</span>
+                  <input id="q" type="search" placeholder="Cari aset" autocomplete="off" enterkeyhint="search">
+                </label>
+                <label class="sort"><span class="vh">Urutkan</span>
+                  <select id="sort" class="select">
+                    <option value="value">Nilai terbesar</option>
+                    <option value="pnlPct">Untung tertinggi</option>
+                    <option value="dayPct">Naik hari ini</option>
+                    <option value="name">Nama A–Z</option>
+                  </select>
+                </label>
+              </div>
+              <div class="chips" id="chips" role="group" aria-label="Saring jenis aset"></div>
+              <p id="filter-note" class="muted note-line" role="status"></p>
+              <ul id="holdings" class="hold-list"></ul>
+            </section>
+          </div>
 
-          <section class="card g-alloc" aria-labelledby="alloc-h">
-            <h2 id="alloc-h">Alokasi</h2>
-            <p class="hint">Ketuk jenis untuk melihat asetnya.</p>
-            <div class="alloc-body">
-              <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
-              <ul id="legend" class="legend"></ul>
-            </div>
-          </section>
-
-          <section class="card g-goal" aria-labelledby="goal-h">
-            <h2 id="goal-h">Target</h2>
-            <div id="goal"></div>
-          </section>
+          <aside class="home-side">
+            <section class="card" id="alloc-card" aria-labelledby="alloc-h">
+              <h2 id="alloc-h">Alokasi</h2>
+              <p class="hint">Ketuk jenis untuk menyaring daftar aset.</p>
+              <div class="alloc-body">
+                <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
+                <ul id="legend" class="legend"></ul>
+              </div>
+            </section>
+            <section class="card" aria-labelledby="goal-h">
+              <h2 id="goal-h">Target</h2>
+              <div id="goal"></div>
+            </section>
+          </aside>
         </div>
         <p class="foot">Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
       </section>
 
-      <!-- ANALISIS -->
+      <!-- ASET: satu aset (#/aset/jenis:kode) -->
+      <section class="view" id="v-aset" hidden>
+        <h2 class="vh" id="vt-aset" tabindex="-1">Aset</h2>
+        <div id="detail" class="detail"></div>
+      </section>
+
       <section class="view" id="v-analisis" hidden>
         <h2 class="vh" id="vt-analisis" tabindex="-1">Analisis</h2>
         <nav class="subnav" id="subnav" aria-label="Bagian analisis">
@@ -121,7 +165,7 @@
           <section class="metrics" id="conc" aria-label="Konsentrasi"></section>
           <section class="card" aria-labelledby="types-h">
             <h2 id="types-h">Per jenis aset</h2>
-            <p class="hint">Bobot dari total, nilai, dan untung/rugi sejak beli. Ketuk untuk melihat asetnya.</p>
+            <p class="hint">Bobot dari total, nilai, dan untung/rugi sejak beli. Ketuk untuk menyaring daftar aset di Beranda.</p>
             <ul class="types" id="types"></ul>
           </section>
         </div>
@@ -151,34 +195,18 @@
         </div>
       </section>
 
-      <!-- ASET -->
-      <section class="view" id="v-aset" hidden>
-        <h2 class="vh" id="vt-aset" tabindex="-1">Aset</h2>
-        <section class="card" aria-labelledby="hold-h">
-          <div class="card-head">
-            <h2 id="hold-h">Aset</h2>
-          </div>
-          <div class="aset-tools">
-            <label class="field"><span class="vh">Cari aset</span>
-              <input id="q" type="search" placeholder="Cari nama atau kode" autocomplete="off" enterkeyhint="search">
-            </label>
-            <label class="sort"><span class="muted">Urutkan</span>
-              <select id="sort" class="select">
-                <option value="value">Nilai terbesar</option>
-                <option value="pnlPct">Untung/rugi tertinggi</option>
-                <option value="dayPct">Naik hari ini</option>
-                <option value="name">Nama A–Z</option>
-              </select>
-            </label>
-          </div>
-          <nav class="chips" id="chips" aria-label="Jenis aset"></nav>
-          <p id="filter-note" class="muted note-line" role="status"></p>
-          <ul class="assets-list" id="holdings"></ul>
+      <!-- AKTIVITAS: keuntungan terealisasi dan riwayat jual-beli -->
+      <section class="view" id="v-aktivitas" hidden>
+        <h2 class="vh" id="vt-aktivitas" tabindex="-1">Aktivitas</h2>
+        <section class="card summary" id="realized" aria-label="Keuntungan terealisasi"></section>
+        <section class="card" aria-labelledby="txs-h">
+          <h2 id="txs-h">Transaksi</h2>
+          <div id="txs"></div>
         </section>
       </section>
     </div>
 
-    <!-- PROFIL: tetap bisa dibuka walau data belum ada atau gagal dimuat -->
+    <!-- PROFIL: tetap bisa dibuka walau data gagal dimuat -->
     <section class="view" id="v-profil" hidden>
       <h2 class="vh" id="vt-profil" tabindex="-1">Profil</h2>
       <div class="settings">
@@ -211,7 +239,7 @@
           <p id="set-data" class="muted"></p>
           <div class="set-actions">
             <button id="set-reload" class="btn" type="button">Muat ulang data</button>
-            <a class="btn" href="kelola.html">Kelola aset</a>
+            <button class="btn" type="button" data-add>Tambah aset</button>
           </div>
         </section>
 
@@ -231,7 +259,87 @@
     </section>
   </main>
 
-  <dialog id="goal-dlg" aria-labelledby="goal-dlg-h">
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <!-- Tambah / ubah aset -->
+  <dialog id="asset-dlg" class="sheet" aria-labelledby="f-h">
+    <form id="asset-form" class="form" novalidate>
+      <div class="sheet-head"><h2 id="f-h">Tambah aset</h2></div>
+      <p id="f-old" class="note" hidden>Kode Apps Script di Sheet-mu masih versi lama, jadi <strong>tanggal beli belum bisa disimpan</strong>. Tempel <code>Code.gs</code> terbaru lalu buat versi deploy baru (langkahnya di README).</p>
+      <label class="field"><span>Jenis</span>
+        <select id="f-type">
+          <option value="idx">Saham IDX</option>
+          <option value="us">Saham AS</option>
+          <option value="crypto">Kripto</option>
+          <option value="gold">Emas</option>
+          <option value="cash">Kas (rekening, dompet, tunai)</option>
+          <option value="manual">Lainnya (reksa dana, deposito)</option>
+        </select>
+      </label>
+      <label class="field"><span id="l-symbol">Kode</span><input id="f-symbol" autocomplete="off" autocapitalize="characters"></label>
+      <label class="field"><span>Nama (opsional)</span><input id="f-name" autocomplete="off"></label>
+      <label class="field" data-for="crypto"><span>ID CoinGecko (mis. bitcoin)</span><input id="f-coingeckoId" autocomplete="off" autocapitalize="none"></label>
+      <label class="field"><span id="l-qty">Jumlah</span><input id="f-qty" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field" data-not="cash"><span id="l-cost">Harga beli rata-rata</span><input id="f-avgCost" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field" id="buy-field"><span>Tanggal beli (opsional; bila beli beberapa kali, isi yang pertama)</span><input id="f-buyDate" type="date"></label>
+      <label class="field" data-for="manual"><span>Harga per unit saat ini (kamu perbarui sendiri)</span><input id="f-price" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field" data-for="manual cash"><span>Mata uang</span>
+        <select id="f-currency"><option value="IDR">Rupiah (IDR)</option><option value="USD">Dolar (USD)</option></select>
+      </label>
+      <details class="adv" data-not="cash">
+        <summary>Opsi lanjutan</summary>
+        <label class="field"><span>Total modal dalam rupiah (isi bila ingin untung/rugi aset dolar memperhitungkan kurs saat beli)</span><input id="f-costIdr" type="number" step="any" min="0" inputmode="decimal"></label>
+        <label class="field"><span>Simbol Yahoo Finance (hanya bila ticker tidak biasa, mis. BRK-B)</span><input id="f-yahoo" autocomplete="off" autocapitalize="characters"></label>
+      </details>
+      <p id="f-err" class="err" role="alert" hidden></p>
+      <div class="row">
+        <button id="f-del" class="btn danger" type="button" hidden>Hapus aset</button>
+        <span class="spacer"></span>
+        <button id="f-cancel" class="btn" type="button">Batal</button>
+        <button id="f-save" class="btn primary" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Beli / jual -->
+  <dialog id="trade-dlg" class="sheet" aria-labelledby="t-h">
+    <form id="trade-form" class="form" novalidate>
+      <div class="sheet-head"><h2 id="t-h">Transaksi</h2></div>
+      <fieldset class="toggle">
+        <legend class="vh">Jenis transaksi</legend>
+        <label><input type="radio" name="kind" value="buy"><span>Beli</span></label>
+        <label><input type="radio" name="kind" value="sell"><span>Jual</span></label>
+      </fieldset>
+      <p id="t-own" class="muted"></p>
+      <label class="field big"><span>Jumlah</span><input id="t-qty" type="number" step="any" min="0" inputmode="decimal"></label>
+      <button type="button" class="link" id="t-all">Jual semua</button>
+      <label class="field big"><span id="t-price-l">Harga per unit</span><input id="t-price" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field big" id="t-fx-f"><span>Kurs USD/IDR saat transaksi</span><input id="t-fx" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field big"><span>Tanggal</span><input id="t-date" type="date"></label>
+      <div id="t-preview" class="preview" aria-live="polite"></div>
+      <p id="t-err" class="err" role="alert" hidden></p>
+      <div class="row">
+        <button id="t-cancel" class="btn" type="button">Batal</button>
+        <button id="t-save" class="btn primary" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Rincian transaksi -->
+  <dialog id="tx-dlg" class="sheet" aria-labelledby="x-h">
+    <div class="form">
+      <div class="sheet-head"><h2 id="x-h">Transaksi</h2></div>
+      <div id="x-body"></div>
+      <p class="muted">Menghapus catatan tidak mengubah jumlah aset.</p>
+      <div class="row">
+        <button id="x-del" class="btn danger" type="button">Hapus catatan</button>
+        <span class="spacer"></span>
+        <button id="x-close" class="btn" type="button">Tutup</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="goal-dlg" class="sheet" aria-labelledby="goal-dlg-h">
     <form id="goal-form" class="form" novalidate>
       <h2 id="goal-dlg-h">Target nilai portofolio</h2>
       <p class="muted">Disimpan hanya di browser ini, tidak dikirim ke mana pun.</p>
@@ -245,7 +353,7 @@
     </form>
   </dialog>
 
-  <script src="assets/nofile.js"></script>
-  <script type="module" src="assets/app.js"></script>
+  <script src="assets/nofile.js?v=73fe310b34"></script>
+  <script type="module" src="assets/app.js?v=73fe310b34"></script>
 </body>
 </html>
