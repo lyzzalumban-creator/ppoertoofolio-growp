@@ -30,10 +30,11 @@ function niceTicks(min, max, n = 4) {
 }
 
 /**
- * Gambar grafik ke `box`. pts = [{ t, date, y, c? }] (c = garis modal, opsional).
- * opts: { fmtY, fmtTip, label, empty, height }
+ * Gambar grafik area ke `box`: isi berwarna penuh selebar kotak, garis putus-putus vertikal di titik terpilih,
+ * gelembung nilai di titik itu, dan tanggalnya di bawah. Bawaan menunjuk titik terakhir; sentuh/geser untuk memilih.
+ * pts = [{ t, date, y, c? }] (c = garis modal, opsional). opts: { fmtTip(p) -> html nilai, label, empty, height }.
  */
-export function lineChart(box, pts, { fmtY, fmtTip, label, empty, height } = {}) {
+export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
   if (pts.length < 2) {
     box.innerHTML = `<div class="empty">${empty || 'Belum ada data untuk rentang ini.'}</div>`;
     return;
@@ -42,70 +43,73 @@ export function lineChart(box, pts, { fmtY, fmtTip, label, empty, height } = {})
   if (!box.clientWidth) { box.innerHTML = ''; return; }
 
   const W = Math.max(260, Math.floor(box.clientWidth));
-  const H = height || (W < 520 ? 210 : 260);
-  const withCost = pts.some((p) => p.c != null);
-  const ml = 8, mr = 52, mt = 10, mb = 24; // sumbu nilai di kanan, seperti aplikasi saham pada umumnya
-  const iw = W - ml - mr, ih = H - mt - mb;
+  const H = height || (W < 520 ? 250 : 290);
+  const mt = 16, mb = 34; // mb: ruang baris tanggal di bawah
+  const ih = H - mt - mb;
   const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
-  const ys = withCost ? pts.flatMap((p) => (p.c != null ? [p.y, p.c] : [p.y])) : pts.map((p) => p.y);
+  const ys = pts.flatMap((p) => (p.c != null ? [p.y, p.c] : [p.y]));
   let lo = Math.min(...ys);
   let hi = Math.max(...ys);
   if (lo === hi) { lo -= Math.abs(lo) * 0.01 || 1; hi += Math.abs(hi) * 0.01 || 1; }
-  const pad = (hi - lo) * 0.08;
-  const floor = lo >= 0 ? Math.max(0, lo - pad) : lo - pad;
-  const ticks = niceTicks(floor, hi + pad);
-  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
-  const X = (t) => ml + ((t - t0) / (t1 - t0)) * iw;
-  const Y = (v) => mt + (1 - (v - y0) / (y1 - y0)) * ih;
+  const pad = (hi - lo) * 0.1;
+  lo -= pad; hi += pad;
+  const X = (t) => ((t - t0) / (t1 - t0)) * W;
+  const Y = (v) => mt + (1 - (v - lo) / (hi - lo)) * ih;
 
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.y).toFixed(1)}`).join('');
-  const area = `${line}L${X(t1).toFixed(1)},${(mt + ih).toFixed(1)}L${X(t0).toFixed(1)},${(mt + ih).toFixed(1)}Z`;
-  const costLine = withCost ? pts.filter((p) => p.c != null).map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.c).toFixed(1)}`).join('') : '';
+  const area = `${line}L${W},${(mt + ih).toFixed(1)}L0,${(mt + ih).toFixed(1)}Z`;
+  const costLine = pts.some((p) => p.c != null) ? pts.filter((p) => p.c != null).map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.c).toFixed(1)}`).join('') : '';
   const dir = tone(pts[pts.length - 1].y - pts[0].y);
   const longSpan = t1 - t0 > 330 * DAY;
   const xLabels = [0, 1, 2].map((k) => {
     const t = t0 + ((t1 - t0) * k) / 2;
-    return `<text x="${X(t).toFixed(1)}" y="${H - 6}" text-anchor="${['start', 'middle', 'end'][k]}">${(longSpan ? fMonth : fDay).format(t)}</text>`;
+    return `<text x="${(X(t) + [4, 0, -4][k]).toFixed(1)}" y="${H - 6}" text-anchor="${['start', 'middle', 'end'][k]}">${(longSpan ? fMonth : fDay).format(t)}</text>`;
   }).join('');
-  const grid = ticks.map((v) => `<line class="grid-line" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${W - mr + 6}" y="${(Y(v) + 4).toFixed(1)}">${esc(fmtY(v))}</text>`).join('');
-  const zero = y0 < 0 && y1 > 0 ? `<line class="zero-line" x1="${ml}" x2="${W - mr}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"/>` : '';
-  const last = pts[pts.length - 1];
+  const vgrid = [1, 2, 3, 4, 5].map((k) => `<line class="grid-line" x1="${((W * k) / 6).toFixed(1)}" x2="${((W * k) / 6).toFixed(1)}" y1="${mt}" y2="${mt + ih}"/>`).join('');
   const gid = `g-${box.id}`;
 
   box.innerHTML = `
-    <svg class="chart ${dir}" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(label(pts[0], last))}">
-      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".22"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
-      <g class="axis">${grid}${xLabels}</g>
-      ${zero}
+    <svg class="chart ${dir}" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(label(pts[0], pts[pts.length - 1]))}">
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".42"/><stop offset="1" stop-color="currentColor" stop-opacity=".03"/></linearGradient></defs>
+      ${vgrid}
       <path d="${area}" fill="url(#${gid})"/>
       ${costLine ? `<path class="cost" d="${costLine}"/>` : ''}
       <path class="line" d="${line}"/>
-      <circle class="dot" cx="${X(last.t).toFixed(1)}" cy="${Y(last.y).toFixed(1)}" r="4"/>
-      <g class="cursor" hidden><line y1="${mt}" y2="${mt + ih}"/><circle class="dot" r="5"/></g>
-      <rect class="hit" x="${ml}" y="0" width="${iw}" height="${H}" fill="transparent"/>
+      <g class="axis">${xLabels}</g>
+      <g class="cursor"><line y1="${mt}" y2="${mt + ih}"/><circle r="5"/></g>
+      <rect class="hit" x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
     </svg>
-    <div class="tip" hidden></div>`;
+    <div class="tip"></div><div class="dpill"></div>`;
 
-  const svg = box.querySelector('svg'), cur = svg.querySelector('.cursor'), tip = box.querySelector('.tip');
+  const svg = box.querySelector('svg'), cur = svg.querySelector('.cursor'), tip = box.querySelector('.tip'), pill = box.querySelector('.dpill');
+  const place = (p) => {
+    const cx = X(p.t), cy = Y(p.y);
+    const ln = cur.querySelector('line'), dot = cur.querySelector('circle');
+    ln.setAttribute('x1', cx); ln.setAttribute('x2', cx);
+    dot.setAttribute('cx', cx); dot.setAttribute('cy', cy);
+    tip.style.left = '0px'; // ukur dari posisi netral: lebar tidak boleh dipengaruhi posisi sebelumnya
+    tip.innerHTML = fmtTip(p);
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    // di kiri titik; bila tak muat pindah ke kanannya; selalu tetap di dalam kotak
+    tip.style.left = `${Math.min(Math.max(2, cx - tw - 10 >= 2 ? cx - tw - 10 : cx + 12), W - tw - 2)}px`;
+    tip.style.top = `${Math.min(Math.max(2, cy - th / 2), mt + ih - th)}px`;
+    pill.textContent = longDate(p.date);
+    pill.style.left = `${Math.min(Math.max(2, cx - pill.offsetWidth / 2), W - pill.offsetWidth - 2)}px`;
+    pill.style.top = `${mt + ih + 6}px`;
+  };
+  const last = pts[pts.length - 1];
+  place(last);
   const show = (ev) => {
     const r = svg.getBoundingClientRect();
     const px = ((ev.clientX - r.left) / r.width) * W;
     let best = pts[0];
     for (const p of pts) if (Math.abs(X(p.t) - px) < Math.abs(X(best.t) - px)) best = p;
-    const cx = X(best.t), cy = Y(best.y);
-    cur.hidden = false;
-    cur.querySelector('line').setAttribute('x1', cx); cur.querySelector('line').setAttribute('x2', cx);
-    cur.querySelector('circle').setAttribute('cx', cx); cur.querySelector('circle').setAttribute('cy', cy);
-    tip.hidden = false;
-    tip.innerHTML = fmtTip(best);
-    const w = tip.offsetWidth;
-    tip.style.left = `${Math.min(Math.max(4, (cx / W) * r.width - w / 2), r.width - w - 4)}px`;
+    place(best);
   };
-  const hide = () => { cur.hidden = true; tip.hidden = true; };
   const hit = svg.querySelector('.hit');
   hit.addEventListener('pointermove', show);
   hit.addEventListener('pointerdown', show);
-  hit.addEventListener('pointerleave', hide);
+  hit.addEventListener('pointerleave', () => place(last));
 }
 
 /** Gambar ulang saat lebar kotak berubah (termasuk saat halamannya baru dibuka). */

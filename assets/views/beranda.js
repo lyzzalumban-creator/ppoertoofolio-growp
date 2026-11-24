@@ -1,6 +1,6 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fCompact, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { $, ICON, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { goalProgress, insights, sortPositions } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
@@ -61,8 +61,7 @@ function drawChart() {
   $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
   $('chart-key').innerHTML = amt && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
   lineChart($('chart'), pts, {
-    fmtY: (v) => (amt ? fCompact.format(v) : `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`),
-    fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `Modal ${esc(fIdr.format(p.c))}<br>` : ''}${longDate(p.date)}`,
+    fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `<span>Modal ${esc(fIdr.format(p.c))}</span>` : ''}`,
     label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
     empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',
   });

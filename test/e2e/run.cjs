@@ -148,8 +148,14 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const navs = await page.locator('#nav a, #nav button').evaluateAll((els) => els.map((a) => `${a.textContent.trim()}${a.getAttribute('aria-current') ? '*' : ''}`).join());
     check('B3 menu: Beranda, Analisis, tombol Tambah, Aktivitas, Profil; hanya Beranda yang aktif', navs === 'Beranda*,Analisis,Tambah,Aktivitas,Profil', navs);
     const box = await page.locator('#chart svg').boundingBox();
-    await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5);
-    check('B4 grafik + tooltip', await page.locator('#chart .tip').isVisible());
+    const lastDate = sheetOf(fake).history.at(-1).date;
+    check('B4 grafik: bawaan menunjuk titik terakhir dengan gelembung nilai (= total) dan tanggalnya di bawah', await page.locator('#chart .tip').isVisible() && nb(await page.locator('#chart .tip b').innerText()) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && (await page.locator('#chart .dpill').innerText()) === '23 Nov 2026' && lastDate === '2026-11-23');
+    const before = await page.locator('#chart .dpill').innerText();
+    await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
+    check('B4b menggeser/mengarahkan kursor: tanggal di bawah dan nilai ikut berubah; garis putus-putus vertikal ada', (await page.locator('#chart .dpill').innerText()) !== before && (await page.locator('#chart .cursor line').count()) === 1);
+    await page.mouse.move(box.x + box.width * 0.5, box.y - 40);
+    check('B4c kursor keluar dari grafik: kembali ke titik terakhir', (await page.locator('#chart .dpill').innerText()) === before);
+    await shot(page, 'grafik.png');
     await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
     check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
     await page.locator('#ranges').getByRole('button', { name: 'Semua' }).click();
@@ -176,7 +182,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('B8b saat tersembunyi tidak ada sumbu rupiah ("jt") yang tertinggal', !/\d+ jt/.test(hidden));
     check('B9 jumlah unit tersembunyi, persentase tetap', !/\d\s(lembar|gram)\b/.test(hidden) && /[+−]\d+,\d{2}%/.test(hidden), (hidden.match(/.{30}(lembar|gram\b).{10}/g) || []).join(' | '));
     await nav(page, 'beranda');
-    check('B9b kembali ke Beranda: grafik digambar ulang dalam persen', (await page.locator('#chart svg').count()) === 1 && /%/.test(await page.locator('#chart .axis').textContent()));
+    check('B9b kembali ke Beranda: grafik digambar ulang dalam persen', (await page.locator('#chart svg').count()) === 1 && /%/.test(await page.locator('#chart .tip').textContent()) && !/Rp/.test(await page.locator('#chart .tip').textContent()));
     await shot(page, 'beranda-hidden.png', { fullPage: true });
     check('B10 tanpa error konsol', errors.length === 0, errors.join(' | '));
 
