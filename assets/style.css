@@ -306,6 +306,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .tx-main b { display: block; }
 .tx-main small, .tx-val small { display: block; color: var(--muted); font-size: 0.78rem; }
 .tx-val { text-align: right; }
+/* angka untung/rugi di daftar: latar samar sewarna arah (tetap pakai panah dan tanda) */
+.tx-val b.pos, .tx-val b.neg, .mr-v.pos, .mr-v.neg, .h-val .pos, .h-val .neg { display: inline-block; padding: 2px 9px; border-radius: 8px; }
+.tx-val b.pos, .mr-v.pos, .h-val .pos { background: var(--pos-bg); }
+.tx-val b.neg, .mr-v.neg, .h-val .neg { background: var(--neg-bg); }
 
 /* ---------- lembar (dialog): dari bawah di HP, tengah di desktop ---------- */
 dialog {
