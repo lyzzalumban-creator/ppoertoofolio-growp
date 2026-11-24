@@ -71,7 +71,9 @@ const short = (m) => fMonth.format(toMs(`${m}-01`)).split(' ')[0];
 function drawFx() {
   const months = fxStats(state.txs).months.slice(-12);
   const show = !state.hidden; // nominal: saat tersembunyi hanya bentuk batang, tanpa angka
-  barChart($('fxchart'), months.map((m) => ({ label: short(m.month), v: m.pnl, tip: `<b>${esc(monthName(m.month))}</b><span>${esc(usd(m.pnl, { sign: true }))}</span><span>${m.trades} trade</span>` })), {
+  barChart($('fxchart'), months.map((m) => ({ label: short(m.month), v: m.pnl, tip: `<b>${esc(monthName(m.month))}</b><span>${esc(usd(m.pnl, { sign: true }))}</span><span>${m.trades} trade</span>`, head: `<b>${esc(usd(m.pnl, { sign: true }))}</b><small class="muted">${esc(monthName(m.month))} · ${m.trades} trade</small>` })), {
+    head: $('fxhead'),
+    restHead: months.length ? `<b>${esc(usd(months.reduce((a, m) => a + m.pnl, 0), { sign: true }))}</b><small class="muted">${months.length} bulan</small>` : '',
     fmtY: (v) => (show ? `${v.toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : ''),
     fmtV: (v) => (show ? v.toLocaleString('id-ID', { maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 1 }) : ''),
     aria: months.length ? `Profit trading emas per bulan, ${months.length} bulan` : '',

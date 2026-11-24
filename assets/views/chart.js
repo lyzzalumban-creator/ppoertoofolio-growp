@@ -16,6 +16,14 @@ export function inRange(snaps, range) {
   return snaps.filter((s) => end - toMs(s.date) <= days * DAY);
 }
 
+/** Ganti isi judul angka di atas grafik; angka yang berubah "bergulir" singkat (kabur lalu jelas). */
+export function rollText(el, html) {
+  if (!el || el.innerHTML === html) return;
+  el.innerHTML = html;
+  const b = el.querySelector('b');
+  if (b) { b.classList.remove('roll'); void b.offsetWidth; b.classList.add('roll'); }
+}
+
 export const rangesHtml = (cur) => RANGES.map(([l]) => `<button type="button" data-range="${l}" aria-pressed="${l === cur}">${l}</button>`).join('');
 
 function niceTicks(min, max, n = 4) {
@@ -39,13 +47,14 @@ function niceTicks(min, max, n = 4) {
  * gelembung nilai di titik itu, dan tanggalnya di bawah. Detail dan garis modal hanya tampil saat disentuh/diarahkan.
  * pts = [{ t, date, y, c? }] (c = garis modal, opsional). opts: { fmtTip(p) -> html nilai, label, empty, height }.
  */
-export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
+export function lineChart(box, pts, { fmtTip, label, empty, height, head, headHtml } = {}) {
   if (pts.length < 2) {
+    if (head) head.innerHTML = '';
     box.innerHTML = `<div class="empty">${empty || 'Belum ada data untuk rentang ini.'}</div>`;
     return;
   }
   // Halaman tersembunyi: kosongkan (jangan sisakan angka lama), digambar lagi saat halamannya dibuka.
-  if (!box.clientWidth) { box.innerHTML = ''; return; }
+  if (!box.clientWidth) { box.innerHTML = ''; if (head) head.innerHTML = ''; return; } // halaman tersembunyi: angka lama jangan tersisa
 
   const W = Math.max(260, Math.floor(box.clientWidth));
   const H = height || (W < 520 ? 250 : 290);
@@ -101,6 +110,7 @@ export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
     pill.textContent = longDate(p.date);
     pill.style.left = `${Math.min(Math.max(2, cx - pill.offsetWidth / 2), W - pill.offsetWidth - 2)}px`;
     pill.style.top = `${mt + ih + 6}px`;
+    if (head && headHtml) rollText(head, headHtml(p, p === last)); // angka di atas grafik ikut titik yang disentuh
   };
   const last = pts[pts.length - 1];
   place(last);
@@ -157,11 +167,12 @@ export function sparkline(values, cls = '', gid = '') {
 
 /**
  * Grafik batang per periode (return bulanan, profit trading): hijau di atas nol, merah di bawah, nilai di ujung batang.
- * items = [{ label, v, tip? }] (tip = html gelembung saat diketuk/diarahkan); opts: { fmtY, fmtV, aria, empty }.
+ * items = [{ label, v, tip?, head? }] (tip = html gelembung, head = html angka di atas grafik saat disentuh); opts: { fmtY, fmtV, aria, empty, head: elemen, restHead: html saat diam }.
  */
-export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
-  if (!items.length) { box.innerHTML = `<div class="empty">${empty || 'Belum ada data.'}</div>`; return; }
-  if (!box.clientWidth) { box.innerHTML = ''; return; }
+export function barChart(box, items, { fmtY, fmtV, aria, empty, head, restHead = '' } = {}) {
+  if (!items.length) {
+    if (head) head.innerHTML = ''; box.innerHTML = `<div class="empty">${empty || 'Belum ada data.'}</div>`; return; }
+  if (!box.clientWidth) { box.innerHTML = ''; if (head) head.innerHTML = ''; return; } // halaman tersembunyi: angka lama jangan tersisa
   const W = Math.max(260, Math.floor(box.clientWidth));
   const H = 230, ml = 40, mr = 4, mt = 22, mb = 26;
   const iw = W - ml - mr, ih = H - mt - mb;
@@ -189,6 +200,7 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
     const r = svg.getBoundingClientRect();
     const i = Math.min(items.length - 1, Math.max(0, Math.floor((((ev.clientX - r.left) / r.width) * W - ml) / slot)));
     rects.forEach((b, k) => b.classList.toggle('sel', k === i));
+    if (head && items[i].head) rollText(head, items[i].head);
     if (!items[i].tip) return;
     tip.hidden = false;
     tip.innerHTML = items[i].tip;
@@ -198,7 +210,8 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
   };
   svg.addEventListener('pointerdown', pick);
   svg.addEventListener('pointermove', pick);
-  const clear = () => { tip.hidden = true; rects.forEach((b) => b.classList.remove('sel')); };
+  const clear = () => { tip.hidden = true; rects.forEach((b) => b.classList.remove('sel')); if (head) rollText(head, restHead); };
+  if (head) rollText(head, restHead);
   svg.addEventListener('pointerleave', clear);
   svg.addEventListener('pointercancel', clear);
 }

@@ -60,7 +60,14 @@ function drawChart() {
     .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100, c: amt && Number.isFinite(s.cost) ? s.cost : null }));
   $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
   $('chart-key').innerHTML = amt && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
+  const first = pts[0];
   lineChart($('chart'), pts, {
+    head: $('chart-head'),
+    headHtml: (p, rest) => {
+      const d = p.y - first.y;
+      const shown = amt ? `${esc(money(d, { sign: true }))}${first.y ? ` (${esc(pct(p.y / first.y - 1))})` : ''}` : esc(pct(d / 100));
+      return `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b><span class="pill ${tone(d)}">${arrow(d)}${shown}</span><small class="muted">${rest ? `sejak ${esc(longDate(first.date))}` : esc(longDate(p.date))}</small>`;
+    },
     fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `<span>Modal ${esc(fIdr.format(p.c))}</span>` : ''}`,
     label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
     empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',

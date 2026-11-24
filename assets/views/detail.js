@@ -24,7 +24,15 @@ function drawChart() {
   const base = raw.length ? raw[0].y : 1;
   const pts = secret ? raw.map((p) => ({ ...p, y: (p.y / base - 1) * 100 })) : raw;
   const fmt = usd ? fUsd : fIdr;
+  const first = pts[0];
+  const sgn = (d) => `${d > 0 ? '+' : d < 0 ? '−' : ''}${fmt.format(Math.abs(d))}`;
   lineChart(box, pts, {
+    head: $('ahead'),
+    headHtml: (p, rest) => {
+      const d = p.y - first.y;
+      const shown = secret ? pct(d / 100) : `${sgn(d)}${first.y ? ` (${pct(p.y / first.y - 1)})` : ''}`;
+      return `<b>${esc(secret ? pct(p.y / 100) : fmt.format(p.y))}</b><span class="pill ${tone(d)}">${arrow(d)}${esc(shown)}</span><small class="muted">${rest ? `sejak ${esc(longDate(first.date))}` : esc(longDate(p.date))}</small>`;
+    },
     fmtTip: (p) => `<b>${esc(secret ? pct(p.y / 100) : fmt.format(p.y))}</b>`,
     label: (a, b) => `Harga ${symDisp(pos || asset)} dari ${secret ? pct(a.y / 100) : fmt.format(a.y)} pada ${longDate(a.date)} menjadi ${secret ? pct(b.y / 100) : fmt.format(b.y)} pada ${longDate(b.date)}`,
     empty: 'Grafik harga muncul setelah robot mencatat harga aset ini beberapa hari.',
@@ -72,7 +80,7 @@ export function render() {
     <section class="card d-main">
       <div class="d-value">${pos ? money(pos.value) : '–'}</div>
       <div class="d-day">${pos ? (Number.isFinite(pos.dayPct) ? `<span class="pill ${tone(pos.dayPct)}">${arrow(pos.dayPct)}${pct(pos.dayPct)}</span><span class="muted">hari ini</span>` : '<span class="muted">Hari ini: belum ada pembanding</span>') : '<span class="chip-wait">Menunggu harga</span><span class="muted">Robot mengambil harga 4 kali sehari.</span>'}</div>
-      ${cash ? '' : `<div id="achart" class="chart-box"></div><div class="seg seg-ranges" id="aranges" role="group" aria-label="Rentang waktu grafik harga">${rangesHtml(state.arange)}</div>`}
+      ${cash ? '' : `<div id="ahead" class="chart-head" aria-live="off"></div><div id="achart" class="chart-box"></div><div class="seg seg-ranges" id="aranges" role="group" aria-label="Rentang waktu grafik harga">${rangesHtml(state.arange)}</div>`}
     </section>
     <div class="acts" role="group" aria-label="Tindakan">
       ${cash ? `<button type="button" class="act" data-act="convert"${canFx() ? '' : ' aria-disabled="true"'}>${ICON.swap}<span>Tukar</span></button>` : tradeBtn('buy', 'Beli', ICON.plus) + tradeBtn('sell', 'Jual', ICON.minus)}
