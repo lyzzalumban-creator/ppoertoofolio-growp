@@ -131,3 +131,32 @@ export function sparkline(values, cls = '') {
   const d = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 100).toFixed(2)},${(29 - ((v - lo) / span) * 27).toFixed(2)}`).join('');
   return `<svg class="spark ${tone(pts[pts.length - 1] - pts[0])} ${cls}" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="area" d="${d}L100,32L0,32Z"/><path class="line" d="${d}"/></svg>`;
 }
+
+/**
+ * Grafik batang per periode (return bulanan, profit trading): hijau di atas nol, merah di bawah, nilai di ujung batang.
+ * items = [{ label, v }]; opts: { fmtY, fmtV, aria, empty }.
+ */
+export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
+  if (!items.length) { box.innerHTML = `<div class="empty">${empty || 'Belum ada data.'}</div>`; return; }
+  if (!box.clientWidth) { box.innerHTML = ''; return; }
+  const W = Math.max(260, Math.floor(box.clientWidth));
+  const H = 230, ml = 40, mr = 4, mt = 22, mb = 26;
+  const iw = W - ml - mr, ih = H - mt - mb;
+  const vals = items.map((i) => i.v);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals));
+  const y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const Y = (v) => mt + (1 - (v - y0) / (y1 - y0 || 1)) * ih;
+  const slot = iw / items.length;
+  const bw = Math.min(28, slot * 0.62);
+  const grid = ticks.map((v) => `<line class="${v === 0 ? 'zero-line' : 'grid-line'}" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${ml - 6}" y="${(Y(v) + 3.5).toFixed(1)}" text-anchor="end">${esc(fmtY(v))}</text>`).join('');
+  const bars = items.map((it, i) => {
+    const cx = ml + slot * (i + 0.5);
+    const top = Math.min(Y(it.v), Y(0)), h = Math.max(1.5, Math.abs(Y(it.v) - Y(0)));
+    const dir = it.v > 0 ? 'pos' : it.v < 0 ? 'neg' : 'flat';
+    const ty = it.v >= 0 ? top - 4 : top + h + 11;
+    return `<rect class="bar ${dir}" x="${(cx - bw / 2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3"/>
+      <text class="bv ${dir}" x="${cx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle">${esc(fmtV(it.v))}</text>
+      <text class="bl" x="${cx.toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(it.label)}</text>`;
+  }).join('');
+  box.innerHTML = `<svg class="chart bars" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(aria || '')}"><g class="axis">${grid}</g>${bars}</svg>`;
+}

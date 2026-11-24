@@ -5,7 +5,6 @@
 // ikut, karena kapan ia mulai dimiliki tidak diketahui; ia baru muncul di snapshot nyata dari robot harian.
 
 import { buildSnapshot, currencyOf, keyOf } from './portfolio.mjs';
-import { OZ_GRAM } from './quotes.mjs';
 
 export const MAX_BACKFILL_DAYS = 366;
 
@@ -50,7 +49,7 @@ function priceOn(a, date, series, fx) {
   if (c == null) return null;
   if (a.type === 'idx' || a.type === 'us') return c;
   if (!(fx > 0)) return null;
-  return a.type === 'crypto' ? c * fx : (c * fx) / OZ_GRAM; // kripto: USD -> IDR; emas: USD/ons -> IDR/gram
+  return c * fx; // kripto: USD -> IDR
 }
 
 /**

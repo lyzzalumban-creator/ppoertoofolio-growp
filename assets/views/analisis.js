@@ -1,8 +1,9 @@
 // Analisis: Kinerja, Alokasi, Risiko, Riwayat. Semua dihitung dari riwayat snapshot di browser.
 import { $, arrow, colorOf, delta, esc, fDay, fMonth, latest, longDate, money, monthName, pct, state, symDisp, tile, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { byTypePnl, cashSplit, concentration, currentDrawdown, riskStats } from '../stats.js';
+import { barChart, watch } from './chart.js';
 
-const SUBS = ['kinerja', 'alokasi', 'risiko', 'riwayat'];
+const SUBS = ['kinerja', 'bulanan', 'alokasi', 'risiko', 'riwayat'];
 const PAGE = 30;
 const num1 = (v) => v.toLocaleString('id-ID', { maximumFractionDigits: 1 });
 const none = (msg) => `<div class="empty">${msg}</div>`;
@@ -12,8 +13,7 @@ const none = (msg) => `<div class="empty">${msg}</div>`;
 function renderKinerja() {
   const { index, months, dd } = state.perf;
   if (state.series.length < 2) {
-    $('metrics').innerHTML = '';
-    $('months').innerHTML = '<li class="empty">Butuh data minimal 2 hari.</li>';
+    $('metrics').innerHTML = none('Butuh data minimal 2 hari.');
   } else {
     const ranked = [...months].sort((a, b) => b.ret - a.ret);
     $('metrics').innerHTML = [
@@ -23,15 +23,6 @@ function renderKinerja() {
       tile('Bulan terburuk', delta(ranked.at(-1).ret), esc(monthName(ranked.at(-1).month))),
     ].join('');
 
-    // Kalender 12 bulan terakhir; makin pekat warnanya makin besar geraknya (arah tetap ditulis dengan panah).
-    const shown = months.slice(-12);
-    const maxAbs = Math.max(1e-9, ...shown.map((m) => Math.abs(m.ret)));
-    $('months').innerHTML = shown.map((m, i) => {
-      const note = m === months[0] && !m.from.endsWith('-01') ? `dari ${fDay.format(toMs(m.from))}`
-        : i === shown.length - 1 ? `s.d. ${fDay.format(toMs(m.to))}` : '';
-      const k = 8 + Math.round((Math.abs(m.ret) / maxAbs) * 24);
-      return `<li class="mo ${tone(m.ret)}" style="--k:${k}%"><span class="mo-m">${esc(fMonth.format(toMs(`${m.month}-01`)))}</span><span class="mo-v">${arrow(m.ret)}${pct(m.ret)}</span>${note ? `<span class="mo-n">${esc(note)}</span>` : ''}</li>`;
-    }).join('');
   }
 
   // Batang untung/rugi per aset, berpusat di nol bila ada yang rugi.
@@ -49,6 +40,40 @@ function renderKinerja() {
       <span class="pr-v ${tone(p.pnlPct)}">${arrow(p.pnlPct)}${pct(p.pnlPct, 1)}</span></li>`;
   }).join('') || '<li class="muted">Belum ada aset dengan modal.</li>';
 }
+
+// -- Bulanan: batang return per bulan + daftar dengan rupiah dan persen --
+
+let mAll = false; // false = 12 bulan terakhir
+const short = (m) => fMonth.format(toMs(`${m}-01`)).split(' ')[0];
+
+function drawMonths() {
+  const months = state.perf ? (mAll ? state.perf.months : state.perf.months.slice(-12)) : [];
+  const ok = state.series.length >= 2 && months.length;
+  barChart($('mchart'), ok ? months.map((m) => ({ label: short(m.month), v: m.ret * 100 })) : [], {
+    fmtY: (v) => `${v.toLocaleString('id-ID', { maximumFractionDigits: 0 })}%`,
+    fmtV: (v) => `${v.toLocaleString('id-ID', { maximumFractionDigits: Math.abs(v) >= 10 ? 0 : 1 })}%`,
+    aria: ok ? `Return bulanan, ${months.length} bulan` : '',
+    empty: 'Butuh data minimal 2 hari.',
+  });
+  chartDrawn();
+}
+const chartDrawn = watch($('mchart'), () => { if (state.route.view === 'analisis') drawMonths(); });
+
+function renderBulanan() {
+  const months = state.perf ? (mAll ? state.perf.months : state.perf.months.slice(-12)) : [];
+  $('mlist').innerHTML = state.series.length < 2 ? '' : [...months].reverse().map((m) => `<li class="mrow">
+      <span class="mr-m">${esc(short(m.month))} ${esc(m.month.slice(0, 4))}</span>
+      <span class="mr-v ${tone(m.ret)}">${state.hidden ? '' : `${money(m.pnl, { sign: true })} `}${arrow(m.ret)}${pct(m.ret).replace(/^[+−]/, '')}</span></li>`).join('');
+  for (const b of $('mrange').querySelectorAll('button')) b.setAttribute('aria-pressed', String((b.dataset.m === 'all') === mAll));
+  drawMonths();
+}
+
+$('mrange').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-m]');
+  if (!b) return;
+  mAll = b.dataset.m === 'all';
+  renderBulanan();
+});
 
 // -- Alokasi: seberapa menumpuk, dan untung/rugi per jenis --
 
@@ -107,6 +132,7 @@ function renderRiwayat() {
 
 export function render() {
   renderKinerja();
+  renderBulanan();
   renderAlokasi();
   renderRisiko();
   renderRiwayat();
@@ -116,6 +142,7 @@ export function render() {
 export function show(sub) {
   const s = SUBS.includes(sub) ? sub : 'kinerja';
   for (const k of SUBS) $(`an-${k}`).hidden = k !== s;
+  if (s === 'bulanan') drawMonths();
   for (const a of $('subnav').querySelectorAll('a')) {
     if (a.getAttribute('href') === `#/analisis/${s}`) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');

@@ -1,8 +1,8 @@
 // Halaman satu aset (#/aset/<jenis:kode>): nilai, grafik harga, statistik, tombol Beli/Jual/Ubah/Hapus, aktivitasnya.
 import { currencyOf } from '../../scripts/lib/portfolio.mjs';
-import { $, ICON, MASK, toast, assetName, canTrade, colorOf, delta, esc, fCompact, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
+import { $, ICON, MASK, toast, assetName, canFx, canTrade, colorOf, delta, esc, fCompact, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
 import { inRange, lineChart, rangesHtml, watch } from './chart.js';
-import { openAssetForm, openTrade, openTx, removeAsset } from './sheets.js';
+import { openAssetForm, openConvert, openTrade, openTx, removeAsset } from './sheets.js';
 import { txRow } from './aktivitas.js';
 
 const current = () => {
@@ -76,11 +76,11 @@ export function render() {
       ${cash ? '' : `<div id="achart" class="chart-box"></div><div class="seg seg-ranges" id="aranges" role="group" aria-label="Rentang waktu grafik harga">${rangesHtml(state.arange)}</div>`}
     </section>
     <div class="acts" role="group" aria-label="Tindakan">
-      ${cash ? '' : tradeBtn('buy', 'Beli', ICON.plus) + tradeBtn('sell', 'Jual', ICON.minus)}
+      ${cash ? `<button type="button" class="act" data-act="convert"${canFx() ? '' : ' aria-disabled="true"'}>${ICON.swap}<span>Tukar</span></button>` : tradeBtn('buy', 'Beli', ICON.plus) + tradeBtn('sell', 'Jual', ICON.minus)}
       <button type="button" class="act" data-act="edit">${ICON.edit}<span>${cash ? 'Ubah saldo' : 'Ubah'}</span></button>
       <button type="button" class="act danger" data-act="del">${ICON.trash}<span>Hapus</span></button>
     </div>
-    ${!cash && !canTrade() ? '<p class="note">Beli/Jual butuh kode Apps Script versi 3 (tab Transaksi). Tempel <code>Code.gs</code> terbaru lalu buat versi deploy baru; langkahnya ada di README.</p>' : ''}
+    ${(!cash && !canTrade()) || (cash && !canFx()) ? '<p class="note">Fitur ini butuh kode Apps Script terbaru. Tempel <code>Code.gs</code> lalu buat versi deploy baru.</p>' : ''}
     <dl class="stats card">${stats.join('')}</dl>
     <section class="card" aria-labelledby="d-act-h"><h2 id="d-act-h">Aktivitas</h2>
       ${trades.length ? `<ul class="tx-list">${trades.map(txRow).join('')}</ul>` : '<p class="muted">Belum ada jual-beli untuk aset ini.</p>'}
@@ -99,6 +99,7 @@ $('detail').addEventListener('click', (e) => {
     if (!asset) return;
     const act = b.dataset.act;
     if (act === 'buy' || act === 'sell') openTrade(asset, act);
+    else if (act === 'convert') openConvert(keyOf(asset));
     else if (act === 'edit') openAssetForm(asset);
     else if (act === 'del') removeAsset(asset).catch((ex) => toast(ex.message));
     return;

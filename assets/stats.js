@@ -12,21 +12,26 @@ export function returnIndex(snaps) {
   });
 }
 
-/** Return tiap bulan kalender: [{ month: 'YYYY-MM', from, to, ret }], urut lama -> baru. */
+/**
+ * Return tiap bulan kalender: [{ month: 'YYYY-MM', from, to, ret, pnl }], urut lama -> baru.
+ * pnl = jumlah perubahan harian dalam rupiah (dayPnl) bulan itu: hanya gerak harga, tanpa setoran/jual-beli.
+ */
 export function monthlyReturns(snaps) {
   const months = [];
-  for (const p of returnIndex(snaps)) {
+  returnIndex(snaps).forEach((p, i) => {
     const m = p.date.slice(0, 7);
     const last = months[months.length - 1];
+    const d = Number.isFinite(snaps[i].dayPnl) ? snaps[i].dayPnl : 0;
     if (last && last.month === m) {
       last.to = p.date;
       last.end = p.idx;
+      last.pnl += d;
     } else {
       // Bulan baru diukur dari akhir bulan sebelumnya; bulan pertama dari snapshot pertama.
-      months.push({ month: m, from: p.date, to: p.date, base: last ? last.end : p.idx, end: p.idx });
+      months.push({ month: m, from: p.date, to: p.date, base: last ? last.end : p.idx, end: p.idx, pnl: d });
     }
-  }
-  return months.map(({ month, from, to, base, end }) => ({ month, from, to, ret: end / base - 1 }));
+  });
+  return months.map(({ month, from, to, base, end, pnl }) => ({ month, from, to, ret: end / base - 1, pnl }));
 }
 
 /** Penurunan terdalam dari puncak ke lembah: { pct (<= 0), from (puncak), to (lembah) }. */

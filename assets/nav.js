@@ -15,7 +15,7 @@ export function mountNav() {
   nav.setAttribute('aria-label', 'Menu utama');
   nav.innerHTML = ITEMS.map((it) => (it
     ? `<a id="nav-${it[0]}" href="#/${it[0]}"><svg viewBox="0 0 24 24" aria-hidden="true">${it[2]}</svg><span>${it[1]}</span></a>`
-    : '<button type="button" id="nav-add" class="nav-add" data-add aria-label="Tambah aset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Tambah</span></button>')).join('');
+    : '<button type="button" id="nav-add" class="nav-add" data-menu aria-label="Tambah"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Tambah</span></button>')).join('');
   document.querySelector('.top').after(nav);
   return nav;
 }

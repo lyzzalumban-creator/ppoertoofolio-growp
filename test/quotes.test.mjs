@@ -7,7 +7,6 @@ const A = {
   bbca: { type: 'idx', symbol: 'BBCA', qty: 1, avgCost: 1 },
   aapl: { type: 'us', symbol: 'AAPL', qty: 1, avgCost: 1 },
   btc: { type: 'crypto', symbol: 'BTC', coingeckoId: 'bitcoin', qty: 1, avgCost: 1 },
-  gold: { type: 'gold', symbol: 'XAU', qty: 1, avgCost: 1 },
   cash: { type: 'manual', symbol: 'KAS', qty: 1, price: 1, avgCost: 1 },
   usdManual: { type: 'manual', symbol: 'USDCASH', qty: 1, price: 1, currency: 'USD', avgCost: 1 },
 };
@@ -19,7 +18,6 @@ function makeSrc(over = {}) {
     'BBCA.JK': { price: 10_000, asOf: '2026-11-23', currency: 'IDR' },
     AAPL: { price: 200, asOf: '2026-11-21', currency: 'USD' },
     'USDIDR=X': { price: 16_000, asOf: '2026-11-23' },
-    'GC=F': { price: 3_110.34768, asOf: '2026-11-23', currency: 'USD' },
     'BTC-USD': { price: 60_000, asOf: '2026-11-24', currency: 'USD' },
     ...(over.yahooMap || {}),
   };
@@ -34,15 +32,13 @@ const warnings = [];
 const warn = (m) => warnings.push(m);
 const run = (assets, over = {}, extra = {}) => { warnings.length = 0; return collectQuotes({ assets, date: '2026-11-24', warn, src: makeSrc(over), ...extra }); };
 
-test('semua sumber normal: harga, mata uang, dan konversi emas per gram', async () => {
-  const r = await run([A.bbca, A.aapl, A.btc, A.gold, A.cash]);
+test('semua sumber normal: harga dan mata uang', async () => {
+  const r = await run([A.bbca, A.aapl, A.btc, A.cash]);
   assert.deepEqual(r.problems, []);
   assert.equal(r.fx, 16_000);
   assert.equal(r.quotes.get('idx:BBCA').price, 10_000);
   assert.equal(r.quotes.get('us:AAPL').price, 200);
   assert.equal(r.quotes.get('crypto:BTC').price, 1_050_000_000);
-  // 3110.34768 USD/ons * 16000 / 31.1034768 g = 1.600.000 per gram
-  assert.ok(Math.abs(r.quotes.get('gold:XAU').price - 1_600_000) < 1e-3);
   assert.deepEqual(r.quotes.get('manual:KAS'), { price: 1, asOf: '2026-11-24' });
   assert.equal(warnings.length, 0);
 });
@@ -96,10 +92,10 @@ test('kurs gagal diambil -> pakai kurs terakhir dari snapshot lama', async () =>
   assert.ok(warnings.some((w) => /kurs USD\/IDR memakai nilai terakhir/i.test(w)));
 });
 
-test('kurs gagal dan tak ada kurs lama -> aset dolar & emas jadi masalah', async () => {
-  const r = await run([A.aapl, A.gold, A.bbca], { yahooMap: { 'USDIDR=X': new Error('x') } });
+test('kurs gagal dan tak ada kurs lama -> aset dolar jadi masalah', async () => {
+  const r = await run([A.aapl, A.usdManual, A.bbca], { yahooMap: { 'USDIDR=X': new Error('x') } });
   const keys = r.problems.map((p) => p.split(':')[0]).sort();
-  assert.deepEqual(keys, ['#1 us', '#2 gold']); // urutan = urutan aset di daftar
+  assert.deepEqual(keys, ['#1 us', '#2 manual']); // urutan = urutan aset di daftar
   assert.ok(r.quotes.has('idx:BBCA')); // aset rupiah tidak ikut terseret
 });
 

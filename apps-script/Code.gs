@@ -8,11 +8,15 @@
 const COLS = ['type', 'symbol', 'name', 'qty', 'avgCost', 'coingeckoId', 'price', 'currency', 'costIdr', 'yahoo', 'buyDate'];
 const TEXT = ['type', 'symbol', 'name', 'coingeckoId', 'currency', 'yahoo', 'buyDate'];
 // Catatan jual-beli (tab Transaksi). id dibuat web, dipakai agar kiriman ulang tidak tercatat dua kali.
-const TX = ['id', 'date', 'kind', 'type', 'symbol', 'name', 'qty', 'price', 'currency', 'fx', 'costIdr', 'pnl', 'pnlIdr', 'at'];
-const TX_TEXT = ['id', 'date', 'kind', 'type', 'symbol', 'name', 'currency', 'at'];
+// kind: buy | sell | convert (tukar mata uang: toSymbol, toQty) | fx (trade emas: side, qty = lot, pnl = profit dolar).
+// Kolom baru ditaruh di belakang agar baris lama tetap terbaca.
+const TX = ['id', 'date', 'kind', 'type', 'symbol', 'name', 'qty', 'price', 'currency', 'fx', 'costIdr', 'pnl', 'pnlIdr', 'at', 'side', 'toSymbol', 'toQty'];
+const TX_TEXT = ['id', 'date', 'kind', 'type', 'symbol', 'name', 'currency', 'at', 'side', 'toSymbol'];
+const KINDS = ['buy', 'sell', 'convert', 'fx'];
 // Naikkan bila format data berubah; web memeriksanya agar tidak mengirim kolom yang belum dikenal skrip lama.
 // 3: tab Transaksi, aksi trade dan deleteTx.
-const VERSION = 3;
+// 4: kind convert (tukar mata uang) dan fx (trade emas) di tab Transaksi, kolom side/toSymbol/toQty.
+const VERSION = 4;
 
 // shortcut: kata sandi dibandingkan biasa (bukan constant-time) dan tanpa batas percobaan, cukup untuk
 // satu pemilik dengan kata sandi panjang; tambahkan penundaan/penguncian bila URL ini bocor.
@@ -47,9 +51,11 @@ const ACTIONS = {
   trade: (req) => {
     const t = req.tx;
     if (!t || !/^[A-Za-z0-9_-]{8,64}$/.test(String(t.id || ''))) throw new Error('tx.id tidak valid');
-    if (t.kind !== 'buy' && t.kind !== 'sell') throw new Error('tx.kind harus buy atau sell');
+    if (KINDS.indexOf(t.kind) < 0) throw new Error('tx.kind harus salah satu dari ' + KINDS.join(', '));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) throw new Error('tx.date harus YYYY-MM-DD');
     if (!(typeof t.qty === 'number' && t.qty > 0)) throw new Error('tx.qty harus angka lebih dari 0');
+    if (t.kind === 'convert' && !(typeof t.toQty === 'number' && t.toQty > 0)) throw new Error('tx.toQty harus angka lebih dari 0');
+    if (t.kind === 'fx' && !(typeof t.pnl === 'number' && isFinite(t.pnl))) throw new Error('tx.pnl harus angka');
     const lock = LockService.getScriptLock();
     lock.waitLock(20000);
     try {

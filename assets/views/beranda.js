@@ -14,14 +14,14 @@ function renderSummary() {
   const L = latest();
   const box = $('summary');
   if (!state.assets.length && !L) {
-    box.innerHTML = `<div class="onboard"><h2>Mulai catat portofoliomu</h2>
-      <p class="muted">Tambah aset pertamamu: saham IDX atau AS, kripto, emas, kas, atau lainnya. Harga diperbarui otomatis 4 kali sehari.</p>
-      <button type="button" class="btn primary" data-add>Tambah aset pertama</button></div>`;
+    box.innerHTML = `<div class="onboard"><h2>Mulai dari kas</h2>
+      <p class="muted">Tambah kas dulu, lalu beli aset darinya.</p>
+      <button type="button" class="btn primary" data-add>Tambah kas</button></div>`;
     return;
   }
   if (!L) {
     box.innerHTML = `<div class="sum-top"><span class="label">Total nilai</span></div><div class="sum-value">–</div>
-      <p class="muted">Menunggu harga pertama dari robot (4 kali sehari). Asetmu sudah tersimpan.</p>`;
+      <p class="muted">Menunggu harga pertama dari robot.</p>`;
     return;
   }
   const mtd = state.series.length > 1 && state.perf ? state.perf.months.at(-1) : null;

@@ -36,7 +36,7 @@ export const sampleAssets = [
     "symbol": "BTC",
     "name": "Bitcoin",
     "coingeckoId": "bitcoin",
-    "qty": 0.02,
+    "qty": 0.03,
     "avgCost": 1000000000
   },
   {
@@ -46,13 +46,6 @@ export const sampleAssets = [
     "coingeckoId": "ethereum",
     "qty": 0.5,
     "avgCost": 40000000
-  },
-  {
-    "type": "gold",
-    "symbol": "XAU",
-    "name": "Emas (gram)",
-    "qty": 10,
-    "avgCost": 1100000
   },
   {
     "type": "manual",
@@ -67,6 +60,13 @@ export const sampleAssets = [
     "symbol": "KAS",
     "name": "Kas",
     "qty": 3000000
+  },
+  {
+    "type": "cash",
+    "symbol": "USD",
+    "name": "Dolar",
+    "qty": 500,
+    "currency": "USD"
   }
 ].map((a) => (a.symbol === 'BBCA' ? { ...a, buyDate: '2025-03-03' } : a));
 
@@ -78,9 +78,9 @@ export function seedFake(fake, { days = 150, end = '2026-11-23', withHistory = t
   let seed = 20261123;
   const rnd = () => { seed = (seed + 0x6d2b79f5) | 0; let x = Math.imul(seed ^ (seed >>> 15), 1 | seed); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   const gauss = () => Math.sqrt(-2 * Math.log(rnd() || 1e-9)) * Math.cos(2 * Math.PI * rnd());
-  const START = { BBCA: 9300, TLKM: 3150, AAPL: 175, NVDA: 115, BTC: 960_000_000, ETH: 38_000_000, XAU: 1_130_000, RDPU: 4_900_000, KAS: 1 };
-  const VOL = { idx: 0.012, us: 0.016, crypto: 0.03, gold: 0.007, manual: 0.00015 };
-  const DRIFT = { idx: 0.0003, us: 0.0007, crypto: 0.0009, gold: 0.0003, manual: 0.00012 };
+  const START = { BBCA: 9300, TLKM: 3150, AAPL: 175, NVDA: 115, BTC: 960_000_000, ETH: 38_000_000, RDPU: 4_900_000, KAS: 1, USD: 1 };
+  const VOL = { idx: 0.012, us: 0.016, crypto: 0.03, manual: 0.00015 };
+  const DRIFT = { idx: 0.0003, us: 0.0007, crypto: 0.0009, manual: 0.00012 };
   const px = Object.fromEntries(sampleAssets.map((a) => [keyOf(a), START[a.symbol] ?? a.avgCost]));
   let fx = 15_900, prev = null;
   const endMs = Date.parse(`${end}T00:00:00Z`);
@@ -90,7 +90,7 @@ export function seedFake(fake, { days = 150, end = '2026-11-23', withHistory = t
     const weekend = [0, 6].includes(d.getUTCDay());
     fx *= 1 + 0.0002 * gauss();
     for (const a of sampleAssets) {
-      if (a.symbol === 'KAS') continue;
+      if (a.type === 'cash') continue;
       if (['idx', 'us'].includes(a.type) && weekend) continue;
       px[keyOf(a)] *= 1 + DRIFT[a.type] + VOL[a.type] * gauss();
     }

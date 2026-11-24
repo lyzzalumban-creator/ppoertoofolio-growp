@@ -36,11 +36,11 @@ async function loadSeries(assets, from, to) {
   for (const a of assets) {
     if (!a.buyDate || a.type === 'manual' || a.type === 'cash') continue;
     const { points, currency } = await fetchYahooSeries(yahooSymbol(a), start, to);
-    const want = a.type === 'idx' ? 'IDR' : 'USD'; // us, kripto (X-USD), dan emas (GC=F) semuanya dalam dolar
+    const want = a.type === 'idx' ? 'IDR' : 'USD'; // us dan kripto (X-USD) dalam dolar
     if (currency && currency !== want) throw new Error(`#${assets.indexOf(a) + 1} ${a.type}: mata uang ${currency} dari sumber tidak sama dengan ${want} yang diharapkan`);
     series.set(keyOf(a), points);
   }
-  const needFx = assets.some((a) => a.buyDate && (currencyOf(a) === 'USD' || a.type === 'gold' || a.type === 'crypto'));
+  const needFx = assets.some((a) => a.buyDate && (currencyOf(a) === 'USD' || a.type === 'crypto'));
   const fxSeries = needFx ? (await fetchYahooSeries('USDIDR=X', start, to)).points : null;
   return { series, fxSeries };
 }

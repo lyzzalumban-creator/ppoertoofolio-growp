@@ -25,7 +25,7 @@ test('JSON rusak -> error, bukan crash', () => {
 test('list pada Sheet kosong: tab dibuat otomatis, hasil kosong', () => {
   const f = createFake();
   const r = f.call({ token: f.token, action: 'list' });
-  assert.deepEqual(r, { ok: true, version: 3, assets: [], history: [], transactions: [] });
+  assert.deepEqual(r, { ok: true, version: 4, assets: [], history: [], transactions: [] });
   assert.deepEqual([...f.sheets.keys()].sort(), ['Aset', 'Riwayat', 'Transaksi']);
 });
 
@@ -143,7 +143,7 @@ test('menyimpan ulang menaikkan header lama ke 11 kolom dan menjaga data', () =>
   assert.deepEqual(f.call({ token: f.token, action: 'list' }).assets[0], { type: 'idx', symbol: 'CUAN', qty: 1000, avgCost: 200, buyDate: '2025-01-15' });
 });
 
-// ---------- transaksi (versi 3) ----------
+// ---------- transaksi (versi 3 dan 4) ----------
 
 const tx = (id, extra = {}) => ({ id, date: '2026-11-23', kind: 'sell', type: 'idx', symbol: 'BBCA', name: 'BCA', qty: 400, price: 10_000, currency: 'IDR', costIdr: 3_600_000, pnl: 400_000, pnlIdr: 400_000, at: '2026-11-23T05:00:00Z', ...extra });
 
@@ -169,7 +169,7 @@ test('trade dikirim ulang dengan id sama: catatan tidak dobel, daftar aset tetap
 test('trade menolak isian cacat tanpa menyentuh Sheet', () => {
   const f = createFake();
   const assets = [{ type: 'idx', symbol: 'BBCA', qty: 1, avgCost: 1 }];
-  for (const [bad, msg] of [[{ ...tx('pendek'), id: 'x' }, /tx.id/], [{ ...tx('tx-00000003'), kind: 'tukar' }, /kind/], [{ ...tx('tx-00000004'), date: '23/11/2026' }, /date/], [{ ...tx('tx-00000005'), qty: 0 }, /qty/]]) {
+  for (const [bad, msg] of [[{ ...tx('pendek'), id: 'x' }, /tx.id/], [{ ...tx('tx-00000003'), kind: 'pinjam' }, /kind/], [{ ...tx('tx-00000004'), date: '23/11/2026' }, /date/], [{ ...tx('tx-00000005'), qty: 0 }, /qty/]]) {
     assert.match(f.call({ token: f.token, action: 'trade', assets, tx: bad }).error, msg);
   }
   assert.match(f.call({ token: f.token, action: 'trade', assets }).error, /tx.id/);
@@ -193,4 +193,28 @@ test('nama transaksi berawalan = tetap teks (bukan rumus)', () => {
   const f = createFake();
   f.call({ token: f.token, action: 'trade', assets: [], tx: tx('tx-0000000c', { name: '=IMPORTXML("http://x")' }) });
   assert.equal(f.call({ token: f.token, action: 'list' }).transactions[0].name, '=IMPORTXML("http://x")');
+});
+
+test('v4: tukar mata uang dan trade emas tercatat lengkap (kolom baru), baris v3 tetap terbaca', () => {
+  const f = createFake();
+  const assets = [{ type: 'cash', symbol: 'BCA', qty: 8_400_000 }, { type: 'cash', symbol: 'USD', qty: 600, currency: 'USD' }];
+  const conv = { id: 'tx-conv0001', date: '2026-11-24', kind: 'convert', type: 'cash', symbol: 'BCA', name: 'BCA', qty: 1_600_000, price: 16_000, currency: 'IDR', toSymbol: 'USD', toQty: 100, at: '2026-11-24T01:00:00Z' };
+  const fx = { id: 'tx-fx000001', date: '2026-11-24', kind: 'fx', type: 'forex', symbol: 'XAUUSD', name: 'Emas (XAU/USD)', qty: 0.05, side: 'sell', currency: 'USD', pnl: -12.5, at: '2026-11-24T02:00:00Z' };
+  f.call({ token: f.token, action: 'trade', assets: [{ type: 'idx', symbol: 'BBCA', qty: 600, avgCost: 9000 }], tx: tx('tx-00000001') });
+  assert.equal(f.call({ token: f.token, action: 'trade', assets, tx: conv }).recorded, true);
+  assert.equal(f.call({ token: f.token, action: 'trade', assets, tx: fx }).recorded, true);
+  const l = f.call({ token: f.token, action: 'list' });
+  assert.deepEqual(l.transactions, [tx('tx-00000001'), conv, fx]);
+  assert.equal(l.transactions[2].pnl, -12.5, 'profit negatif tersimpan sebagai angka');
+  assert.equal(typeof l.transactions[1].toSymbol, 'string');
+  assert.equal(f.locks.held, 0);
+});
+
+test('v4: tukar tanpa toQty dan trade emas tanpa pnl ditolak tanpa menyentuh Sheet', () => {
+  const f = createFake();
+  const base = { id: 'tx-bad00001', date: '2026-11-24', type: 'cash', symbol: 'BCA', qty: 1, currency: 'IDR' };
+  assert.match(f.call({ token: f.token, action: 'trade', assets: [], tx: { ...base, kind: 'convert' } }).error, /toQty/);
+  assert.match(f.call({ token: f.token, action: 'trade', assets: [], tx: { ...base, kind: 'fx' } }).error, /pnl/);
+  assert.match(f.call({ token: f.token, action: 'trade', assets: [], tx: { ...base, kind: 'fx', pnl: Infinity } }).error, /pnl|JSON/);
+  assert.ok(!f.sheets.has('Transaksi'));
 });

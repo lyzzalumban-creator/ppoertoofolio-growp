@@ -100,19 +100,16 @@ test('buildBackfill: aset dolar tanpa kurs -> tanggal dilewati, aset rupiah murn
   assert.deepEqual(noFx.map((s) => s.date), ['2026-10-30', '2026-10-31']); // sebelum PANW dimiliki
 });
 
-test('buildBackfill: kripto = harga USD x kurs; emas = USD/ons x kurs / 31,1035; manual = harga tetap', () => {
+test('buildBackfill: kripto = harga USD x kurs; manual = harga tetap', () => {
   const a = [
     { type: 'crypto', symbol: 'BTC', coingeckoId: 'bitcoin', qty: 2, avgCost: 1, buyDate: '2026-10-30' },
-    { type: 'gold', symbol: 'XAU', qty: 31.1034768, avgCost: 1, buyDate: '2026-10-30' },
     { type: 'manual', symbol: 'DEPO', qty: 1, price: 5_000_000, avgCost: 1, buyDate: '2026-10-30' },
   ];
   const sr = new Map([
     ['crypto:BTC', pts({ '2026-10-30': 60_000 })],
-    ['gold:XAU', pts({ '2026-10-30': 3_000 })],
   ]);
   const [s] = buildBackfill({ assets: a, dates: ['2026-10-30'], series: sr, fxSeries: pts({ '2026-10-30': 16_000 }) });
   assert.equal(s.positions.find((p) => p.symbol === 'BTC').value, 2 * 60_000 * 16_000);
-  assert.ok(Math.abs(s.positions.find((p) => p.symbol === 'XAU').value - 3_000 * 16_000) < 1e-3);
   assert.equal(s.positions.find((p) => p.symbol === 'DEPO').value, 5_000_000);
 });
 
@@ -151,12 +148,11 @@ test('fetchYahooSeries: period1/period2 mencakup tanggal akhir, dan host cadanga
   assert.match(urls[1], /interval=1d/);
 });
 
-test('yahooSymbol: idx, kripto, emas, dan penimpaan manual', () => {
+test('yahooSymbol: idx, kripto, dan penimpaan manual', () => {
   assert.equal(yahooSymbol({ type: 'idx', symbol: 'BBCA' }), 'BBCA.JK');
   assert.equal(yahooSymbol({ type: 'idx', symbol: 'BBCA.JK' }), 'BBCA.JK');
   assert.equal(yahooSymbol({ type: 'us', symbol: 'AAPL' }), 'AAPL');
   assert.equal(yahooSymbol({ type: 'crypto', symbol: 'BTC' }), 'BTC-USD');
-  assert.equal(yahooSymbol({ type: 'gold', symbol: 'XAU' }), 'GC=F');
   assert.equal(yahooSymbol({ type: 'us', symbol: 'BRK.B', yahoo: 'BRK-B' }), 'BRK-B');
 });
 
