@@ -6,7 +6,6 @@ export const TYPE = {
   idx: { label: 'Saham IDX', unit: 'lembar' },
   us: { label: 'Saham AS', unit: 'saham' },
   crypto: { label: 'Kripto', unit: '' },
-  gold: { label: 'Emas', unit: 'gram' },
   cash: { label: 'Kas', unit: '' },
   manual: { label: 'Lainnya', unit: 'unit' },
 };
@@ -32,6 +31,9 @@ export const ICON = {
   edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+  swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+  trend: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zM3 7l12-3v3M16 14h2"/></svg>',
 };
 
 export const $ = (id) => document.getElementById(id);
@@ -77,7 +79,8 @@ try { const v = localStorage.getItem('pf-hidden'); state.hidden = v === null ? t
 try { const g = Number(localStorage.getItem('pf-goal')); state.goal = g > 0 ? g : null; } catch { state.goal = null; }
 
 export const latest = () => state.series[state.series.length - 1];
-export const canTrade = () => state.meta.version >= 3; // Code.gs versi 3: tab Transaksi
+export const canTrade = () => state.meta.version >= 3; // Code.gs versi 3: tab Transaksi (beli/jual)
+export const canFx = () => state.meta.version >= 4; // versi 4: tukar mata uang dan trade emas
 
 const subs = [];
 export const subscribe = (fn) => subs.push(fn);

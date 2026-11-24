@@ -3,14 +3,11 @@
 
 import { currencyOf, keyOf } from './portfolio.mjs';
 
-export const OZ_GRAM = 31.1034768; // gram per troy ons
-
-/** Simbol Yahoo Finance sebuah aset: idx -> BBCA.JK, kripto -> BTC-USD, emas -> GC=F; field `yahoo` menimpa. */
+/** Simbol Yahoo Finance sebuah aset: idx -> BBCA.JK, kripto -> BTC-USD; field `yahoo` menimpa. */
 export function yahooSymbol(a) {
   if (a.yahoo) return a.yahoo;
   if (a.type === 'idx') return a.symbol.endsWith('.JK') ? a.symbol : `${a.symbol}.JK`;
   if (a.type === 'crypto') return `${a.symbol}-USD`;
-  if (a.type === 'gold') return 'GC=F';
   return a.symbol;
 }
 
@@ -44,7 +41,7 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
   };
 
   // --- kurs USD/IDR: dibutuhkan aset dolar, emas, dan cadangan kripto ---
-  const needFx = assets.some((a) => currencyOf(a) === 'USD' || a.type === 'gold' || a.type === 'crypto');
+  const needFx = assets.some((a) => currencyOf(a) === 'USD' || a.type === 'crypto');
   let fx = null;
   let fxErr = null;
   if (needFx) {
@@ -94,9 +91,6 @@ export async function collectQuotes({ assets, date, lastKnown, src, warn = () =>
           if (y.currency && y.currency !== 'USD') throw new Error(`Yahoo bermata uang ${y.currency}, bukan USD`);
           q = { price: y.price * requireFx(), asOf: y.asOf };
         }
-      } else if (a.type === 'gold') {
-        const oz = await firstOk(who(a), [['Yahoo GC=F', () => src.yahoo(yahooSymbol(a))], ['Stooq xauusd', () => src.stooq('xauusd')]]);
-        q = { price: (oz.price * requireFx()) / OZ_GRAM, asOf: oz.asOf }; // USD/ons -> IDR/gram
       } else {
         const ySym = yahooSymbol(a);
         const attempts = [['Yahoo', () => src.yahoo(ySym)]];

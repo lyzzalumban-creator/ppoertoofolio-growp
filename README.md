@@ -1,6 +1,6 @@
 # Lumbung
 
-Dasbor pribadi yang menggabungkan semua portofolio investasimu (saham IDX, saham AS, kripto, emas, reksa dana, kas) di satu halaman. Aset diisi **lewat web**, data disimpan di **Google Sheet-mu sendiri**, dan harga diperbarui **4 kali sehari** (01.30, 07.30, 13.30, dan 19.30 WIB).
+Dasbor pribadi yang menggabungkan semua portofolio investasimu (saham IDX, saham AS, kripto, reksa dana, kas) plus catatan trading emas di satu halaman. Aset diisi **lewat web**, data disimpan di **Google Sheet-mu sendiri**, dan harga diperbarui **4 kali sehari** (01.30, 07.30, 13.30, dan 19.30 WIB).
 
 ```
 Web: dasbor, tambah/ubah aset, jual-beli ──┐
@@ -23,11 +23,11 @@ Robot harian (GitHub Actions) ─────────────┘
 6. **Aktifkan GitHub Pages:** *Settings → Pages → Deploy from branch →* `main`, folder `/ (root)`. Workflow terjadwal GitHub hanya berjalan dari branch default, jadi pastikan semua file ini sudah ada di `main`.
 7. **Pakai:** buka situsmu, tempel URL dan kata sandi (sekali per perangkat), lalu tambah asetmu lewat tombol **+** (di tengah menu bawah; di desktop tombol **Tambah**). Lalu tab *Actions → Update harga harian → Run workflow*. Sesudah itu jalan sendiri 4 kali sehari.
 
-Aset yang kamu tambah langsung tampil di daftar. Kas dan aset `manual` langsung terhitung; saham, kripto, dan emas bertanda **Menunggu harga** sampai update harga berikutnya (maksimal 6 jam, atau langsung bila kamu menekan *Run workflow*). Mengubah jumlah, membeli, dan menjual langsung terhitung dengan harga terakhir yang diketahui.
+Aset yang kamu tambah langsung tampil di daftar. Kas dan aset `manual` langsung terhitung; saham dan kripto bertanda **Menunggu harga** sampai update harga berikutnya (maksimal 6 jam, atau langsung bila kamu menekan *Run workflow*). Mengubah jumlah, membeli, dan menjual langsung terhitung dengan harga terakhir yang diketahui.
 
 > **Mengubah kode Apps Script nanti?** Perubahan baru aktif setelah *Deploy → Manage deployments → Edit (ikon pensil) → Version: New version → Deploy*. URL-nya tetap sama.
 >
-> Bila fitur baru butuh kode Apps Script yang lebih baru, dasbor memberi tahu dan menahan fitur itu, supaya tidak ada data yang hilang diam-diam: tanggal beli butuh versi 2 (lembar Tambah aset memberi catatan), **Beli/Jual butuh versi 3** (tombolnya redup dengan catatan). Versi yang terpasang tertulis di Profil > Data. Tempel `Code.gs` terbaru lalu deploy versi baru; data di Sheet tidak berubah.
+> Bila fitur baru butuh kode Apps Script yang lebih baru, dasbor memberi tahu dan menahan fitur itu, supaya tidak ada data yang hilang diam-diam: tanggal beli butuh versi 2 (lembar Tambah aset memberi catatan), **Beli/Jual butuh versi 3**, **Tukar mata uang dan Trade emas butuh versi 4** (tombolnya redup atau menunya memberi pesan). Versi yang terpasang tertulis di Profil > Data. Tempel `Code.gs` terbaru lalu deploy versi baru; data di Sheet tidak berubah.
 
 ## Mengisi aset
 
@@ -35,11 +35,11 @@ Tambah lewat tombol **+**. Ketuk aset di Beranda untuk halamannya: grafik harga,
 
 | Field | Keterangan |
 |---|---|
-| `type` | `idx` saham Indonesia · `us` saham AS · `crypto` kripto · `gold` emas · `cash` kas (rekening, dompet, tunai) · `manual` yang lain (reksa dana, deposito) |
+| `type` | `idx` saham Indonesia · `us` saham AS · `crypto` kripto · `cash` kas (rekening, dompet, tunai) · `manual` yang lain (reksa dana, deposito) |
 | `symbol` | `idx`: kode tanpa `.JK` (mis. `BBCA`). `us`: ticker (mis. `AAPL`). `cash` dan `manual`: label bebas (mis. `BCA`, `TUNAI`) |
 | `name` | Nama yang tampil (opsional) |
-| `qty` | Jumlah. **`idx` dalam LEMBAR, bukan lot** (1 lot = 100 lembar). `gold` dalam gram. `manual` dalam unit. **`cash` = saldo** (dalam mata uangnya) |
-| `avgCost` | Tidak dipakai untuk `cash`. Harga beli rata-rata **per unit**, dalam mata uang aset: rupiah untuk `idx`/`crypto`/`gold`/`manual`, dolar untuk `us` |
+| `qty` | Jumlah. **`idx` dalam LEMBAR, bukan lot** (1 lot = 100 lembar). `manual` dalam unit. **`cash` = saldo** (dalam mata uangnya) |
+| `avgCost` | Tidak dipakai untuk `cash`. Harga beli rata-rata **per unit**, dalam mata uang aset: rupiah untuk `idx`/`crypto`/`manual`, dolar untuk `us` |
 | `coingeckoId` | Wajib untuk `crypto`. Lihat "API ID" di halaman koin di coingecko.com (mis. `bitcoin`) |
 | `price` | Wajib untuk `manual`: harga per unit saat ini. Kamu perbarui sendiri |
 | `currency` | Hanya `manual` dan `cash`: `IDR` (default) atau `USD` |
@@ -51,13 +51,31 @@ Tambah lewat tombol **+**. Ketuk aset di Beranda untuk halamannya: grafik harga,
 
 Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara termudah mencatat sesuatu yang tidak punya harga pasar.
 
+## Alur uang: kas dulu
+
+Semua uang bergerak lewat **kas**. Tambah kas lebih dulu (tombol **+** → *Kas*), baru beli aset darinya.
+
+- **Beli aset** (tombol **+** → *Beli aset*, atau **Beli** di halaman aset) memotong kas bermata uang yang sama: rupiah untuk saham IDX, kripto, dan aset `manual` rupiah; dolar untuk saham AS. Saldo kurang atau belum ada kas = ditolak dengan pesan jelas. Kas boleh bersaldo 0 setelah dipakai habis.
+- **Jual** menambah hasil jualnya ke kas (saham AS masuk ke kas **dolar**). Bila belum ada kas bermata uang itu, dibuat otomatis (`KAS` atau `USD`).
+- **Tukar mata uang** (**+** → *Tukar mata uang*, atau **Tukar** di halaman kas): pilih kas asal dan tujuan (IDR ↔ USD), isi jumlah dan **kurs sesuai aplikasi yang kamu pakai** (rupiah per dolar); hasilnya langsung terlihat sebelum disimpan. Tercatat di tab `Transaksi` (butuh `Code.gs` versi 4).
+- **Ubah** dan **Hapus** aset hanya mengoreksi catatan: kas tidak ikut berubah.
+- Aset yang sudah ada sebelum aturan ini tidak otomatis memotong kas. Untuk mulai bersih: kosongkan tab `Aset` dan `Transaksi` di Sheet, tambah kas, lalu catat pembelian lewat **Beli aset**.
+
+## Trading emas (forex XAU/USD)
+
+**+** → *Trade emas* mencatat satu trade secara ringkas: tanggal, **Buy/Sell**, **lot**, dan hasilnya (**Profit** atau **Rugi**, dalam dolar). Profit menambah dan rugi mengurangi **kas dolar** yang kamu pilih; rugi yang melebihi saldo ditolak. Menu **Aktivitas → Trading emas** menampilkan total profit, profit bulan ini, win rate, menang/kalah, grafik profit per bulan, dan daftar trade. Ketuk satu trade untuk rinciannya atau menghapus catatannya (saldo kas tidak ikut berubah). Trade emas tidak masuk keuntungan terealisasi saham dan tidak butuh harga dari robot: hanya hasil yang kamu catat. Butuh `Code.gs` versi 4.
+
+## Performa bulanan
+
+**Analisis → Bulanan** menampilkan grafik batang return tiap bulan (12 bulan terakhir atau semua) dan daftar bulannya: rupiah dan persen. Rupiahnya adalah jumlah perubahan harga harian bulan itu (tanpa setoran, penarikan, atau jual-beli), jadi sejalan dengan return persennya. Saat nominal disembunyikan, rupiah hilang dan persen tetap.
+
 ## Jual dan beli (keuntungan terealisasi)
 
 Di halaman aset, **Jual** mencatat penjualan: isi jumlah (atau *Jual semua*), harga per unit, dan tanggal; untuk aset dolar juga kurs saat itu. Sebelum menyimpan, lembarnya menampilkan hasil jual, modal porsi yang dijual, **keuntungan terealisasi** (rupiah dan persen), dan sisa. Setelah disimpan, jumlah di tab `Aset` berkurang (aset hilang dari daftar bila terjual habis) dan satu baris masuk ke tab `Transaksi`. **Beli** menambah jumlah dan menimbang ulang harga beli rata-rata.
 
 - **Dasar modal: harga beli rata-rata** saat dijual (satu-satunya yang disimpan per aset, bukan FIFO). Menjual tidak mengubah harga rata-rata sisanya.
 - **Aset dolar:** modal memakai `costIdr` bila diisi (kurs saat beli), selain itu harga rata-rata × kurs yang kamu isi saat menjual. Tab `Transaksi` menyimpan untung/rugi dalam rupiah (`pnlIdr`) dan dolar (`pnl`).
-- **Aktivitas** (menu bawah) menampilkan total keuntungan terealisasi, total tahun ini, dan semua transaksi per bulan. Ketuk satu baris untuk rinciannya; **Hapus catatan** hanya menghapus catatannya (untuk salah input), jumlah aset tidak ikut berubah.
+- **Aktivitas → Jual-beli** menampilkan total keuntungan terealisasi, total tahun ini, dan semua transaksi (termasuk tukar mata uang) per bulan. Ketuk satu baris untuk rinciannya; **Hapus catatan** hanya menghapus catatannya (untuk salah input), jumlah aset tidak ikut berubah.
 - **Aman diulang:** bila sinyal putus setelah menekan Jual, tekan lagi. Setiap transaksi punya id, jadi Sheet tidak menjual atau mencatat dua kali.
 - Kas tidak dijual-beli; ubah saldonya saja. Untuk mencatat aset yang terjual tanpa keuntungannya, pakai **Hapus**.
 - Kinerja (return tertimbang waktu) tetap dari pergerakan harga, jadi menjual tidak terbaca sebagai untung/rugi portofolio.
@@ -81,7 +99,6 @@ Di halaman aset, **Jual** mencatat penjualan: isi jumlah (atau *Jual semua*), ha
 |---|---|---|
 | Saham IDX, saham AS, kurs USD/IDR | Yahoo Finance (cadangan: Stooq untuk saham AS & kurs) | Endpoint tidak resmi tanpa kontrak; bisa berubah atau menolak IP cloud. Cadangan Stooq belum teruji ke server aslinya |
 | Kripto | CoinGecko (cadangan: Yahoo `BTC-USD` × kurs) | CoinGecko memberi harga rupiah langsung tetapi bisa membalas 429 (kena batas request); skrip menunggu sesuai `Retry-After`, lalu pindah ke Yahoo. Koin yang simbol Yahoo-nya bukan `<SIMBOL>-USD` bisa diatur lewat field `yahoo` |
-| Emas | Harga emas dunia (futures `GC=F`, cadangan XAUUSD) × kurs ÷ 31,1035 | Harga **internasional per gram**, bukan harga Antam/toko emas. Untuk harga Antam pakai `manual` |
 
 - **4 kali sehari:** 07.30 WIB menangkap penutupan bursa AS dan kripto pagi, 19.30 WIB menangkap penutupan IDX (tutup sekitar 16.00 WIB), sedangkan 13.30 dan 01.30 memberi pembaruan di tengah sesi. Selama bursa buka, angka yang tampil adalah **harga terakhir**, bukan penutupan. Satu tanggal tetap satu snapshot: run berikutnya di hari yang sama menimpanya, jadi riwayat tidak membengkak. Jadwal GitHub bisa terlambat beberapa menit.
 - Bila satu harga gagal diambil, dipakai harga terakhir dan baris ditandai **harga lama**. Bila belum pernah ada harganya (mis. salah ketik simbol), proses **dibatalkan** dan tidak menulis apa pun, supaya total tidak diam-diam salah. Workflow gagal sehingga GitHub memberi tahumu.
@@ -109,7 +126,7 @@ Grafik digambar dari snapshot harian (satu per tanggal), dan robot baru mulai me
 | `unauthorized` / "Kata sandi salah" | `TOKEN` di Script properties tidak sama dengan yang kamu ketik atau isi di secret |
 | "Respons bukan JSON" | URL salah, atau deploy belum *Who has access: Anyone*, atau kode diubah tanpa *New version* |
 | "Daftar aset kosong" (robot) | Belum ada aset: tambah lewat tombol **+** |
-| Tombol Beli/Jual redup | Kode Apps Script belum versi 3: tempel `Code.gs` terbaru lalu *New version* |
+| Tombol Beli/Jual redup, atau Tukar dan Trade emas memberi pesan "versi 4" | Kode Apps Script belum versi terbaru: tempel `Code.gs` lalu *New version* |
 | Workflow merah dengan daftar aset | Simbol salah ketik / sumber harga menolak. Baca daftarnya di log Actions |
 
 ## Perintah lokal

@@ -7,30 +7,30 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <script src="assets/theme.js?v=a0ceabd136"></script>
+  <script src="assets/theme.js?v=cd7a037d41"></script>
   <script type="importmap">
   {
     "imports": {
-      "./assets/app.js": "./assets/app.js?v=a0ceabd136",
-      "./assets/creds.js": "./assets/creds.js?v=a0ceabd136",
-      "./assets/data.js": "./assets/data.js?v=a0ceabd136",
-      "./assets/lib.js": "./assets/lib.js?v=a0ceabd136",
-      "./assets/nav.js": "./assets/nav.js?v=a0ceabd136",
-      "./assets/stats.js": "./assets/stats.js?v=a0ceabd136",
-      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=a0ceabd136",
-      "./assets/views/analisis.js": "./assets/views/analisis.js?v=a0ceabd136",
-      "./assets/views/beranda.js": "./assets/views/beranda.js?v=a0ceabd136",
-      "./assets/views/chart.js": "./assets/views/chart.js?v=a0ceabd136",
-      "./assets/views/detail.js": "./assets/views/detail.js?v=a0ceabd136",
-      "./assets/views/profil.js": "./assets/views/profil.js?v=a0ceabd136",
-      "./assets/views/sheets.js": "./assets/views/sheets.js?v=a0ceabd136",
-      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=a0ceabd136",
-      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=a0ceabd136",
-      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=a0ceabd136"
+      "./assets/app.js": "./assets/app.js?v=cd7a037d41",
+      "./assets/creds.js": "./assets/creds.js?v=cd7a037d41",
+      "./assets/data.js": "./assets/data.js?v=cd7a037d41",
+      "./assets/lib.js": "./assets/lib.js?v=cd7a037d41",
+      "./assets/nav.js": "./assets/nav.js?v=cd7a037d41",
+      "./assets/stats.js": "./assets/stats.js?v=cd7a037d41",
+      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=cd7a037d41",
+      "./assets/views/analisis.js": "./assets/views/analisis.js?v=cd7a037d41",
+      "./assets/views/beranda.js": "./assets/views/beranda.js?v=cd7a037d41",
+      "./assets/views/chart.js": "./assets/views/chart.js?v=cd7a037d41",
+      "./assets/views/detail.js": "./assets/views/detail.js?v=cd7a037d41",
+      "./assets/views/profil.js": "./assets/views/profil.js?v=cd7a037d41",
+      "./assets/views/sheets.js": "./assets/views/sheets.js?v=cd7a037d41",
+      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=cd7a037d41",
+      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=cd7a037d41",
+      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=cd7a037d41"
     }
   }
   </script>
-  <link rel="stylesheet" href="assets/style.css?v=a0ceabd136">
+  <link rel="stylesheet" href="assets/style.css?v=cd7a037d41">
 </head>
 <body>
   <main class="wrap">
@@ -115,7 +115,6 @@
           <aside class="home-side">
             <section class="card" id="alloc-card" aria-labelledby="alloc-h">
               <h2 id="alloc-h">Alokasi</h2>
-              <p class="hint">Ketuk jenis untuk menyaring daftar aset.</p>
               <div class="alloc-body">
                 <div id="donut" class="donut" role="img" aria-label="Diagram alokasi aset"></div>
                 <ul id="legend" class="legend"></ul>
@@ -127,8 +126,7 @@
             </section>
           </aside>
         </div>
-        <p class="foot">Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
-      </section>
+              </section>
 
       <!-- ASET: satu aset (#/aset/jenis:kode) -->
       <section class="view" id="v-aset" hidden>
@@ -138,8 +136,9 @@
 
       <section class="view" id="v-analisis" hidden>
         <h2 class="vh" id="vt-analisis" tabindex="-1">Analisis</h2>
-        <nav class="subnav" id="subnav" aria-label="Bagian analisis">
+        <nav class="subnav" id="subnav" aria-label="Bagian analisis" style="--n:5">
           <a href="#/analisis/kinerja">Kinerja</a>
+          <a href="#/analisis/bulanan">Bulanan</a>
           <a href="#/analisis/alokasi">Alokasi</a>
           <a href="#/analisis/risiko">Risiko</a>
           <a href="#/analisis/riwayat">Riwayat</a>
@@ -147,37 +146,32 @@
 
         <div class="panel" id="an-kinerja">
           <section class="metrics" id="metrics" aria-label="Metrik kinerja"></section>
-          <div class="perf-grid">
-            <section class="card" aria-labelledby="months-h">
-              <h2 id="months-h">Return bulanan</h2>
-              <p class="hint">Dari pergerakan harga saja: menambah atau menjual aset tidak dihitung sebagai untung/rugi.</p>
-              <ol class="months" id="months"></ol>
-            </section>
-            <section class="card" aria-labelledby="perf-h">
-              <h2 id="perf-h">Untung/rugi per aset</h2>
-              <p class="hint">Sejak beli, dibanding modal masing-masing.</p>
-              <ul class="perf" id="perf"></ul>
-            </section>
-          </div>
+          <section class="card" aria-labelledby="perf-h">
+            <h2 id="perf-h">Untung/rugi per aset</h2>
+            <ul class="perf" id="perf"></ul>
+          </section>
+        </div>
+
+        <div class="panel" id="an-bulanan" hidden>
+          <section class="card" aria-labelledby="mb-h">
+            <div class="card-head"><h2 id="mb-h">Return bulanan</h2>
+              <div class="seg" id="mrange" role="group" aria-label="Rentang bulan"><button type="button" data-m="12" aria-pressed="true">12 bln</button><button type="button" data-m="all" aria-pressed="false">Semua</button></div>
+            </div>
+            <div id="mchart" class="chart-box"></div>
+            <ul class="mlist" id="mlist"></ul>
+          </section>
         </div>
 
         <div class="panel" id="an-alokasi" hidden>
           <section class="metrics" id="conc" aria-label="Konsentrasi"></section>
           <section class="card" aria-labelledby="types-h">
             <h2 id="types-h">Per jenis aset</h2>
-            <p class="hint">Bobot dari total, nilai, dan untung/rugi sejak beli. Ketuk untuk menyaring daftar aset di Beranda.</p>
             <ul class="types" id="types"></ul>
           </section>
         </div>
 
         <div class="panel" id="an-risiko" hidden>
           <section class="metrics" id="risk" aria-label="Metrik risiko"></section>
-          <section class="card prose" aria-labelledby="risk-h">
-            <h2 id="risk-h">Cara membacanya</h2>
-            <p><b>Volatilitas</b> menunjukkan seberapa liar nilai portofolio bergoyang, disetahunkan dari perubahan harga harian. Makin tinggi, makin tidak tenang.</p>
-            <p><b>Penurunan saat ini</b> adalah jarak nilai sekarang dari puncaknya. Nol berarti sedang di puncak.</p>
-            <p>Dihitung dari snapshot tiap hari kalender, jadi akhir pekan ikut dihitung (harga saham tidak bergerak saat bursa tutup, kripto tetap). Butuh minimal 14 hari data agar angkanya layak dipercaya.</p>
-          </section>
         </div>
 
         <div class="panel" id="an-riwayat" hidden>
@@ -197,11 +191,29 @@
       <!-- AKTIVITAS: keuntungan terealisasi dan riwayat jual-beli -->
       <section class="view" id="v-aktivitas" hidden>
         <h2 class="vh" id="vt-aktivitas" tabindex="-1">Aktivitas</h2>
-        <section class="card summary" id="realized" aria-label="Keuntungan terealisasi"></section>
-        <section class="card" aria-labelledby="txs-h">
-          <h2 id="txs-h">Transaksi</h2>
-          <div id="txs"></div>
-        </section>
+        <nav class="subnav" id="aktnav" aria-label="Bagian aktivitas" style="--n:2">
+          <a href="#/aktivitas/jual-beli">Jual-beli</a>
+          <a href="#/aktivitas/trading">Trading emas</a>
+        </nav>
+        <div class="panel" id="ak-jb">
+          <section class="card summary" id="realized" aria-label="Keuntungan terealisasi"></section>
+          <section class="card" aria-labelledby="txs-h">
+            <h2 id="txs-h">Transaksi</h2>
+            <div id="txs"></div>
+          </section>
+        </div>
+        <div class="panel" id="ak-fx" hidden>
+          <section class="card summary" id="fxsum" aria-label="Ringkasan trading emas"></section>
+          <section class="card" aria-labelledby="fxm-h">
+            <h2 id="fxm-h">Profit per bulan</h2>
+            <div id="fxchart" class="chart-box"></div>
+            <ul class="mlist" id="fxmonths"></ul>
+          </section>
+          <section class="card" aria-labelledby="fxl-h">
+            <h2 id="fxl-h">Trade</h2>
+            <div id="fxlist"></div>
+          </section>
+        </div>
       </section>
     </div>
 
@@ -212,7 +224,7 @@
         <section class="card" aria-labelledby="set-view-h">
           <h2 id="set-view-h">Tampilan</h2>
           <div class="set-row">
-            <div><b id="set-hide-l">Sembunyikan nominal</b><p class="hint">Rupiah disamarkan, persen tetap tampil. Aman bila layarmu dilihat orang.</p></div>
+            <div><b id="set-hide-l">Sembunyikan nominal</b><p class="hint">Rupiah disamarkan, persen tetap tampil.</p></div>
             <button id="set-hide" class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="set-hide-l"></button>
           </div>
           <div class="set-row">
@@ -238,15 +250,13 @@
           <p id="set-data" class="muted"></p>
           <div class="set-actions">
             <button id="set-reload" class="btn" type="button">Muat ulang data</button>
-            <button class="btn" type="button" data-add>Tambah aset</button>
+            <button class="btn" type="button" data-menu>Tambah</button>
           </div>
         </section>
 
         <section class="card prose" aria-labelledby="set-about-h">
           <h2 id="set-about-h">Tentang</h2>
-          <p>Harga diambil 4 kali sehari (Yahoo Finance, CoinGecko) dan bisa tertunda. Selama bursa buka angkanya harga terakhir, bukan penutupan. Saham AS memakai harga bursa AS terakhir, kripto memakai harga saat pengambilan.</p>
-          <p>Datamu ada di Google Sheet milikmu sendiri. URL dan kata sandi hanya tersimpan di browser ini dan hanya dikirim ke script.google.com.</p>
-          <p>Hanya untuk pencatatan pribadi, bukan saran investasi.</p>
+          <p>Harga diambil 4 kali sehari dan bisa tertunda. Datamu ada di Google Sheet milikmu; URL dan kata sandi hanya tersimpan di browser ini.</p>
         </section>
 
         <section class="card" aria-labelledby="set-acc-h">
@@ -267,11 +277,10 @@
       <p id="f-old" class="note" hidden>Kode Apps Script di Sheet-mu masih versi lama, jadi <strong>tanggal beli belum bisa disimpan</strong>. Tempel <code>Code.gs</code> terbaru lalu buat versi deploy baru (langkahnya di README).</p>
       <label class="field"><span>Jenis</span>
         <select id="f-type">
+          <option value="cash">Kas (rekening, dompet, tunai)</option>
           <option value="idx">Saham IDX</option>
           <option value="us">Saham AS</option>
           <option value="crypto">Kripto</option>
-          <option value="gold">Emas</option>
-          <option value="cash">Kas (rekening, dompet, tunai)</option>
           <option value="manual">Lainnya (reksa dana, deposito)</option>
         </select>
       </label>
@@ -280,6 +289,7 @@
       <label class="field" data-for="crypto"><span>ID CoinGecko (mis. bitcoin)</span><input id="f-coingeckoId" autocomplete="off" autocapitalize="none"></label>
       <label class="field"><span id="l-qty">Jumlah</span><input id="f-qty" type="number" step="any" min="0" inputmode="decimal"></label>
       <label class="field" data-not="cash"><span id="l-cost">Harga beli rata-rata</span><input id="f-avgCost" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field" id="pay-field"><span>Bayar dari kas</span><select id="f-pay"></select></label>
       <label class="field" id="buy-field"><span>Tanggal beli (opsional; bila beli beberapa kali, isi yang pertama)</span><input id="f-buyDate" type="date"></label>
       <label class="field" data-for="manual"><span>Harga per unit saat ini (kamu perbarui sendiri)</span><input id="f-price" type="number" step="any" min="0" inputmode="decimal"></label>
       <label class="field" data-for="manual cash"><span>Mata uang</span>
@@ -313,6 +323,7 @@
       <label class="field big"><span>Jumlah</span><input id="t-qty" type="number" step="any" min="0" inputmode="decimal"></label>
       <button type="button" class="link" id="t-all">Jual semua</button>
       <label class="field big"><span id="t-price-l">Harga per unit</span><input id="t-price" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field"><span id="t-cash-l">Bayar dari kas</span><select id="t-cash"></select></label>
       <label class="field big" id="t-fx-f"><span>Kurs USD/IDR saat transaksi</span><input id="t-fx" type="number" step="any" min="0" inputmode="decimal"></label>
       <label class="field big"><span>Tanggal</span><input id="t-date" type="date"></label>
       <div id="t-preview" class="preview" aria-live="polite"></div>
@@ -338,6 +349,65 @@
     </div>
   </dialog>
 
+  <!-- Menu + -->
+  <dialog id="menu-dlg" class="sheet" aria-labelledby="m-h">
+    <div class="form">
+      <div class="sheet-head"><h2 id="m-h">Tambah</h2></div>
+      <ul class="menu-list">
+        <li><button type="button" class="menu-item" data-menu-act="cash"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h15a3 3 0 0 1 3 3v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zM3 7l12-3v3M16 14h2"/></svg><span>Kas</span></button></li>
+        <li><button type="button" class="menu-item" data-menu-act="asset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20v-8M12 20V5M19 20v-5"/></svg><span>Beli aset</span></button></li>
+        <li><button type="button" class="menu-item" data-menu-act="fx"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span>Trade emas</span></button></li>
+        <li><button type="button" class="menu-item" data-menu-act="convert"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg><span>Tukar mata uang</span></button></li>
+      </ul>
+      <div class="row"><button id="m-close" class="btn" type="button">Tutup</button></div>
+    </div>
+  </dialog>
+
+  <!-- Tukar mata uang -->
+  <dialog id="conv-dlg" class="sheet" aria-labelledby="v-h">
+    <form id="conv-form" class="form" novalidate>
+      <div class="sheet-head"><h2 id="v-h">Tukar mata uang</h2></div>
+      <label class="field"><span>Dari kas</span><select id="v-from"></select></label>
+      <label class="field"><span>Ke kas</span><select id="v-to"></select></label>
+      <label class="field big"><span id="v-amt-l">Jumlah</span><input id="v-amt" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field big"><span>Kurs (Rp per US$)</span><input id="v-rate" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field"><span>Tanggal</span><input id="v-date" type="date"></label>
+      <div id="v-preview" class="preview" aria-live="polite"></div>
+      <p id="v-err" class="err" role="alert" hidden></p>
+      <div class="row">
+        <button id="v-cancel" class="btn" type="button">Batal</button>
+        <button id="v-save" class="btn primary" type="submit">Tukar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Trade emas -->
+  <dialog id="fx-dlg" class="sheet" aria-labelledby="z-h">
+    <form id="fx-form" class="form" novalidate>
+      <div class="sheet-head"><h2 id="z-h">Trade emas</h2></div>
+      <fieldset class="toggle">
+        <legend class="vh">Arah trade</legend>
+        <label><input type="radio" name="side" value="buy"><span>Buy</span></label>
+        <label><input type="radio" name="side" value="sell"><span>Sell</span></label>
+      </fieldset>
+      <label class="field big"><span>Lot</span><input id="z-lot" type="number" step="any" min="0" inputmode="decimal"></label>
+      <fieldset class="toggle">
+        <legend class="vh">Hasil trade</legend>
+        <label><input type="radio" name="res" value="profit"><span>Profit</span></label>
+        <label><input type="radio" name="res" value="loss"><span>Rugi</span></label>
+      </fieldset>
+      <label class="field big"><span>Jumlah (US$)</span><input id="z-amt" type="number" step="any" min="0" inputmode="decimal"></label>
+      <label class="field"><span>Tanggal</span><input id="z-date" type="date"></label>
+      <label class="field"><span>Masuk ke kas</span><select id="z-cash"></select></label>
+      <div id="z-preview" class="preview" aria-live="polite"></div>
+      <p id="z-err" class="err" role="alert" hidden></p>
+      <div class="row">
+        <button id="z-cancel" class="btn" type="button">Batal</button>
+        <button id="z-save" class="btn primary" type="submit">Simpan</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="goal-dlg" class="sheet" aria-labelledby="goal-dlg-h">
     <form id="goal-form" class="form" novalidate>
       <h2 id="goal-dlg-h">Target nilai portofolio</h2>
@@ -352,7 +422,7 @@
     </form>
   </dialog>
 
-  <script src="assets/nofile.js?v=a0ceabd136"></script>
-  <script type="module" src="assets/app.js?v=a0ceabd136"></script>
+  <script src="assets/nofile.js?v=cd7a037d41"></script>
+  <script type="module" src="assets/app.js?v=cd7a037d41"></script>
 </body>
 </html>

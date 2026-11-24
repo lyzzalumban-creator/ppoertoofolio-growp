@@ -19,7 +19,7 @@ export function render() {
   $('set-theme').value = theme();
   $('set-goal').textContent = state.goal ? `Target ${money(state.goal)}` : 'Belum diatur.';
   const v = state.meta.version;
-  const script = v >= 3 ? `versi ${v}` : v >= 2 ? `versi ${v}: jual-beli belum bisa dicatat, tempel Code.gs terbaru` : 'versi lama: tempel Code.gs terbaru agar tanggal beli dan jual-beli tersimpan';
+  const script = v >= 4 ? `versi ${v}` : v >= 3 ? `versi ${v}: tukar mata uang dan trade emas belum bisa, tempel Code.gs terbaru` : v >= 2 ? `versi ${v}: jual-beli belum bisa dicatat, tempel Code.gs terbaru` : 'versi lama: tempel Code.gs terbaru agar tanggal beli dan jual-beli tersimpan';
   $('set-data').textContent = state.assets.length || state.snapshots.length
     ? `${state.assets.length} aset, riwayat ${state.snapshots.length} hari, ${state.txs.length} transaksi. Skrip Apps Script ${script}.`
     : `Belum ada data. Skrip Apps Script ${v ? script : 'belum terbaca'}.`;

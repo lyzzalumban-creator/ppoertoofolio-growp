@@ -27,6 +27,17 @@ test('monthlyReturns: bulan baru diukur dari akhir bulan sebelumnya', () => {
   assert.deepEqual([m[0].from, m[0].to, m[2].from, m[2].to], ['2026-01-30', '2026-01-31', '2026-03-05', '2026-03-05']);
 });
 
+test('monthlyReturns: pnl rupiah = jumlah dayPnl bulan itu; snapshot tanpa dayPnl dihitung 0', () => {
+  const withPnl = (date, dayPct, dayPnl) => ({ ...snap(date, dayPct), dayPnl });
+  const m = monthlyReturns([
+    withPnl('2026-01-30', null, null), withPnl('2026-01-31', 0.1, 1_000), // Jan: 1.000
+    withPnl('2026-02-01', 0.1, 2_500), withPnl('2026-02-02', -0.5, -4_000), // Feb: -1.500
+    snap('2026-03-05', 0.2), // tanpa dayPnl: 0, bukan NaN
+  ]);
+  assert.deepEqual(m.map((x) => x.pnl), [1_000, -1_500, 0]);
+  assert.ok(m.every((x) => Number.isFinite(x.pnl)));
+});
+
 test('monthlyReturns: hasil bulanan berantai sama dengan return total', () => {
   const s = [];
   for (let i = 0; i < 90; i++) s.push(snap(new Date(Date.UTC(2026, 0, 1) + i * 86_400_000).toISOString().slice(0, 10), ((i * 37) % 11 - 5) / 400));

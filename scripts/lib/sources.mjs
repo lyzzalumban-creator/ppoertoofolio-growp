@@ -1,5 +1,5 @@
 // Pengambil harga penutupan dari sumber gratis tanpa API key.
-//  - Yahoo Finance : saham IDX (.JK), saham AS, kurs USD/IDR, emas (GC=F)
+//  - Yahoo Finance : saham IDX (.JK), saham AS, kurs USD/IDR
 //  - Stooq         : cadangan untuk saham AS, kurs, dan emas bila Yahoo menolak
 //  - CoinGecko     : kripto, langsung dalam rupiah
 // Semua fungsi menerima `get` supaya bisa dites tanpa jaringan.

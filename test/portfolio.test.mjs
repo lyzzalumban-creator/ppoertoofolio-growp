@@ -119,8 +119,10 @@ test('kas: cukup label, saldo, dan (opsional) mata uang; tanpa avgCost atau pric
   assert.doesNotThrow(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'USD', qty: 1500, currency: 'USD' }] }));
 });
 
-test('kas: saldo harus > 0, mata uang hanya IDR/USD, label tidak boleh kembar', () => {
-  assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 0 }] }), /qty harus/);
+test('kas: saldo boleh 0 tapi tidak negatif, mata uang hanya IDR/USD, label tidak boleh kembar', () => {
+  assert.doesNotThrow(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 0 }] }));
+  assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: -1 }] }), /qty harus angka 0 atau lebih/);
+  assert.throws(() => validateHoldings({ assets: [{ type: 'idx', symbol: 'BBCA', qty: 0, avgCost: 1 }] }), /qty harus angka lebih dari 0/);
   assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 1, currency: 'EUR' }] }), /currency harus IDR atau USD/);
   assert.throws(() => validateHoldings({ assets: [{ type: 'cash', symbol: 'BCA', qty: 1 }, { type: 'cash', symbol: 'BCA', qty: 2 }] }), /duplikat/);
 });
