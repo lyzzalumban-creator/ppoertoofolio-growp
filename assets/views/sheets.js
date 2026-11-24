@@ -386,6 +386,54 @@ $('conv-form').addEventListener('submit', async (e) => {
   }
 });
 
+// ---------- tarik kas: kurangi saldo tanpa catatan (tidak di Aktivitas, tidak memengaruhi return) ----------
+
+const wdInput = () => ({ key: $('w-from').value, amount: $('w-amt').valueAsNumber });
+function wdView() {
+  const a = state.assets.find((x) => keyOf(x) === $('w-from').value);
+  const cur = a ? currencyOf(a) : 'IDR';
+  $('w-amt-l').textContent = `Jumlah (${cur === 'USD' ? 'US$' : 'Rp'})`;
+  const { amount } = wdInput();
+  if (!(amount > 0)) { $('w-preview').innerHTML = '<p class="muted">Isi jumlah yang ditarik.</p>'; return; }
+  const bal = a ? a.qty : 0;
+  $('w-preview').innerHTML = amount > bal
+    ? `<p class="neg">Saldo kas kurang${state.hidden ? '' : ` ${esc(fmtC(cur).format(amount - bal))}`}</p>`
+    : `<dl class="pv"><div><dt>Saldo kas</dt><dd>${state.hidden ? MASK : `${esc(fmtC(cur).format(bal))} → ${esc(fmtC(cur).format(bal - amount))}`}</dd></div></dl>`;
+}
+
+export function openWithdraw(fromKey) {
+  const cash = state.assets.find((a) => a.type === 'cash');
+  if (!cash) { toast('Belum ada kas.'); return; }
+  $('w-from').innerHTML = allCashOpts(fromKey || keyOf(cash));
+  $('w-amt').value = '';
+  showErr('w-err', '');
+  $('w-save').disabled = false;
+  wdView();
+  $('wd-dlg').showModal();
+  $('w-amt').focus();
+}
+
+$('w-from').addEventListener('change', wdView);
+$('wd-form').addEventListener('input', () => { showErr('w-err', ''); wdView(); });
+$('w-cancel').addEventListener('click', () => $('wd-dlg').close());
+$('wd-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const { key, amount } = wdInput();
+  const a = state.assets.find((x) => keyOf(x) === key);
+  if (!a) return showErr('w-err', 'Pilih kas.');
+  if (!(amount > 0)) return showErr('w-err', 'Jumlah harus lebih dari 0.');
+  if (amount > a.qty) return showErr('w-err', `Saldo kas ${state.hidden ? '' : `${fmtC(currencyOf(a)).format(a.qty)} `}kurang.`.replace('  ', ' '));
+  $('w-save').disabled = true;
+  try {
+    await saveAssets(withCash(state.assets, currencyOf(a), key, -amount));
+    $('wd-dlg').close();
+    toast('Kas dikurangi.');
+  } catch (ex) {
+    $('w-save').disabled = false;
+    showErr('w-err', failText(ex));
+  }
+});
+
 // ---------- trade emas (forex XAU/USD): profit atau rugi langsung ke kas dolar ----------
 
 let fxId = null;
@@ -457,5 +505,6 @@ document.addEventListener('click', (e) => {
   else if (act === 'asset') { if (hasCash) openAssetForm(null, 'idx'); else { toast('Tambah kas dulu, lalu beli aset darinya.'); openAssetForm(null, 'cash'); } }
   else if (act === 'fx') openFx();
   else if (act === 'convert') openConvert();
+  else if (act === 'withdraw') openWithdraw();
 });
 $('m-close').addEventListener('click', () => $('menu-dlg').close());

@@ -333,7 +333,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await openDash(page, fake);
     const list = () => sheetOf(fake).assets;
     await page.locator('#nav-add').click();
-    check('C0 tombol + membuka menu dengan 4 pilihan: Kas, Beli aset, Trade emas, Tukar mata uang', (await isOpen(page, 'menu-dlg')) && (await page.locator('#menu-dlg .menu-item').allInnerTexts()).map(flat).join() === 'Kas,Beli aset,Trade emas,Tukar mata uang');
+    check('C0 tombol + membuka menu dengan 5 pilihan: Kas, Beli aset, Trade emas, Tukar mata uang, Tarik kas', (await isOpen(page, 'menu-dlg')) && (await page.locator('#menu-dlg .menu-item').allInnerTexts()).map(flat).join() === 'Kas,Beli aset,Trade emas,Tukar mata uang,Tarik kas');
     await page.locator('[data-menu-act="asset"]').click();
     check('C1 "Beli aset": lembar terbuka tanpa tombol Hapus, ada pilihan "Bayar dari kas" berisi KAS', (await isOpen(page, 'asset-dlg')) && (await page.locator('#f-h').innerText()) === 'Beli aset' && !(await page.locator('#f-del').isVisible()) && (await page.locator('#pay-field').isVisible()) && /^Kas ·/.test(await page.locator('#f-pay').innerText()));
     check('C1b pilihan jenis: Kas dulu, tanpa Emas', (await page.locator('#f-type option').allInnerTexts()).map((t) => t.split(' ')[0]).join() === 'Kas,Saham,Saham,Kripto,Lainnya');
@@ -564,7 +564,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
 
     // kas: tanpa jual-beli
     await goto(page, AH('cash:KAS'));
-    check('T17 Kas: tanpa Beli/Jual; tombol Tukar, Ubah saldo, Hapus', (await page.locator('#detail .act').allInnerTexts()).map(flat).join() === 'Tukar,Ubah saldo,Hapus');
+    check('T17 Kas: tanpa Beli/Jual; tombol Tukar, Tarik, Ubah saldo, Hapus', (await page.locator('#detail .act').allInnerTexts()).map(flat).join() === 'Tukar,Tarik,Ubah saldo,Hapus');
     check('T18 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
@@ -639,6 +639,19 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.locator('#v-presets button', { hasText: '16.000' }).click();
     check('N12c ketuk pilihan kurs mengisi kolom kurs', (await page.inputValue('#v-rate')) === '16000');
     await page.locator('#v-cancel').click();
+    // tarik kas: kurangi saldo tanpa catatan
+    const txBefore = txs().length;
+    await openAdd(page, 'withdraw');
+    check('N12d Tarik kas: lembar terbuka, label jumlah dalam Rp, pratinjau minta isian', (await isOpen(page, 'wd-dlg')) && /^Jumlah \(Rp\)/.test(await page.locator('#w-amt-l').innerText()) && /Isi jumlah/.test(await page.locator('#w-preview').innerText()));
+    await page.fill('#w-amt', '99999999');
+    check('N12e jumlah melebihi saldo: pratinjau "Saldo kas kurang"; menyimpan ditolak dan saldo tetap', /Saldo kas kurang/.test(await page.locator('#w-preview').innerText()));
+    await page.locator('#w-save').click();
+    await page.waitForSelector('#w-err:not([hidden])');
+    check('N12f galat saldo kurang, kas tidak berubah', /kurang/.test(await page.locator('#w-err').innerText()) && asset('KAS').qty === 4_025_000);
+    await page.fill('#w-amt', '1000000');
+    await page.locator('#w-save').click();
+    await done('wd-dlg');
+    check('N12g tarik 1.000.000: kas 4.025.000 -> 3.025.000, tidak ada catatan baru di Aktivitas', asset('KAS').qty === 3_025_000 && txs().length === txBefore);
     await nav(page, 'aktivitas');
     const rowsJb = await page.locator('#txs .tx').allInnerTexts();
     check('N13 Aktivitas > Jual-beli memuat baris Tukar (dua), Jual, Beli; baris Tukar menampilkan asal -> tujuan', rowsJb.filter((t) => /^Tukar/.test(t)).length === 2 && rowsJb.some((t) => /KAS → USD/.test(t)) && rowsJb.some((t) => /^Jual/.test(t)) && rowsJb.some((t) => /^Beli/.test(t)), rowsJb.map(flat).join(' | '));

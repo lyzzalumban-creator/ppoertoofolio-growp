@@ -7,7 +7,7 @@ import { call } from '../scripts/lib/api.mjs';
 import { clearCreds, readCreds, saveCreds, scriptUrlOk } from './creds.js';
 import { mountNav, setActive } from './nav.js';
 import { $, ICON, agoText, esc, fAtDate, fAtTime, latest, longDate, setHidden, state, subscribe, todayWib } from './lib.js';
-import { setData } from './data.js';
+import { saveStamp, setData, whenSaved } from './data.js';
 import { demoData } from './demo.js';
 import * as beranda from './views/beranda.js';
 import * as detail from './views/detail.js';
@@ -138,7 +138,12 @@ function fail(msg, hint) {
 async function start(creds, prefetched) {
   let d = prefetched;
   try {
-    if (!d) d = await call(creds.url, creds.token, 'list');
+    if (!d) {
+      await whenSaved(); // simpan yang sedang berjalan selesai dulu, supaya hasilnya tidak tertimpa data lama
+      const stamp = saveStamp();
+      d = await call(creds.url, creds.token, 'list');
+      if (saveStamp() !== stamp) { await whenSaved(); d = await call(creds.url, creds.token, 'list'); } // ada simpan baru selama memuat
+    }
   } catch (e) {
     if (e.message === 'unauthorized') return showConnect('Kata sandi tidak cocok.', creds.url);
     return fail(`Data tidak bisa dibaca (${e.message}).`, 'Periksa koneksi internet, lalu muat ulang. <a href="#" id="relink">Sambungkan ulang</a>');
