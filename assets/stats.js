@@ -179,3 +179,60 @@ export function liveView(assets, snaps, today) {
   if (L && L.at) snap.at = L.at;
   return { snap, pending };
 }
+
+/**
+ * Treemap (squarified): bagi kotak W×H menjadi petak seluas `value` masing-masing, urut dari terbesar.
+ * Mengembalikan [{ item, x, y, w, h }] (satuan sama dengan W/H). Dipakai peta aset di Beranda.
+ */
+export function treemap(items, W = 100, H = 100) {
+  const list = items.filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
+  const total = list.reduce((s, i) => s + i.value, 0);
+  let rest = list.map((item) => ({ item, a: (item.value / total) * W * H }));
+  const out = [];
+  const worst = (row, side) => {
+    const s = row.reduce((t, r) => t + r.a, 0);
+    const mx = Math.max(...row.map((r) => r.a)), mn = Math.min(...row.map((r) => r.a));
+    return Math.max((side * side * mx) / (s * s), (s * s) / (side * side * mn));
+  };
+  let x = 0, y = 0, w = W, h = H;
+  while (rest.length) {
+    const side = Math.min(w, h);
+    const row = [rest[0]];
+    let k = 1;
+    while (k < rest.length && worst([...row, rest[k]], side) <= worst(row, side)) row.push(rest[k++]);
+    rest = rest.slice(k);
+    const s = row.reduce((t, r) => t + r.a, 0);
+    if (w >= h) { // kolom di kiri, ditumpuk ke bawah
+      const rw = s / h;
+      let cy = y;
+      for (const r of row) { const rh = r.a / rw; out.push({ item: r.item, x, y: cy, w: rw, h: rh }); cy += rh; }
+      x += rw; w -= rw;
+    } else { // baris di atas, berjajar ke kanan
+      const rh = s / w;
+      let cx = x;
+      for (const r of row) { const rw = r.a / rh; out.push({ item: r.item, x: cx, y, w: rw, h: rh }); cx += rw; }
+      y += rh; h -= rh;
+    }
+  }
+  return out;
+}
+
+/**
+ * Bahan peta aset: semua aset termasuk kas (kas netral, tanpa warna arah); aset berbobot < minShare digabung jadi satu
+ * petak bila ada ≥ 2. metric: 'day' (perubahan hari ini) atau 'pnl' (untung total). Petak gabungan memakai rata-rata
+ * tertimbang nilai dari anggota yang punya angka.
+ */
+export function heatItems(positions, metric = 'day', minShare = 0.05) {
+  const rows = positions.filter((p) => p.value > 0);
+  const total = rows.reduce((s, p) => s + p.value, 0);
+  const val = (p) => { if (p.type === 'cash') return null; const v = metric === 'pnl' ? p.pnlPct : p.dayPct; return Number.isFinite(v) ? v : null; };
+  const small = rows.filter((p) => p.value / total < minShare);
+  const group = small.length >= 2 ? small : [];
+  const items = rows.filter((p) => !group.includes(p)).map((p) => ({ p, value: p.value, d: val(p) }));
+  if (group.length) {
+    const ok = group.filter((p) => val(p) != null);
+    const w = ok.reduce((s, p) => s + p.value, 0);
+    items.push({ group, value: group.reduce((s, p) => s + p.value, 0), d: w ? ok.reduce((s, p) => s + p.value * val(p), 0) / w : null });
+  }
+  return items;
+}

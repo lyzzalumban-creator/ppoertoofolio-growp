@@ -233,6 +233,14 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O2 demo: dasbor langsung terbuka, banner "Mode demo", subjudul demo, menu tampil', /Mode demo/.test(await page.locator('#banner').innerText()) && /Demo/.test(await page.locator('#subtitle').innerText()) && (await page.locator('#nav').isVisible()));
     check('O3 demo tidak memanggil Google sama sekali dan tidak menyimpan kredensial; pilihan sembunyikan nominalmu tidak berubah', env.calls.length === 0 && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null && (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === null);
     check('O4 demo menampilkan angka (nominal tampil) dan banyak aset', /Rp\s?\d/.test(await page.locator('#summary .sum-value').innerText()) && (await page.locator('#holdings .hold').count()) >= 8);
+    check('O4h peta aset: petak per aset, bisa diketuk ke halaman aset, tanpa nominal rupiah; terbesar = bobot terbesar', (await page.locator('#heat .hm-tile').count()) >= 5 && /#\/aset\//.test(await page.locator('#heat .hm-tile').first().getAttribute('href')) && !/Rp/.test(await page.locator('#heat').innerText()) && (await page.locator('#heat .hm-tile').first().evaluate((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height)) >= (await page.locator('#heat .hm-tile').last().evaluate((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height)));
+    check('O4i peta aset: kas ikut jadi petak netral (tanpa persen arah), aset kecil digabung jadi "N lain"', /\bBCA\b/.test(await page.locator('#heat').innerText()) && (await page.locator('#heat .hm-tile.flat').count()) >= 1 && (await page.locator('#heat .hm-tile[role="img"]').count()) === 1);
+    const colorOf = () => page.locator('#heat .hm-tile:not(.flat)').first().evaluate((e) => getComputedStyle(e).backgroundColor);
+    const dayColor = await colorOf();
+    await page.locator('#heat-mode [data-heat="pnl"]').click();
+    check('O4j peta aset: "Untung total" mengganti warna dan tombol ditandai; kembali ke "Hari ini" memulihkan', (await page.locator('#heat-mode [data-heat="pnl"]').getAttribute('aria-pressed')) === 'true' && (await colorOf()) !== dayColor && (await page.locator('#heat .hm-tile:not(.flat)').first().innerText()).includes('%'));
+    await page.locator('#heat-mode [data-heat="day"]').click();
+    check('O4k kembali ke Hari ini: warna semula', (await colorOf()) === dayColor);
     await page.locator('#ranges').getByRole('button', { name: '1 thn' }).click();
     check('O5 grafik portofolio 1 tahun: gelembung bertanggal hari ini', /2026/.test(await page.locator('#chart .dpill').textContent()) && (await page.locator('#chart path.line').count()) === 1);
     await nav(page, 'aktivitas');

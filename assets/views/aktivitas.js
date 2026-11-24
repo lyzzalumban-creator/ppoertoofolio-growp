@@ -2,7 +2,7 @@
 // Ketuk satu baris untuk rinciannya (dan menghapus catatan).
 import { $, MASK, arrow, esc, fMonth, fNum, fUsd, longDate, monthName, money, state, symDisp, toMs, todayWib, tone } from '../lib.js';
 import { fxStats, realized } from '../../scripts/lib/trade.mjs';
-import { barChart, watch } from './chart.js';
+import { barChart, sparkline, watch } from './chart.js';
 import { openTx } from './sheets.js';
 
 const usd = (v, { sign = false } = {}) => {
@@ -40,6 +40,12 @@ function groupByMonth(list) {
   return [...groups].map(([m, ts]) => `<h3 class="tx-month">${esc(/^\d{4}-\d{2}$/.test(m) ? monthName(m) : m)}</h3><ul class="tx-list">${ts.map(txRow).join('')}</ul>`).join('');
 }
 
+/** Jumlah berjalan per transaksi (urut tanggal): bentuk kurva untuk mini-grafik kartu statistik. */
+const cumulative = (list, val) => {
+  let sum = 0;
+  return [...list].sort((a, b) => (a.date === b.date ? String(a.at).localeCompare(String(b.at)) : a.date < b.date ? -1 : 1)).map((t) => (sum += Number(val(t)) || 0));
+};
+
 function renderJualBeli() {
   const list = state.txs.filter((t) => t.kind !== 'fx');
   const sells = list.filter((t) => t.kind === 'sell');
@@ -47,8 +53,10 @@ function renderJualBeli() {
   const all = realized(list);
   const thisYear = realized(list, year);
   $('realized').innerHTML = `
-    <div class="sum-top"><span class="label">Keuntungan terealisasi</span><span class="muted">${sells.length} penjualan</span></div>
-    <div class="sum-value ${sells.length ? tone(all) : ''}">${sells.length ? money(all, { sign: true }) : '–'}</div>
+    <div class="wg"><div class="wg-left">
+      <div class="wg-top"><span class="label">Keuntungan terealisasi</span>${sells.length ? `<span class="pill ${tone(all)}">${arrow(all)}${sells.length} penjualan</span>` : ''}</div>
+      <div class="sum-value ${sells.length ? tone(all) : ''}">${sells.length ? money(all, { sign: true }) : '–'}</div>
+    </div>${sparkline(cumulative(sells, (t) => t.pnlIdr), 'wg-spark', 'g-real')}</div>
     <dl class="stats">
       <div><dt>Tahun ${year}</dt><dd class="${tone(thisYear)}">${sells.length ? money(thisYear, { sign: true }) : '–'}</dd></div>
       <div><dt>Transaksi</dt><dd>${list.length}</dd></div>
@@ -77,8 +85,10 @@ function renderTrading() {
   const st = fxStats(state.txs);
   const thisMonth = st.months.find((m) => m.month === todayWib().slice(0, 7));
   $('fxsum').innerHTML = `
-    <div class="sum-top"><span class="label">Profit trading emas</span><span class="muted">${st.trades} trade</span></div>
-    <div class="sum-value ${st.trades ? tone(st.total) : ''}">${st.trades ? usd(st.total, { sign: true }) : '–'}</div>
+    <div class="wg"><div class="wg-left">
+      <div class="wg-top"><span class="label">Profit trading emas</span>${st.trades ? `<span class="pill ${tone(st.total)}">${arrow(st.total)}${st.trades} trade</span>` : ''}</div>
+      <div class="sum-value ${st.trades ? tone(st.total) : ''}">${st.trades ? usd(st.total, { sign: true }) : '–'}</div>
+    </div>${sparkline(cumulative(state.txs.filter((t) => t.kind === 'fx'), (t) => t.pnl), 'wg-spark', 'g-fx')}</div>
     <dl class="stats c3">
       <div><dt>Bulan ini</dt><dd class="${tone(thisMonth && thisMonth.pnl)}">${thisMonth ? usd(thisMonth.pnl, { sign: true }) : '–'}</dd></div>
       <div><dt>Win rate</dt><dd>${st.winRate == null ? '–' : `${Math.round(st.winRate * 100)}%`}</dd></div>

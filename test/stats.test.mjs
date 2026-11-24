@@ -228,3 +228,40 @@ test('liveView: aset dolar tanpa kurs di snapshot -> menunggu, bukan angka salah
   const { pending } = liveView([A2, { type: 'cash', symbol: 'USD', qty: 10, currency: 'USD' }], [s1, sNoFx]);
   assert.deepEqual(pending.map((a) => a.symbol), ['AAPL', 'USD']);
 });
+
+import { treemap } from '../assets/stats.js';
+test('treemap: luas petak sebanding nilai, semua di dalam kotak, tanpa tumpang tindih', () => {
+  const items = [50, 25, 12, 8, 4, 1].map((value, i) => ({ id: i, value }));
+  const r = treemap(items, 100, 90);
+  assert.equal(r.length, 6);
+  const total = 100;
+  for (const t of r) {
+    assert.ok(t.x >= -1e-9 && t.y >= -1e-9 && t.x + t.w <= 100 + 1e-9 && t.y + t.h <= 90 + 1e-9);
+    assert.ok(Math.abs((t.w * t.h) / (100 * 90) - t.item.value / total) < 1e-9);
+  }
+  for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+    const a = r[i], b = r[j];
+    assert.ok(a.x + a.w <= b.x + 1e-9 || b.x + b.w <= a.x + 1e-9 || a.y + a.h <= b.y + 1e-9 || b.y + b.h <= a.y + 1e-9, `petak ${i} dan ${j} bertumpuk`);
+  }
+  assert.equal(treemap([{ value: 0 }, { value: -3 }]).length, 0); // nilai nol/negatif diabaikan
+  assert.equal(treemap([{ value: 5 }], 100, 50)[0].w, 100);
+});
+
+import { heatItems } from '../assets/stats.js';
+test('heatItems: kas ikut tanpa warna arah, aset kecil digabung, metrik hari ini vs untung total', () => {
+  const P = (symbol, value, dayPct, pnlPct, type = 'idx') => ({ type, symbol, value, dayPct, pnlPct });
+  const pos = [P('A', 600, 0.01, 0.2), P('B', 300, -0.02, 0.1), P('C', 30, 0.04, 0.5), P('D', 20, 0.02, 0.1), P('KAS', 300, null, 0, 'cash')];
+  const day = heatItems(pos, 'day');
+  assert.equal(day.length, 4); // A, B, KAS, dan satu petak gabungan C+D
+  const kas = day.find((i) => i.p && i.p.type === 'cash');
+  assert.ok(kas && kas.d === null && heatItems(pos, 'pnl').find((i) => i.p && i.p.type === 'cash').d === null);
+  const g = day.find((i) => i.group);
+  assert.equal(g.group.length, 2);
+  assert.equal(g.value, 50);
+  assert.ok(Math.abs(g.d - (30 * 0.04 + 20 * 0.02) / 50) < 1e-12);
+  assert.equal(heatItems(pos, 'pnl').find((i) => i.p && i.p.symbol === 'A').d, 0.2);
+  // hanya satu aset kecil: tidak digabung
+  assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').length, 2);
+  assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').some((i) => i.group), false);
+  assert.equal(heatItems([P('X', 10, null, null)], 'day')[0].d, null);
+});

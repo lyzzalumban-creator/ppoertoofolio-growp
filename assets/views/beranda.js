@@ -1,7 +1,7 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
 import { $, ICON, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
-import { goalProgress, insights, sortPositions } from '../stats.js';
+import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
 import { openAssetForm } from './sheets.js';
@@ -118,6 +118,32 @@ function renderHoldings() {
   $('hold-tools').hidden = total < 2;
 }
 
+// ---------- peta aset: ukuran petak = bobot, warna = perubahan hari ini atau untung total (hanya persen, tanpa nominal) ----------
+
+const RADII = ['28px', '28px 28px 28px 6px', '6px 28px 28px 28px', '44px 10px 28px 10px', '28px 6px 28px 6px']; // bentuk sudut bergantian
+const HEAT_FULL = { day: 0.025, pnl: 0.3 }; // persen yang sudah dianggap warna pekat penuh
+function renderHeat() {
+  const all = ((latest() && latest().positions) || []);
+  const items = heatItems(all, state.heat);
+  $('heat-card').hidden = all.filter((p) => p.value > 0).length < 2;
+  if ($('heat-card').hidden) return;
+  for (const b of $('heat-mode').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.heat === state.heat));
+  const H = 92; // kotak 100 × 92 satuan; ditampilkan dengan aspect-ratio yang sama
+  $('heat').innerHTML = treemap(items, 100, H).map(({ item, x, y, w, h }, i) => {
+    const d = item.d;
+    const heat = d == null ? 0 : Math.min(1, Math.abs(d) / HEAT_FULL[state.heat]).toFixed(2);
+    const wt = item.p ? item.p.weight : item.group.reduce((s, p) => s + (p.weight || 0), 0);
+    const name = item.p ? symDisp(item.p) : `Lainnya (${item.group.length})`;
+    const geo = `left:${x.toFixed(2)}%;top:${((y / H) * 100).toFixed(2)}%;width:${w.toFixed(2)}%;height:${((h / H) * 100).toFixed(2)}%;--h:${heat};--r:${RADII[i % RADII.length]}`;
+    const label = `${name}, bobot ${weightText(wt)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}${item.group ? `: ${item.group.map(symDisp).join(', ')}` : ''}`;
+    const inner = `<b class="hm-sym">${esc(item.p ? name : `${item.group.length} lain`)}</b><span class="hm-pct">${weightText(wt)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}`;
+    const cls = `hm-tile ${d == null || d === 0 ? 'flat' : tone(d)}`;
+    return item.p
+      ? `<a class="${cls}" href="${assetHref(item.p)}" style="${geo}" aria-label="${esc(label)}">${inner}</a>`
+      : `<div class="${cls}" style="${geo}" role="img" aria-label="${esc(label)}">${inner}</div>`;
+  }).join('');
+}
+
 // ---------- samping: alokasi ringkas dan target ----------
 
 function renderAlloc() {
@@ -162,6 +188,7 @@ function setGoal(v) {
 export function render() {
   renderSummary();
   renderInsights();
+  renderHeat();
   renderHoldings();
   renderAlloc();
   renderGoal();
@@ -176,6 +203,12 @@ export function show() {
 
 // ---------- interaksi ----------
 
+$('heat-mode').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-heat]');
+  if (!b || b.dataset.heat === state.heat) return;
+  state.heat = b.dataset.heat;
+  renderHeat();
+});
 $('ranges').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-range]');
   if (!b) return;

@@ -135,14 +135,24 @@ export function watch(box, draw) {
 }
 
 /** Mini-grafik bentuk saja (tanpa angka): aman walau nominal disembunyikan. */
-export function sparkline(values, cls = '') {
+export function sparkline(values, cls = '', gid = '') {
   const pts = values.filter(Number.isFinite);
   if (pts.length < 2) return '';
   const lo = Math.min(...pts);
   const hi = Math.max(...pts);
   const span = hi - lo || 1;
-  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 100).toFixed(2)},${(29 - ((v - lo) / span) * 27).toFixed(2)}`).join('');
-  return `<svg class="spark ${tone(pts[pts.length - 1] - pts[0])} ${cls}" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="area" d="${d}L100,32L0,32Z"/><path class="line" d="${d}"/></svg>`;
+  const xy = pts.map((v, i) => [(i / (pts.length - 1)) * 100, 29 - ((v - lo) / span) * 27]);
+  const f = (n) => n.toFixed(2);
+  let d = xy.map(([x, y], i) => `${i ? 'L' : 'M'}${f(x)},${f(y)}`).join('');
+  if (gid) { // melengkung (Catmull-Rom jadi Bezier) dengan area gradasi: kartu statistik (.wg)
+    d = xy.map(([x, y], i) => {
+      if (!i) return `M${f(x)},${f(y)}`;
+      const [x0, y0] = xy[i - 2] || xy[i - 1], [x1, y1] = xy[i - 1], [x3, y3] = xy[i + 1] || xy[i];
+      return `C${f(x1 + (x - x0) / 6)},${f(y1 + (y - y0) / 6)} ${f(x - (x3 - x1) / 6)},${f(y - (y3 - y1) / 6)} ${f(x)},${f(y)}`;
+    }).join('');
+  }
+  const defs = gid ? `<defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".45"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>` : '';
+  return `<svg class="spark ${tone(pts[pts.length - 1] - pts[0])} ${cls}" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" focusable="false">${defs}<path class="area" d="${d}L100,32L0,32Z"${gid ? ` style="fill:url(#${gid});opacity:1"` : ''}/><path class="line" d="${d}"${gid ? ' pathLength="1"' : ''}/></svg>`;
 }
 
 /**
