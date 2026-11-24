@@ -158,6 +158,8 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await shot(page, 'grafik.png');
     await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
     check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
+    await page.locator('#ranges').getByRole('button', { name: 'YTD' }).click();
+    check('B5y YTD: grafik hanya berisi titik tahun berjalan', (await page.locator('#chart svg').count()) === 1 && (await page.locator('#ranges').getByRole('button', { name: 'YTD' }).getAttribute('aria-pressed')) === 'true');
     await page.locator('#ranges').getByRole('button', { name: 'Semua' }).click();
 
     await page.locator('#legend [data-filter="crypto"]').click();

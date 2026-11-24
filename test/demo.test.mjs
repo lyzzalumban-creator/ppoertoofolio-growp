@@ -60,3 +60,11 @@ test('demo: nilai terakhir = jumlah posisi; bobot per jenis berjumlah 1', () => 
   assert.ok(Math.abs(sum - L.total) < 1);
   assert.ok(Math.abs(Object.values(L.byType).reduce((s, t) => s + t.weight, 0) - 1) < 1e-4);
 });
+
+test('rentang YTD: hanya titik tahun terakhir; kurang dari 2 titik = semua', async () => {
+  const { inRange } = await import('../assets/views/chart.js');
+  const s = ['2025-12-30', '2025-12-31', '2026-01-02', '2026-06-01', '2026-11-23'].map((date) => ({ date }));
+  assert.deepEqual(inRange(s, 'YTD').map((x) => x.date), ['2026-01-02', '2026-06-01', '2026-11-23']);
+  assert.equal(inRange([{ date: '2025-12-31' }, { date: '2026-01-01' }], 'YTD').length, 2);
+  assert.equal(inRange([{ date: '2025-12-30' }, { date: '2026-01-05' }], 'YTD').length, 2); // hanya 1 titik tahun ini: tampilkan semua
+});
