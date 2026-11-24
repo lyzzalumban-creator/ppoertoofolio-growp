@@ -200,12 +200,22 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#chart .dpill');
     const first = await page.locator('#chart .dpill').innerText();
     const bx = await page.locator('#chart svg').boundingBox();
-    await page.touchscreen.tap(bx.x + bx.width * 0.3, bx.y + bx.height * 0.5);
+    const hold = async (x, y) => { // sentuh dan tahan lewat CDP; kembalikan fungsi untuk mengangkat jari
+      const cdp = await ctx.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+      return () => cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    const lift = await hold(bx.x + bx.width * 0.3, bx.y + bx.height * 0.5);
+    await page.waitForTimeout(100);
     const picked = await page.locator('#chart .dpill').innerText();
+    check('B5a disentuh: gelembung dan tanggal pindah ke titik yang disentuh', picked !== first && (await page.locator('#chart .tip').isVisible()));
+    await lift();
     await page.waitForTimeout(150);
-    check('B5a ketuk grafik di layar sentuh: gelembung dan tanggal pindah ke titik itu dan TETAP ada setelah jari diangkat', picked !== first && (await page.locator('#chart .dpill').innerText()) === picked && (await page.locator('#chart .tip').isVisible()));
-    await page.touchscreen.tap(bx.x + bx.width - 1, bx.y + bx.height * 0.5);
-    check('B5b ketuk dekat tepi kanan: kembali menunjuk titik terakhir; gelembung tetap di dalam kotak grafik', (await page.locator('#chart .dpill').innerText()) === first && (await page.locator('#chart .tip').evaluate((t) => { const r = t.getBoundingClientRect(); const b = document.getElementById('chart').getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1; })));
+    check('B5b jari diangkat: kembali menunjuk titik terakhir', (await page.locator('#chart .dpill').innerText()) === first);
+    const lift2 = await hold(bx.x + bx.width - 1, bx.y + bx.height * 0.5);
+    await page.waitForTimeout(100);
+    check('B5d sentuh dekat tepi kanan: gelembung tetap di dalam kotak grafik', await page.locator('#chart .tip').evaluate((t) => { const r = t.getBoundingClientRect(); const b = document.getElementById('chart').getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1; }));
+    await lift2();
     check('B5c tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
@@ -280,15 +290,21 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#mchart rect.bar');
     const bars = page.locator('#mchart rect.bar');
     const box = await bars.nth(2).boundingBox();
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    const cdp = await ctx.newCDPSession(page);
+    const touch = (type, b) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x: b.x + b.width / 2, y: b.y + b.height / 2 }] });
+    await touch('touchStart', box);
+    await page.waitForTimeout(100);
     const tipTxt = flat(await page.locator('#mchart .tip').innerText());
-    check('O15 ketuk batang bulanan: gelembung memuat nama bulan dan persen; batang ditandai', /\d{4}/.test(tipTxt) && /%/.test(tipTxt) && (await page.locator('#mchart rect.bar.sel').count()) === 1, tipTxt);
+    check('O15 disentuh: gelembung memuat nama bulan dan persen; batang ditandai', /\d{4}/.test(tipTxt) && /%/.test(tipTxt) && (await page.locator('#mchart rect.bar.sel').count()) === 1, tipTxt);
+    await touch('touchEnd', box);
     await page.waitForTimeout(150);
-    check('O15b pilihan bertahan setelah jari diangkat', await page.locator('#mchart .tip').isVisible());
+    check('O15b jari diangkat: gelembung dan tanda batang hilang', !(await page.locator('#mchart .tip').isVisible()) && (await page.locator('#mchart rect.bar.sel').count()) === 0);
     await page.locator('#privacy').click();
     const b2 = await bars.nth(1).boundingBox();
-    await page.touchscreen.tap(b2.x + b2.width / 2, b2.y + b2.height / 2);
+    await touch('touchStart', b2);
+    await page.waitForTimeout(100);
     check('O15c nominal tersembunyi: gelembung tanpa rupiah, persen tetap', !/Rp/.test(await page.locator('#mchart .tip').innerText()) && /%/.test(await page.locator('#mchart .tip').innerText()));
+    await touch('touchEnd', b2);
     check('O16 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }

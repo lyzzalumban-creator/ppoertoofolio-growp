@@ -109,8 +109,9 @@ export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
   const hit = svg.querySelector('.hit');
   hit.addEventListener('pointermove', show);
   hit.addEventListener('pointerdown', show);
-  // Mouse: kembali ke titik terakhir saat kursor pergi. Sentuh: pilihan bertahan setelah jari diangkat (ketuk titik lain untuk pindah).
-  hit.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') place(last); });
+  // Detail hanya selama disentuh atau diarahkan; saat jari diangkat atau kursor pergi, kembali ke titik terakhir.
+  hit.addEventListener('pointerleave', () => place(last));
+  hit.addEventListener('pointercancel', () => place(last));
 }
 
 /** Gambar ulang saat lebar kotak berubah (termasuk saat halamannya baru dibuka). */
@@ -164,7 +165,7 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
       <text class="bl" x="${cx.toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(it.label)}</text>`;
   }).join('');
   box.innerHTML = `<svg class="chart bars" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(aria || '')}"><g class="axis">${grid}</g>${bars}</svg><div class="tip" hidden></div>`;
-  // Ketuk (atau arahkan) satu batang: gelembung berisi bulan dan nilainya; pilihan bertahan sampai batang lain dipilih.
+  // Sentuh (atau arahkan) satu batang: gelembung berisi bulan dan nilainya; hilang saat jari diangkat atau kursor pergi.
   const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), rects = svg.querySelectorAll('rect.bar');
   const pick = (ev) => {
     const r = svg.getBoundingClientRect();
@@ -178,5 +179,8 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
     tip.style.top = `${Math.max(2, top - tip.offsetHeight - 22)}px`;
   };
   svg.addEventListener('pointerdown', pick);
-  svg.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'mouse') pick(ev); });
+  svg.addEventListener('pointermove', pick);
+  const clear = () => { tip.hidden = true; rects.forEach((b) => b.classList.remove('sel')); };
+  svg.addEventListener('pointerleave', clear);
+  svg.addEventListener('pointercancel', clear);
 }
