@@ -1,6 +1,6 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
@@ -60,7 +60,14 @@ function drawChart() {
     .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100, c: amt && Number.isFinite(s.cost) ? s.cost : null }));
   $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
   $('chart-key').innerHTML = amt && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
+  const first = pts[0];
   lineChart($('chart'), pts, {
+    head: $('chart-head'),
+    headHtml: (p, rest) => {
+      const d = p.y - first.y;
+      const shown = amt ? `${esc(money(d, { sign: true }))}${first.y ? ` (${esc(pct(p.y / first.y - 1))})` : ''}` : esc(pct(d / 100));
+      return `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b><span class="pill ${tone(d)}">${arrow(d)}${shown}</span><small class="muted">${rest ? `sejak ${esc(longDate(first.date))}` : esc(longDate(p.date))}</small>`;
+    },
     fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `<span>Modal ${esc(fIdr.format(p.c))}</span>` : ''}`,
     label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
     empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',
@@ -133,10 +140,10 @@ function renderHeat() {
     const d = item.d;
     const heat = d == null ? 0 : Math.min(1, Math.abs(d) / HEAT_FULL[state.heat]).toFixed(2);
     const wt = item.p ? item.p.weight : item.group.reduce((s, p) => s + (p.weight || 0), 0);
-    const name = item.p ? symDisp(item.p) : `Lainnya (${item.group.length})`;
+    const name = state.hidden ? MASK : item.p ? symDisp(item.p) : `Lainnya (${item.group.length})`; // nominal tersembunyi: nama aset ikut disamarkan
     const geo = `left:${x.toFixed(2)}%;top:${((y / H) * 100).toFixed(2)}%;width:${w.toFixed(2)}%;height:${((h / H) * 100).toFixed(2)}%;--h:${heat};--r:${RADII[i % RADII.length]}`;
-    const label = `${name}, bobot ${weightText(wt)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}${item.group ? `: ${item.group.map(symDisp).join(', ')}` : ''}`;
-    const inner = `<b class="hm-sym">${esc(item.p ? name : `${item.group.length} lain`)}</b><span class="hm-pct">${weightText(wt)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}`;
+    const label = `${name}, bobot ${weightText(wt)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}${item.group && !state.hidden ? `: ${item.group.map(symDisp).join(', ')}` : ''}`;
+    const inner = `<b class="hm-sym">${esc(state.hidden ? MASK : item.p ? name : `${item.group.length} lain`)}</b><span class="hm-pct">${weightText(wt)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}`;
     const cls = `hm-tile ${d == null || d === 0 ? 'flat' : tone(d)}`;
     return item.p
       ? `<a class="${cls}" href="${assetHref(item.p)}" style="${geo}" aria-label="${esc(label)}">${inner}</a>`

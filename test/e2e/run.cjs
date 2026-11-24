@@ -151,10 +151,14 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const lastDate = sheetOf(fake).history.at(-1).date;
     check('B4 grafik diam: bersih (tanpa gelembung, tanggal, kursor, garis modal); isi tersembunyi tetap menunjuk titik terakhir (= total)', !(await page.locator('#chart .tip').isVisible()) && !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart .cursor').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && nb(await page.locator('#chart .tip b').textContent()) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && (await page.locator('#chart .dpill').textContent()) === '23 Nov 2026' && lastDate === '2026-11-23');
     const before = await page.locator('#chart .dpill').textContent();
+    const headRest = await page.locator('#chart-head b').innerText();
+    check('B4g angka di atas grafik saat diam = total terakhir', nb(headRest) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && /sejak/.test(await page.locator('#chart-head small').innerText()));
     await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
     check('B4b mengarahkan kursor: gelembung, tanggal, garis modal dan kursor muncul; tanggal dan nilai ikut berubah', (await page.locator('#chart .dpill').isVisible()) && (await page.locator('#chart .tip').isVisible()) && (await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').innerText()) !== before && (await page.locator('#chart .cursor line').count()) === 1);
+    check('B4h angka di atas grafik: saat disentuh berubah mengikuti titik (nilai dan selisih dari awal rentang)', (await page.locator('#chart-head b').innerText()) !== headRest && /[▲▼]/.test(await page.locator('#chart-head .pill').innerText()));
     await page.mouse.move(box.x + box.width * 0.5, box.y - 40);
     check('B4c kursor keluar dari grafik: bersih lagi', !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').textContent()) === before);
+    check('B4i kursor keluar: angka di atas grafik kembali ke total terakhir', (await page.locator('#chart-head b').innerText()) === headRest);
     await shot(page, 'grafik.png');
     await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
     check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
@@ -241,6 +245,9 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O4j peta aset: "Untung total" mengganti warna dan tombol ditandai; kembali ke "Hari ini" memulihkan', (await page.locator('#heat-mode [data-heat="pnl"]').getAttribute('aria-pressed')) === 'true' && (await colorOf()) !== dayColor && (await page.locator('#heat .hm-tile:not(.flat)').first().innerText()).includes('%'));
     await page.locator('#heat-mode [data-heat="day"]').click();
     check('O4k kembali ke Hari ini: warna semula', (await colorOf()) === dayColor);
+    await page.locator('#privacy').click(); // sembunyikan nominal
+    check('O4l nominal tersembunyi: nama aset di peta ikut disamarkan (teks dan label pembaca layar), persen tetap', !/\b(BTC|AAPL|BBCA|RDPU|TLKM|BCA|USD)\b/.test(await page.locator('#heat').innerText()) && /••••••/.test(await page.locator('#heat').innerText()) && !/\b(BTC|AAPL|BBCA|RDPU|TLKM)\b/.test((await page.locator('#heat .hm-tile').evaluateAll((es) => es.map((e) => e.getAttribute('aria-label')))).join(' ')) && /%/.test(await page.locator('#heat').innerText()));
+    await page.locator('#privacy').click();
     await page.locator('#ranges').getByRole('button', { name: '1 thn' }).click();
     check('O5 grafik portofolio 1 tahun: gelembung bertanggal hari ini', /2026/.test(await page.locator('#chart .dpill').textContent()) && (await page.locator('#chart path.line').count()) === 1);
     await nav(page, 'aktivitas');
@@ -308,6 +315,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O15 disentuh: gelembung memuat nama bulan dan persen; batang ditandai', /\d{4}/.test(tipTxt) && /%/.test(tipTxt) && (await page.locator('#mchart rect.bar.sel').count()) === 1, tipTxt);
     await touch('touchEnd', box);
     await page.waitForTimeout(150);
+    check('O15h angka di atas grafik batang ikut batang yang disentuh, kembali saat dilepas', /%/.test(await page.locator('#mhead b').innerText()) && (await page.locator('#mhead small').innerText()).length > 0);
     check('O15b jari diangkat: gelembung dan tanda batang hilang', !(await page.locator('#mchart .tip').isVisible()) && (await page.locator('#mchart rect.bar.sel').count()) === 0);
     await page.locator('#privacy').click();
     const b2 = await bars.nth(1).boundingBox();
