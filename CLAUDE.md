@@ -98,7 +98,7 @@ Integrasi robot dengan harga Yahoo asli pernah diuji di sesi sebelumnya tetapi s
 
 ## Status dan yang belum terbukti
 
-- **`Code.gs` versi 3 belum ditempel di Sheet pengguna** (per sesi Nov 2026). Sampai pengguna menempel dan membuat *New version*, Beli/Jual redup dan Profil menyebut versi lamanya. `LockService` dan tab `Transaksi` baru teruji di tiruan.
+- **`Code.gs` versi 3 sudah terpasang di Sheet pengguna dan teruji sungguhan** (Nov 2026, lewat iPad): deploy versi baru, Profil menyebut versi 3, satu penjualan tercatat di tab `Transaksi`. Belum diamati: kirim ulang saat jaringan putus dan dua perangkat menyimpan bersamaan (`LockService`); itu baru teruji di tiruan.
 - Sheet pengguna masih berisi **data contoh** (dua aset percobaan). Sebelum memasukkan data asli: ganti aset lewat dasbor, **kosongkan tab `Riwayat`** (robot hanya mengisi celah di depan dan tidak menimpa snapshot yang ada), lalu jalankan workflow.
 - Snapshot lama di Sheet pengguna belum punya `px`; grafik harga per aset terisi sejak run robot berikutnya (riwayat mundur juga mengisinya).
 - Run terjadwal otomatis pertama belum pernah diamati; hanya run manual.
