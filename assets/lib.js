@@ -70,6 +70,7 @@ export const state = {
   series: [], pending: [], perf: null, // series = riwayat robot dengan hari terakhir diganti tampilan langsung
   hidden: true, goal: null,
   route: { view: 'beranda', sub: '' },
+  demo: false, // mode demo: data contoh di memori, tidak ada jaringan dan tidak ada yang disimpan
   range: 'Semua', arange: 'Semua', sort: 'value', q: '', filter: '', histN: 30,
 };
 
@@ -88,7 +89,7 @@ export const notify = () => subs.forEach((fn) => fn());
 
 export function setHidden(v) {
   state.hidden = v;
-  try { localStorage.setItem('pf-hidden', v ? '1' : '0'); } catch { /* abaikan */ }
+  if (!state.demo) try { localStorage.setItem('pf-hidden', v ? '1' : '0'); } catch { /* abaikan */ } // demo tidak mengubah pilihanmu
   notify();
 }
 

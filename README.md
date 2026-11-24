@@ -51,6 +51,10 @@ Tambah lewat tombol **+**. Ketuk aset di Beranda untuk halamannya: grafik harga,
 
 Aset `manual` dengan `qty` 1 dan `price` = saldo (mis. deposito) adalah cara termudah mencatat sesuatu yang tidak punya harga pasar.
 
+## Coba demo
+
+Di layar sambung ada tombol **Coba demo** (atau buka `index.html?demo`): portofolio fiktif **1 tahun ke belakang** dengan 120-an transaksi (beli, jual, tukar mata uang, dan puluhan trade emas) yang saling cocok. Semuanya di memori browser: tidak memanggil Google, tidak menyimpan apa pun, dan tidak mengubah pilihan sembunyikan nominalmu. Beli, jual, tukar, dan trade emas bisa dicoba; **Muat ulang data** membuat demo dari awal, **Keluar dari demo** (Profil) kembali ke keadaan semula. Kredensial yang sudah tersimpan tidak terhapus.
+
 ## Alur uang: kas dulu
 
 Semua uang bergerak lewat **kas**. Tambah kas lebih dulu (tombol **+** → *Kas*), baru beli aset darinya.

@@ -49,7 +49,7 @@ const short = (m) => fMonth.format(toMs(`${m}-01`)).split(' ')[0];
 function drawMonths() {
   const months = state.perf ? (mAll ? state.perf.months : state.perf.months.slice(-12)) : [];
   const ok = state.series.length >= 2 && months.length;
-  barChart($('mchart'), ok ? months.map((m) => ({ label: short(m.month), v: m.ret * 100 })) : [], {
+  barChart($('mchart'), ok ? months.map((m) => ({ label: short(m.month), v: m.ret * 100, tip: `<b>${esc(monthName(m.month))}</b>${state.hidden ? '' : `<span>${esc(money(m.pnl, { sign: true }))}</span>`}<span>${esc(pct(m.ret))}</span>` })) : [], {
     fmtY: (v) => `${v.toLocaleString('id-ID', { maximumFractionDigits: 0 })}%`,
     fmtV: (v) => `${v.toLocaleString('id-ID', { maximumFractionDigits: Math.abs(v) >= 10 ? 0 : 1 })}%`,
     aria: ok ? `Return bulanan, ${months.length} bulan` : '',

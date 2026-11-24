@@ -31,6 +31,7 @@ const creds = () => {
 };
 
 async function send(action, payload) {
+  if (state.demo) return {}; // demo: perubahan hanya di memori
   const c = creds();
   return call(c.url, c.token, action, payload);
 }

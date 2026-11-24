@@ -109,7 +109,8 @@ export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
   const hit = svg.querySelector('.hit');
   hit.addEventListener('pointermove', show);
   hit.addEventListener('pointerdown', show);
-  hit.addEventListener('pointerleave', () => place(last));
+  // Mouse: kembali ke titik terakhir saat kursor pergi. Sentuh: pilihan bertahan setelah jari diangkat (ketuk titik lain untuk pindah).
+  hit.addEventListener('pointerleave', (ev) => { if (ev.pointerType === 'mouse') place(last); });
 }
 
 /** Gambar ulang saat lebar kotak berubah (termasuk saat halamannya baru dibuka). */
@@ -138,7 +139,7 @@ export function sparkline(values, cls = '') {
 
 /**
  * Grafik batang per periode (return bulanan, profit trading): hijau di atas nol, merah di bawah, nilai di ujung batang.
- * items = [{ label, v }]; opts: { fmtY, fmtV, aria, empty }.
+ * items = [{ label, v, tip? }] (tip = html gelembung saat diketuk/diarahkan); opts: { fmtY, fmtV, aria, empty }.
  */
 export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
   if (!items.length) { box.innerHTML = `<div class="empty">${empty || 'Belum ada data.'}</div>`; return; }
@@ -162,5 +163,20 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
       <text class="bv ${dir}" x="${cx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle">${esc(fmtV(it.v))}</text>
       <text class="bl" x="${cx.toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(it.label)}</text>`;
   }).join('');
-  box.innerHTML = `<svg class="chart bars" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(aria || '')}"><g class="axis">${grid}</g>${bars}</svg>`;
+  box.innerHTML = `<svg class="chart bars" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(aria || '')}"><g class="axis">${grid}</g>${bars}</svg><div class="tip" hidden></div>`;
+  // Ketuk (atau arahkan) satu batang: gelembung berisi bulan dan nilainya; pilihan bertahan sampai batang lain dipilih.
+  const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), rects = svg.querySelectorAll('rect.bar');
+  const pick = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const i = Math.min(items.length - 1, Math.max(0, Math.floor((((ev.clientX - r.left) / r.width) * W - ml) / slot)));
+    rects.forEach((b, k) => b.classList.toggle('sel', k === i));
+    if (!items[i].tip) return;
+    tip.hidden = false;
+    tip.innerHTML = items[i].tip;
+    const cx = ml + slot * (i + 0.5), top = Math.min(Y(items[i].v), Y(0));
+    tip.style.left = `${Math.min(Math.max(2, cx - tip.offsetWidth / 2), W - tip.offsetWidth - 2)}px`;
+    tip.style.top = `${Math.max(2, top - tip.offsetHeight - 22)}px`;
+  };
+  svg.addEventListener('pointerdown', pick);
+  svg.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'mouse') pick(ev); });
 }
