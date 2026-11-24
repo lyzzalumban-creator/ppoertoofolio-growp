@@ -1,6 +1,6 @@
 // Halaman satu aset (#/aset/<jenis:kode>): nilai, grafik harga, statistik, tombol Beli/Jual/Ubah/Hapus, aktivitasnya.
 import { currencyOf } from '../../scripts/lib/portfolio.mjs';
-import { $, ICON, MASK, toast, assetName, canFx, canTrade, colorOf, delta, esc, fCompact, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
+import { $, ICON, MASK, toast, assetName, canFx, canTrade, colorOf, delta, esc, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
 import { inRange, lineChart, rangesHtml, watch } from './chart.js';
 import { openAssetForm, openConvert, openTrade, openTx, removeAsset } from './sheets.js';
 import { txRow } from './aktivitas.js';
@@ -25,8 +25,7 @@ function drawChart() {
   const pts = secret ? raw.map((p) => ({ ...p, y: (p.y / base - 1) * 100 })) : raw;
   const fmt = usd ? fUsd : fIdr;
   lineChart(box, pts, {
-    fmtY: (v) => (secret ? `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : usd ? v.toLocaleString('id-ID', { maximumFractionDigits: 2 }) : fCompact.format(v)),
-    fmtTip: (p) => `<b>${esc(secret ? pct(p.y / 100) : fmt.format(p.y))}</b>${longDate(p.date)}`,
+    fmtTip: (p) => `<b>${esc(secret ? pct(p.y / 100) : fmt.format(p.y))}</b>`,
     label: (a, b) => `Harga ${symDisp(pos || asset)} dari ${secret ? pct(a.y / 100) : fmt.format(a.y)} pada ${longDate(a.date)} menjadi ${secret ? pct(b.y / 100) : fmt.format(b.y)} pada ${longDate(b.date)}`,
     empty: 'Grafik harga muncul setelah robot mencatat harga aset ini beberapa hari.',
     height: 200,
