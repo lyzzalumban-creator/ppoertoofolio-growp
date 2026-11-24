@@ -34,6 +34,8 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
+html { scroll-padding-bottom: calc(var(--nav-h) + 16px); } /* kolom yang fokus tidak tertutup menu bawah */
+button, a, summary, select, input { touch-action: manipulation; } /* tanpa jeda ketuk di iPad */
 
 body {
   margin: 0;
@@ -301,6 +303,7 @@ dialog::backdrop { background: var(--scrim, rgba(0, 0, 0, 0.45)); } /* var() di 
   dialog.sheet[open] { animation: up 0.22s ease-out; }
 }
 @keyframes up { from { transform: translateY(24px); } }
+dialog.sheet { scroll-padding-bottom: 84px; } /* kolom yang fokus tidak tertutup baris tombol */
 /* tombol simpan/batal selalu terlihat walau formulir panjang digulir */
 dialog.sheet .form > .row:last-child { position: sticky; bottom: 0; z-index: 1; margin: 0 -16px; padding: 10px 16px; background: var(--surface); box-shadow: 0 -1px 0 var(--border); }
 @media (min-width: 641px) { dialog.sheet .form > .row:last-child { margin: 0 -20px; padding: 10px 20px; } }

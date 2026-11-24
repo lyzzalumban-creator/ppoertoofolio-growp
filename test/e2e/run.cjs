@@ -219,6 +219,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#f-err:not([hidden])');
     check('C5 duplikat ditolak dengan pesan jelas, lembar tetap terbuka', /duplikat/.test(await page.locator('#f-err').innerText()) && (await isOpen(page, 'asset-dlg')));
     await page.fill('#f-symbol', 'ASII');
+    check('C5b galat duplikat hilang begitu kode dibetulkan', !(await page.locator('#f-err').isVisible()));
     await page.fill('#f-qty', '');
     await page.locator('#f-save').click();
     await page.waitForFunction(() => /qty/.test(document.getElementById('f-err').textContent));
@@ -313,6 +314,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#t-err:not([hidden])');
     check('T3b menyimpan jumlah berlebih ditolak; Sheet tidak berubah, tanpa panggilan simpan', /melebihi/.test(await page.locator('#t-err').innerText()) && asset('BBCA').qty === 1000 && txs().length === 0 && !env.actions.includes('trade'));
     await page.fill('#t-qty', '400');
+    check('T3c galat "melebihi" hilang begitu jumlahnya dibetulkan', !(await page.locator('#t-err').isVisible()));
     await page.fill('#t-price', '10000');
     const pv = nb(flat(await page.locator('#t-preview').innerText()));
     check('T4 pratinjau jual: hasil, modal porsi (harga rata-rata), keuntungan terealisasi dengan persen, sisa', pv.includes(nb(`Hasil jual ${idr.format(4_000_000)}`)) && pv.includes(nb(`Modal porsi ini ${idr.format(3_800_000)}`)) && pv.includes(nb(`▲ +${idr.format(200_000)} (+5,26%)`)) && /Sisa 600/.test(pv), pv);
