@@ -74,6 +74,7 @@ function readForm() {
 }
 
 $('f-type').addEventListener('change', syncType);
+$('asset-form').addEventListener('input', () => showErr('f-err', '')); // galat hilang begitu isiannya dibetulkan
 $('f-cancel').addEventListener('click', () => $('asset-dlg').close());
 
 $('asset-form').addEventListener('submit', async (e) => {
@@ -189,7 +190,7 @@ export function openTrade(asset, kind) {
   $('t-qty').focus();
 }
 
-$('trade-form').addEventListener('input', preview);
+$('trade-form').addEventListener('input', () => { showErr('t-err', ''); preview(); });
 $('t-all').addEventListener('click', () => {
   const a = state.assets.find((x) => keyOf(x) === tradeKey);
   if (a) { $('t-qty').value = String(a.qty); preview(); }

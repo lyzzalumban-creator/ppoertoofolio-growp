@@ -220,4 +220,5 @@ $('goal-form').addEventListener('submit', (e) => {
   setGoal(v);
 });
 $('goal-del').addEventListener('click', () => setGoal(null));
+$('goal-input').addEventListener('input', () => { $('goal-err').hidden = true; });
 $('goal-cancel').addEventListener('click', () => $('goal-dlg').close());
