@@ -241,6 +241,9 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O4j peta aset: "Untung total" mengganti warna dan tombol ditandai; kembali ke "Hari ini" memulihkan', (await page.locator('#heat-mode [data-heat="pnl"]').getAttribute('aria-pressed')) === 'true' && (await colorOf()) !== dayColor && (await page.locator('#heat .hm-tile:not(.flat)').first().innerText()).includes('%'));
     await page.locator('#heat-mode [data-heat="day"]').click();
     check('O4k kembali ke Hari ini: warna semula', (await colorOf()) === dayColor);
+    await page.locator('#privacy').click(); // sembunyikan nominal
+    check('O4l nominal tersembunyi: nama aset di peta ikut disamarkan (teks dan label pembaca layar), persen tetap', !/\b(BTC|AAPL|BBCA|RDPU|TLKM|BCA|USD)\b/.test(await page.locator('#heat').innerText()) && /••••••/.test(await page.locator('#heat').innerText()) && !/\b(BTC|AAPL|BBCA|RDPU|TLKM)\b/.test((await page.locator('#heat .hm-tile').evaluateAll((es) => es.map((e) => e.getAttribute('aria-label')))).join(' ')) && /%/.test(await page.locator('#heat').innerText()));
+    await page.locator('#privacy').click();
     await page.locator('#ranges').getByRole('button', { name: '1 thn' }).click();
     check('O5 grafik portofolio 1 tahun: gelembung bertanggal hari ini', /2026/.test(await page.locator('#chart .dpill').textContent()) && (await page.locator('#chart path.line').count()) === 1);
     await nav(page, 'aktivitas');

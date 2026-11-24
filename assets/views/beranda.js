@@ -1,6 +1,6 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
@@ -133,10 +133,10 @@ function renderHeat() {
     const d = item.d;
     const heat = d == null ? 0 : Math.min(1, Math.abs(d) / HEAT_FULL[state.heat]).toFixed(2);
     const wt = item.p ? item.p.weight : item.group.reduce((s, p) => s + (p.weight || 0), 0);
-    const name = item.p ? symDisp(item.p) : `Lainnya (${item.group.length})`;
+    const name = state.hidden ? MASK : item.p ? symDisp(item.p) : `Lainnya (${item.group.length})`; // nominal tersembunyi: nama aset ikut disamarkan
     const geo = `left:${x.toFixed(2)}%;top:${((y / H) * 100).toFixed(2)}%;width:${w.toFixed(2)}%;height:${((h / H) * 100).toFixed(2)}%;--h:${heat};--r:${RADII[i % RADII.length]}`;
-    const label = `${name}, bobot ${weightText(wt)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}${item.group ? `: ${item.group.map(symDisp).join(', ')}` : ''}`;
-    const inner = `<b class="hm-sym">${esc(item.p ? name : `${item.group.length} lain`)}</b><span class="hm-pct">${weightText(wt)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}`;
+    const label = `${name}, bobot ${weightText(wt)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}${item.group && !state.hidden ? `: ${item.group.map(symDisp).join(', ')}` : ''}`;
+    const inner = `<b class="hm-sym">${esc(state.hidden ? MASK : item.p ? name : `${item.group.length} lain`)}</b><span class="hm-pct">${weightText(wt)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}`;
     const cls = `hm-tile ${d == null || d === 0 ? 'flat' : tone(d)}`;
     return item.p
       ? `<a class="${cls}" href="${assetHref(item.p)}" style="${geo}" aria-label="${esc(label)}">${inner}</a>`
