@@ -12,10 +12,13 @@ import { buildSnapshot, currencyOf, dateInTz, keyOf, validateHoldings } from './
 import { collectQuotes, yahooSymbol } from './lib/quotes.mjs';
 import { addDays, backfillDates, buildBackfill } from './lib/backfill.mjs';
 import { fetchCoinGeckoIdr, fetchStooqClose, fetchYahooClose, fetchYahooSeries } from './lib/sources.mjs';
-import { call } from './lib/api.mjs';
+import { call as rawCall } from './lib/api.mjs';
 import { maskLines, scrub, sensitiveStrings } from './lib/privacy.mjs';
 
 const DRY = process.argv.includes('--dry-run');
+
+// Apps Script sesekali menggantung ±2 menit lalu membalas 500 (gangguan sesaat di Google): menyerah di 45 detik, coba lagi 2 kali.
+const call = (url, token, action, body) => rawCall(url, token, action, body, { timeoutMs: 45_000, retries: 2 });
 
 // Di GitHub Actions log run bisa dibaca orang lain bila repo publik. Karena itu robot di sana tidak mencetak
 // rincian per aset (kode, bobot, untung/rugi, tanggal beli), dan teks yang masih memuat kode/nama aset
@@ -46,7 +49,6 @@ async function main() {
   const { APPS_SCRIPT_URL: url, APPS_SCRIPT_TOKEN: token } = process.env;
   if (!url || !token) throw new Error('Isi env APPS_SCRIPT_URL dan APPS_SCRIPT_TOKEN (di GitHub: Settings > Secrets and variables > Actions)');
 
-  // shortcut: satu kali coba; bila Google sedang error, jalankan ulang workflow-nya.
   const { assets, history } = await call(url, token, 'list');
   secrets = sensitiveStrings(assets);
   if (QUIET) for (const l of maskLines(secrets)) console.log(l); // sebelum apa pun yang bisa memuat kode aset
