@@ -2,10 +2,15 @@
 // Warna garis mengikuti arah dalam rentang yang dipilih (naik hijau, turun merah), dengan area berbayang di bawahnya.
 import { DAY, esc, fDay, fMonth, longDate, toMs, tone } from '../lib.js';
 
-export const RANGES = [['1 bln', 31], ['3 bln', 92], ['6 bln', 183], ['1 thn', 366], ['Semua', Infinity]];
+export const RANGES = [['1 bln', 31], ['3 bln', 92], ['6 bln', 183], ['YTD', 'ytd'], ['1 thn', 366], ['Semua', Infinity]];
 
 export function inRange(snaps, range) {
   const days = (RANGES.find((r) => r[0] === range) || [])[1] ?? Infinity;
+  if (days === 'ytd') { // sejak 1 Januari tahun titik terakhir; kurang dari 2 titik = tampilkan semua
+    const y = snaps.length ? `${snaps[snaps.length - 1].date.slice(0, 4)}-01-01` : '';
+    const f = snaps.filter((s) => s.date >= y);
+    return f.length >= 2 ? f : snaps;
+  }
   if (!Number.isFinite(days) || !snaps.length) return snaps;
   const end = toMs(snaps[snaps.length - 1].date);
   return snaps.filter((s) => end - toMs(s.date) <= days * DAY);
