@@ -2,7 +2,7 @@
 import { currencyOf } from '../../scripts/lib/portfolio.mjs';
 import { $, ICON, MASK, toast, assetName, canFx, canTrade, colorOf, delta, esc, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
 import { inRange, lineChart, rangesHtml, watch } from './chart.js';
-import { openAssetForm, openConvert, openTrade, openTx, removeAsset } from './sheets.js';
+import { openAssetForm, openConvert, openTrade, openTx, openWithdraw, removeAsset } from './sheets.js';
 import { txRow } from './aktivitas.js';
 
 const current = () => {
@@ -83,7 +83,7 @@ export function render() {
       ${cash ? '' : `<div id="ahead" class="chart-head" aria-live="off"></div><div id="achart" class="chart-box"></div><div class="seg seg-ranges" id="aranges" role="group" aria-label="Rentang waktu grafik harga">${rangesHtml(state.arange)}</div>`}
     </section>
     <div class="acts" role="group" aria-label="Tindakan">
-      ${cash ? `<button type="button" class="act" data-act="convert"${canFx() ? '' : ' aria-disabled="true"'}>${ICON.swap}<span>Tukar</span></button>` : tradeBtn('buy', 'Beli', ICON.plus) + tradeBtn('sell', 'Jual', ICON.minus)}
+      ${cash ? `<button type="button" class="act" data-act="convert"${canFx() ? '' : ' aria-disabled="true"'}>${ICON.swap}<span>Tukar</span></button><button type="button" class="act" data-act="withdraw">${ICON.down}<span>Tarik</span></button>` : tradeBtn('buy', 'Beli', ICON.plus) + tradeBtn('sell', 'Jual', ICON.minus)}
       <button type="button" class="act" data-act="edit">${ICON.edit}<span>${cash ? 'Ubah saldo' : 'Ubah'}</span></button>
       <button type="button" class="act danger" data-act="del">${ICON.trash}<span>Hapus</span></button>
     </div>
@@ -107,6 +107,7 @@ $('detail').addEventListener('click', (e) => {
     const act = b.dataset.act;
     if (act === 'buy' || act === 'sell') openTrade(asset, act);
     else if (act === 'convert') openConvert(keyOf(asset));
+    else if (act === 'withdraw') openWithdraw(keyOf(asset));
     else if (act === 'edit') openAssetForm(asset);
     else if (act === 'del') removeAsset(asset).catch((ex) => toast(ex.message));
     return;

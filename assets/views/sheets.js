@@ -319,6 +319,12 @@ let convId = null;
 const allCashOpts = (sel) => state.assets.filter((a) => a.type === 'cash').map((a) => `<option value="${esc(keyOf(a))}"${keyOf(a) === sel ? ' selected' : ''}>${esc(assetName(a))} · ${state.hidden ? MASK : esc(fmtC(currencyOf(a)).format(a.qty))}</option>`).join('');
 const convInput = () => ({ from: $('v-from').value, to: $('v-to').value, amount: $('v-amt').valueAsNumber, rate: $('v-rate').valueAsNumber, date: $('v-date').value });
 
+// Kurs yang terakhir dipakai (per perangkat, 4 terbaru), jadi tidak perlu mengetik ulang; jalan tanpa koneksi.
+const RATES_KEY = 'pf-rates';
+const readRates = () => { try { const v = JSON.parse(localStorage.getItem(RATES_KEY)); return Array.isArray(v) ? v.filter((n) => Number.isFinite(n) && n > 0).slice(0, 4) : []; } catch { return []; } };
+const saveRate = (r) => { if (state.demo) return; try { localStorage.setItem(RATES_KEY, JSON.stringify([r, ...readRates().filter((x) => x !== r)].slice(0, 4))); } catch { /* penyimpanan diblokir: abaikan */ } };
+const robotRate = () => (latest() && latest().fx > 0 ? Math.round(latest().fx) : null);
+
 function convView(fromChanged) {
   const from = state.assets.find((a) => keyOf(a) === $('v-from').value);
   const cur = from ? currencyOf(from) : 'IDR';
@@ -339,7 +345,10 @@ export function openConvert(fromKey) {
   const first = state.assets.find((a) => a.type === 'cash');
   $('v-from').innerHTML = allCashOpts(fromKey || keyOf(first));
   $('v-amt').value = '';
-  $('v-rate').value = latest() && latest().fx ? String(Math.round(latest().fx)) : '';
+  const saved = readRates();
+  $('v-rate').value = String(saved[0] ?? robotRate() ?? '');
+  const presets = [...new Set([...saved, ...(robotRate() ? [robotRate()] : [])])];
+  $('v-presets').innerHTML = presets.map((r) => `<button type="button" data-rate="${r}">${esc(fNum.format(r))}${r === robotRate() && !saved.includes(r) ? ' <small>harga pasar</small>' : ''}</button>`).join('');
   $('v-date').value = todayWib();
   $('v-date').max = todayWib();
   showErr('v-err', '');
@@ -349,6 +358,12 @@ export function openConvert(fromKey) {
   $('v-amt').focus();
 }
 
+$('v-presets').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-rate]');
+  if (!b) return;
+  $('v-rate').value = b.dataset.rate;
+  $('conv-form').dispatchEvent(new Event('input'));
+});
 $('v-from').addEventListener('change', () => convView(true));
 $('conv-form').addEventListener('input', () => { showErr('v-err', ''); convView(false); });
 $('v-cancel').addEventListener('click', () => $('conv-dlg').close());
@@ -362,11 +377,60 @@ $('conv-form').addEventListener('submit', async (e) => {
     const r = convert(state.assets, c);
     validateHoldings({ assets: r.assets });
     await trade(r.assets, convertRecord(state.assets, c, r, convId, new Date().toISOString()));
+    saveRate(c.rate);
     $('conv-dlg').close();
     toast(`Ditukar. Diterima ${state.hidden ? '' : fmtC(r.toCur).format(r.recv)}`.trim());
   } catch (ex) {
     $('v-save').disabled = false;
     showErr('v-err', failText(ex));
+  }
+});
+
+// ---------- tarik kas: kurangi saldo tanpa catatan (tidak di Aktivitas, tidak memengaruhi return) ----------
+
+const wdInput = () => ({ key: $('w-from').value, amount: $('w-amt').valueAsNumber });
+function wdView() {
+  const a = state.assets.find((x) => keyOf(x) === $('w-from').value);
+  const cur = a ? currencyOf(a) : 'IDR';
+  $('w-amt-l').textContent = `Jumlah (${cur === 'USD' ? 'US$' : 'Rp'})`;
+  const { amount } = wdInput();
+  if (!(amount > 0)) { $('w-preview').innerHTML = '<p class="muted">Isi jumlah yang ditarik.</p>'; return; }
+  const bal = a ? a.qty : 0;
+  $('w-preview').innerHTML = amount > bal
+    ? `<p class="neg">Saldo kas kurang${state.hidden ? '' : ` ${esc(fmtC(cur).format(amount - bal))}`}</p>`
+    : `<dl class="pv"><div><dt>Saldo kas</dt><dd>${state.hidden ? MASK : `${esc(fmtC(cur).format(bal))} → ${esc(fmtC(cur).format(bal - amount))}`}</dd></div></dl>`;
+}
+
+export function openWithdraw(fromKey) {
+  const cash = state.assets.find((a) => a.type === 'cash');
+  if (!cash) { toast('Belum ada kas.'); return; }
+  $('w-from').innerHTML = allCashOpts(fromKey || keyOf(cash));
+  $('w-amt').value = '';
+  showErr('w-err', '');
+  $('w-save').disabled = false;
+  wdView();
+  $('wd-dlg').showModal();
+  $('w-amt').focus();
+}
+
+$('w-from').addEventListener('change', wdView);
+$('wd-form').addEventListener('input', () => { showErr('w-err', ''); wdView(); });
+$('w-cancel').addEventListener('click', () => $('wd-dlg').close());
+$('wd-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const { key, amount } = wdInput();
+  const a = state.assets.find((x) => keyOf(x) === key);
+  if (!a) return showErr('w-err', 'Pilih kas.');
+  if (!(amount > 0)) return showErr('w-err', 'Jumlah harus lebih dari 0.');
+  if (amount > a.qty) return showErr('w-err', `Saldo kas ${state.hidden ? '' : `${fmtC(currencyOf(a)).format(a.qty)} `}kurang.`.replace('  ', ' '));
+  $('w-save').disabled = true;
+  try {
+    await saveAssets(withCash(state.assets, currencyOf(a), key, -amount));
+    $('wd-dlg').close();
+    toast('Kas dikurangi.');
+  } catch (ex) {
+    $('w-save').disabled = false;
+    showErr('w-err', failText(ex));
   }
 });
 
@@ -441,5 +505,6 @@ document.addEventListener('click', (e) => {
   else if (act === 'asset') { if (hasCash) openAssetForm(null, 'idx'); else { toast('Tambah kas dulu, lalu beli aset darinya.'); openAssetForm(null, 'cash'); } }
   else if (act === 'fx') openFx();
   else if (act === 'convert') openConvert();
+  else if (act === 'withdraw') openWithdraw();
 });
 $('m-close').addEventListener('click', () => $('menu-dlg').close());

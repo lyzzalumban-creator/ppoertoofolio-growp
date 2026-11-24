@@ -36,28 +36,44 @@ async function send(action, payload) {
   return call(c.url, c.token, action, payload);
 }
 
+// Simpan yang sedang berjalan dilacak supaya muat ulang tidak menimpa hasilnya dengan data lama dari Sheet.
+const saving = new Set();
+let stamp = 0;
+const tracked = (fn) => {
+  stamp++;
+  const p = fn();
+  saving.add(p);
+  const done = () => saving.delete(p);
+  p.then(done, done);
+  return p;
+};
+/** Menunggu semua simpan yang sedang berjalan selesai (berhasil atau gagal). */
+export const whenSaved = () => Promise.allSettled([...saving]);
+/** Penanda yang naik tiap simpan dimulai; berubah selama memuat = data yang diterima mungkin sudah usang. */
+export const saveStamp = () => stamp;
+
 /** Simpan seluruh daftar aset (tambah/ubah/hapus). */
-export async function saveAssets(next) {
+export const saveAssets = (next) => tracked(async () => {
   await send('saveAssets', { assets: next });
   state.assets = next;
   recompute();
   notify();
-}
+});
 
 /** Beli lagi / jual: daftar aset baru + catatan transaksi dalam satu panggilan (aman diulang, id sama). */
-export async function trade(next, tx) {
+export const trade = (next, tx) => tracked(async () => {
   await send('trade', { assets: next, tx });
   state.assets = next;
   state.txs = [...state.txs, tx]; // gagal kirim = melempar sebelum baris ini, jadi tidak pernah dobel
   recompute();
   notify();
-}
+});
 
-export async function deleteTx(id) {
+export const deleteTx = (id) => tracked(async () => {
   await send('deleteTx', { id });
   state.txs = state.txs.filter((t) => t.id !== id);
   notify();
-}
+});
 
 /** id transaksi: acak, cukup unik untuk satu pemilik; dipakai agar kiriman ulang tidak tercatat dua kali. */
 export const newId = () => `tx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
