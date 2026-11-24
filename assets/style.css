@@ -185,6 +185,8 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .chart .cursor circle { fill: var(--surface); stroke: currentColor; stroke-width: 2.5; }
 .chart-box .tip, .chart-box .dpill { position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; white-space: nowrap; }
 .chart-box .tip { padding: 5px 9px; border-radius: 9px; background: var(--text); color: var(--surface); font-size: 0.8rem; line-height: 1.3; }
+.chart-box:not(.on) .tip, .chart-box:not(.on) .dpill { visibility: hidden; }
+.chart-box:not(.on) .chart:not(.bars) .cursor, .chart-box:not(.on) .chart:not(.bars) .cost { display: none; }
 .chart-box .tip b { display: block; font-size: 0.92rem; }
 .chart-box .dpill { padding: 3px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text); box-shadow: 0 0 0 1px var(--border); font-size: 0.76rem; font-weight: 600; }
 .seg-ranges { justify-content: space-between; margin-top: 8px; }

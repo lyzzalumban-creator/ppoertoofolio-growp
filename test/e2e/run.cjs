@@ -149,12 +149,12 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('B3 menu: Beranda, Analisis, tombol Tambah, Aktivitas, Profil; hanya Beranda yang aktif', navs === 'Beranda*,Analisis,Tambah,Aktivitas,Profil', navs);
     const box = await page.locator('#chart svg').boundingBox();
     const lastDate = sheetOf(fake).history.at(-1).date;
-    check('B4 grafik: bawaan menunjuk titik terakhir dengan gelembung nilai (= total) dan tanggalnya di bawah', await page.locator('#chart .tip').isVisible() && nb(await page.locator('#chart .tip b').innerText()) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && (await page.locator('#chart .dpill').innerText()) === '23 Nov 2026' && lastDate === '2026-11-23');
-    const before = await page.locator('#chart .dpill').innerText();
+    check('B4 grafik diam: bersih (tanpa gelembung, tanggal, kursor, garis modal); isi tersembunyi tetap menunjuk titik terakhir (= total)', !(await page.locator('#chart .tip').isVisible()) && !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart .cursor').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && nb(await page.locator('#chart .tip b').textContent()) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && (await page.locator('#chart .dpill').textContent()) === '23 Nov 2026' && lastDate === '2026-11-23');
+    const before = await page.locator('#chart .dpill').textContent();
     await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
-    check('B4b menggeser/mengarahkan kursor: tanggal di bawah dan nilai ikut berubah; garis putus-putus vertikal ada', (await page.locator('#chart .dpill').innerText()) !== before && (await page.locator('#chart .cursor line').count()) === 1);
+    check('B4b mengarahkan kursor: gelembung, tanggal, garis modal dan kursor muncul; tanggal dan nilai ikut berubah', (await page.locator('#chart .dpill').isVisible()) && (await page.locator('#chart .tip').isVisible()) && (await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').innerText()) !== before && (await page.locator('#chart .cursor line').count()) === 1);
     await page.mouse.move(box.x + box.width * 0.5, box.y - 40);
-    check('B4c kursor keluar dari grafik: kembali ke titik terakhir', (await page.locator('#chart .dpill').innerText()) === before);
+    check('B4c kursor keluar dari grafik: bersih lagi', !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').textContent()) === before);
     await shot(page, 'grafik.png');
     await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
     check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
@@ -199,8 +199,8 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
   {
     const { ctx, page, fake, errors } = await newPage({ touch: true, w: 820, h: 1180 });
     await openDash(page, fake);
-    await page.waitForSelector('#chart .dpill');
-    const first = await page.locator('#chart .dpill').innerText();
+    await page.waitForSelector('#chart .dpill', { state: 'attached' });
+    const first = await page.locator('#chart .dpill').textContent();
     const bx = await page.locator('#chart svg').boundingBox();
     const hold = async (x, y) => { // sentuh dan tahan lewat CDP; kembalikan fungsi untuk mengangkat jari
       const cdp = await ctx.newCDPSession(page);
@@ -213,7 +213,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('B5a disentuh: gelembung dan tanggal pindah ke titik yang disentuh', picked !== first && (await page.locator('#chart .tip').isVisible()));
     await lift();
     await page.waitForTimeout(150);
-    check('B5b jari diangkat: kembali menunjuk titik terakhir', (await page.locator('#chart .dpill').innerText()) === first);
+    check('B5b jari diangkat: grafik bersih lagi', !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart .tip').isVisible()) && (await page.locator('#chart .dpill').textContent()) === first);
     const lift2 = await hold(bx.x + bx.width - 1, bx.y + bx.height * 0.5);
     await page.waitForTimeout(100);
     check('B5d sentuh dekat tepi kanan: gelembung tetap di dalam kotak grafik', await page.locator('#chart .tip').evaluate((t) => { const r = t.getBoundingClientRect(); const b = document.getElementById('chart').getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1; }));
@@ -234,7 +234,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O3 demo tidak memanggil Google sama sekali dan tidak menyimpan kredensial; pilihan sembunyikan nominalmu tidak berubah', env.calls.length === 0 && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null && (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === null);
     check('O4 demo menampilkan angka (nominal tampil) dan banyak aset', /Rp\s?\d/.test(await page.locator('#summary .sum-value').innerText()) && (await page.locator('#holdings .hold').count()) >= 8);
     await page.locator('#ranges').getByRole('button', { name: '1 thn' }).click();
-    check('O5 grafik portofolio 1 tahun: gelembung bertanggal hari ini', /2026/.test(await page.locator('#chart .dpill').innerText()) && (await page.locator('#chart path.line').count()) === 1);
+    check('O5 grafik portofolio 1 tahun: gelembung bertanggal hari ini', /2026/.test(await page.locator('#chart .dpill').textContent()) && (await page.locator('#chart path.line').count()) === 1);
     await nav(page, 'aktivitas');
     const jb = await page.locator('#txs .tx').count();
     await page.locator('#aktnav').getByRole('link', { name: 'Trading emas' }).click();
