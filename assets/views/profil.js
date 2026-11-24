@@ -17,6 +17,7 @@ function applyTheme(v) {
 export function render() {
   $('set-hide').setAttribute('aria-checked', String(state.hidden));
   $('set-theme').value = theme();
+  $('logout').textContent = state.demo ? 'Keluar dari demo' : 'Keluar dari perangkat ini';
   $('set-goal').textContent = state.goal ? `Target ${money(state.goal)}` : 'Belum diatur.';
   const v = state.meta.version;
   const script = v >= 4 ? `versi ${v}` : v >= 3 ? `versi ${v}: tukar mata uang dan trade emas belum bisa, tempel Code.gs terbaru` : v >= 2 ? `versi ${v}: jual-beli belum bisa dicatat, tempel Code.gs terbaru` : 'versi lama: tempel Code.gs terbaru agar tanggal beli dan jual-beli tersimpan';

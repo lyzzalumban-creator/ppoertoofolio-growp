@@ -6,8 +6,9 @@
 import { call } from '../scripts/lib/api.mjs';
 import { clearCreds, readCreds, saveCreds, scriptUrlOk } from './creds.js';
 import { mountNav, setActive } from './nav.js';
-import { $, ICON, agoText, esc, fAtDate, fAtTime, latest, longDate, setHidden, state, subscribe } from './lib.js';
+import { $, ICON, agoText, esc, fAtDate, fAtTime, latest, longDate, setHidden, state, subscribe, todayWib } from './lib.js';
 import { setData } from './data.js';
+import { demoData } from './demo.js';
 import * as beranda from './views/beranda.js';
 import * as detail from './views/detail.js';
 import * as analisis from './views/analisis.js';
@@ -32,7 +33,8 @@ function renderHeader() {
   $('subtitle').textContent = Number.isFinite(at)
     ? `Diperbarui ${fAtDate.format(at)}, ${fAtTime.format(at)} WIB (${agoText(age).replace(/ /g, ' ')})`
     : L ? `Data per ${longDate(L.date)}` : state.assets.length ? 'Menunggu harga pertama' : 'Belum ada aset';
-  $('subtitle').classList.toggle('stale', Number.isFinite(at) && age > 12 * 3_600_000); // jadwal 6 jam: lewat 12 jam = ada yang macet
+  if (state.demo) $('subtitle').textContent = 'Demo · data contoh 1 tahun';
+  $('subtitle').classList.toggle('stale', !state.demo && Number.isFinite(at) && age > 12 * 3_600_000); // jadwal 6 jam: lewat 12 jam = ada yang macet
   const btn = $('privacy');
   const label = state.hidden ? 'Tampilkan nominal' : 'Sembunyikan nominal';
   btn.setAttribute('aria-pressed', String(state.hidden));
@@ -157,6 +159,7 @@ async function start(creds, prefetched) {
 $('privacy').addEventListener('click', () => setHidden(!state.hidden));
 
 async function reload() {
+  if (state.demo) return startDemo(); // demo: buat ulang dari awal
   const c = readCreds();
   if (!c) return showConnect();
   const label = $('set-reload').textContent;
@@ -169,7 +172,35 @@ async function reload() {
 $('reload').addEventListener('click', reload);
 $('set-reload').addEventListener('click', reload);
 
+// ---------- demo ----------
+
+function startDemo() {
+  state.demo = true;
+  state.hidden = false; // contoh: tampilkan angkanya (tidak disimpan, pilihanmu di browser ini tidak berubah)
+  setData(demoData(todayWib()));
+  mode = 'dash';
+  render();
+  show('dash');
+  const b = $('banner');
+  b.hidden = false;
+  b.className = 'banner';
+  b.innerHTML = '<strong>Mode demo.</strong> Semua data contoh dan tidak disimpan. Coba beli, jual, tukar, atau trade emas.';
+  renderHeader();
+}
+
+async function exitDemo() {
+  state.demo = false;
+  try { const v = localStorage.getItem('pf-hidden'); state.hidden = v === null ? true : v === '1'; } catch { state.hidden = true; }
+  $('banner').hidden = true;
+  setData({});
+  const c = readCreds();
+  if (c) await start(c);
+  else showConnect();
+}
+$('demo-btn').addEventListener('click', startDemo);
+
 $('logout').addEventListener('click', () => {
+  if (state.demo) { exitDemo(); return; } // keluar dari demo tidak menghapus kredensial apa pun
   clearCreds();
   setData({});
   showConnect();
@@ -199,5 +230,6 @@ document.addEventListener('click', (e) => {
 });
 
 const creds = readCreds();
-if (creds) await start(creds);
+if (new URLSearchParams(location.search).has('demo')) startDemo();
+else if (creds) await start(creds);
 else showConnect();

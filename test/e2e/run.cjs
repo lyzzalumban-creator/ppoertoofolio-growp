@@ -50,10 +50,10 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
 
   // Satu "Google" tiruan per skenario; request ke script.google.com dialihkan ke sana.
   // env.mode: ok | abort (jaringan putus) | html (halaman masuk Google) | lost (Sheet sudah berubah, balasannya hilang)
-  async function newPage({ w = 1280, h = 900, dark = false, withHistory = true, fake: given, seedOpts = {}, freshStorage = false } = {}) {
+  async function newPage({ touch = false, w = 1280, h = 900, dark = false, withHistory = true, fake: given, seedOpts = {}, freshStorage = false } = {}) {
     const fake = given || createFake();
     if (!given) seedFake(fake, { withHistory, ...seedOpts });
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: dark ? 'dark' : 'light' });
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, colorScheme: dark ? 'dark' : 'light', ...(touch ? { hasTouch: true, isMobile: true } : {}) });
     // Bawaan aplikasi: nominal tersembunyi. Tes lama mengharapkan terlihat, jadi diatur '0' kecuali freshStorage.
     if (!freshStorage) await ctx.addInitScript(() => { try { if (localStorage.getItem('pf-hidden') === null) localStorage.setItem('pf-hidden', '0'); } catch {} });
     const page = await ctx.newPage();
@@ -190,6 +190,106 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.locator('#logout').click();
     check('B11 Keluar (di Profil) -> form sambung & kredensial terhapus', (await page.locator('#connect').isVisible()) && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null);
     check('B12 setelah Keluar, dasbor, menu, dan datanya tidak tampil', !(await page.locator('#dash').isVisible()) && !(await page.locator('#nav').isVisible()) && !/Rp\s?\d/.test(await page.locator('body').innerText()));
+    await ctx.close();
+  }
+
+  // ============ B2. grafik di layar sentuh ============
+  {
+    const { ctx, page, fake, errors } = await newPage({ touch: true, w: 820, h: 1180 });
+    await openDash(page, fake);
+    await page.waitForSelector('#chart .dpill');
+    const first = await page.locator('#chart .dpill').innerText();
+    const bx = await page.locator('#chart svg').boundingBox();
+    await page.touchscreen.tap(bx.x + bx.width * 0.3, bx.y + bx.height * 0.5);
+    const picked = await page.locator('#chart .dpill').innerText();
+    await page.waitForTimeout(150);
+    check('B5a ketuk grafik di layar sentuh: gelembung dan tanggal pindah ke titik itu dan TETAP ada setelah jari diangkat', picked !== first && (await page.locator('#chart .dpill').innerText()) === picked && (await page.locator('#chart .tip').isVisible()));
+    await page.touchscreen.tap(bx.x + bx.width - 1, bx.y + bx.height * 0.5);
+    check('B5b ketuk dekat tepi kanan: kembali menunjuk titik terakhir; gelembung tetap di dalam kotak grafik', (await page.locator('#chart .dpill').innerText()) === first && (await page.locator('#chart .tip').evaluate((t) => { const r = t.getBoundingClientRect(); const b = document.getElementById('chart').getBoundingClientRect(); return r.left >= b.left - 1 && r.right <= b.right + 1; })));
+    check('B5c tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+
+  // ============ O. mode demo ============
+  {
+    const { ctx, page, fake, env, errors } = await newPage({ freshStorage: true });
+    await page.goto(`${BASE}/index.html`);
+    await page.waitForSelector('#connect:not([hidden])');
+    check('O1 form sambung punya tombol "Coba demo"', await page.locator('#demo-btn').isVisible());
+    await page.locator('#demo-btn').click();
+    await page.waitForSelector('#dash:not([hidden])');
+    check('O2 demo: dasbor langsung terbuka, banner "Mode demo", subjudul demo, menu tampil', /Mode demo/.test(await page.locator('#banner').innerText()) && /Demo/.test(await page.locator('#subtitle').innerText()) && (await page.locator('#nav').isVisible()));
+    check('O3 demo tidak memanggil Google sama sekali dan tidak menyimpan kredensial; pilihan sembunyikan nominalmu tidak berubah', env.calls.length === 0 && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null && (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === null);
+    check('O4 demo menampilkan angka (nominal tampil) dan banyak aset', /Rp\s?\d/.test(await page.locator('#summary .sum-value').innerText()) && (await page.locator('#holdings .hold').count()) >= 8);
+    await page.locator('#ranges').getByRole('button', { name: '1 thn' }).click();
+    check('O5 grafik portofolio 1 tahun: gelembung bertanggal hari ini', /2026/.test(await page.locator('#chart .dpill').innerText()) && (await page.locator('#chart path.line').count()) === 1);
+    await nav(page, 'aktivitas');
+    const jb = await page.locator('#txs .tx').count();
+    await page.locator('#aktnav').getByRole('link', { name: 'Trading emas' }).click();
+    await routed(page, 'aktivitas/trading');
+    const fxn = await page.locator('#fxlist .tx').count();
+    check('O6 banyak transaksi: Jual-beli >= 30 baris, Trading emas >= 50 trade, grafik 12 bulan', jb >= 30 && fxn >= 50 && (await page.locator('#fxchart rect.bar').count()) === 12, `${jb} / ${fxn}`);
+    check('O6b tab Jual-beli memuat baris Beli, Jual, dan Tukar', await (async () => { await goto(page, '#/aktivitas/jual-beli'); const t = await page.locator('#txs .tx-kind').allInnerTexts(); return ['Beli', 'Jual', 'Tukar'].every((k) => t.includes(k)); })());
+    await goto(page, '#/analisis/bulanan');
+    check('O7 Analisis > Bulanan: 12 batang, daftar 12 bulan', (await page.locator('#mchart rect.bar').count()) === 12 && (await page.locator('#mlist .mrow').count()) === 12);
+    await goto(page, '#/analisis/riwayat');
+    for (let i = 0; i < 14 && (await page.locator('#hist-more').isVisible()); i++) await page.locator('#hist-more').click();
+    check('O8 riwayat 1 tahun penuh (366 hari)', (await page.locator('#hist tbody tr').count()) === 366);
+    // ubah data di demo: jual aset, hanya di memori
+    const cashBefore = flat(await page.locator('#legend').innerText());
+    await goto(page, `#/aset/${encodeURIComponent('idx:BBCA')}`);
+    await page.locator('[data-act="sell"]').click();
+    await page.fill('#t-qty', '100');
+    await page.locator('#t-save').click();
+    await page.waitForFunction(() => !document.getElementById('trade-dlg').open);
+    check('O9 jual di demo berhasil (pesan keuntungan), tetap tanpa panggilan Google', /Terjual/.test(await toastText(page)) && env.calls.length === 0);
+    await nav(page, 'beranda');
+    check('O9b tampilan ikut berubah (alokasi berbeda dari sebelum jual)', flat(await page.locator('#legend').innerText()) !== cashBefore);
+    await page.locator('#set-reload').count();
+    await nav(page, 'profil');
+    check('O10 Profil: tombol "Keluar dari demo"; Muat ulang data membuat demo dari awal tanpa jaringan', (await page.locator('#logout').innerText()) === 'Keluar dari demo');
+    await page.locator('#set-reload').click();
+    await page.waitForTimeout(200);
+    check('O10b setelah muat ulang demo: tetap mode demo, 0 panggilan', /Mode demo/.test(await page.locator('#banner').innerText()) && env.calls.length === 0);
+    await nav(page, 'profil');
+    await page.locator('#logout').click();
+    const o11 = [await page.locator('#connect').isVisible(), !(await page.locator('#banner').isVisible()), !/Rp\s?\d/.test(await page.locator('main').innerText()), (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === null];
+    check('O11 keluar dari demo: kembali ke form sambung, banner hilang, tidak ada data di halaman, penyimpanan tetap kosong', o11.every(Boolean), o11.join());
+    check('O12 tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  {
+    // ?demo membuka demo langsung; bila sudah tersambung, keluar dari demo kembali ke data asli dan kredensial tidak terhapus
+    const { ctx, page, fake, env } = await newPage();
+    await openDash(page, fake);
+    const n = env.calls.length;
+    await page.goto(`${BASE}/index.html?demo`);
+    await page.waitForSelector('#banner:not([hidden])');
+    check('O13 ?demo membuka demo walau sudah tersambung, tanpa panggilan baru', /Mode demo/.test(await page.locator('#banner').innerText()) && env.calls.length === n);
+    await nav(page, 'profil');
+    await page.locator('#logout').click();
+    await page.waitForFunction(() => !/Demo/.test(document.getElementById('subtitle').textContent) && document.getElementById('banner').hidden && !document.getElementById('nav').hidden);
+    check('O14 keluar dari demo: kredensial TIDAK terhapus dan data asli dimuat lagi', !!(await page.evaluate(() => localStorage.getItem('pf-api'))) && !/Mode demo/.test(await page.locator('#subtitle').innerText()) && env.calls.length === n + 1);
+    await ctx.close();
+  }
+
+  // ============ O2. detail ketuk di grafik batang ============
+  {
+    const { ctx, page, fake, errors } = await newPage({ touch: true, w: 820, h: 1180 });
+    await openDash(page, fake, '#/analisis/bulanan');
+    await page.waitForSelector('#mchart rect.bar');
+    const bars = page.locator('#mchart rect.bar');
+    const box = await bars.nth(2).boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    const tipTxt = flat(await page.locator('#mchart .tip').innerText());
+    check('O15 ketuk batang bulanan: gelembung memuat nama bulan dan persen; batang ditandai', /\d{4}/.test(tipTxt) && /%/.test(tipTxt) && (await page.locator('#mchart rect.bar.sel').count()) === 1, tipTxt);
+    await page.waitForTimeout(150);
+    check('O15b pilihan bertahan setelah jari diangkat', await page.locator('#mchart .tip').isVisible());
+    await page.locator('#privacy').click();
+    const b2 = await bars.nth(1).boundingBox();
+    await page.touchscreen.tap(b2.x + b2.width / 2, b2.y + b2.height / 2);
+    check('O15c nominal tersembunyi: gelembung tanpa rupiah, persen tetap', !/Rp/.test(await page.locator('#mchart .tip').innerText()) && /%/.test(await page.locator('#mchart .tip').innerText()));
+    check('O16 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 

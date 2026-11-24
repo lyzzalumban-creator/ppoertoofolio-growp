@@ -445,3 +445,5 @@ table.hist { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .mr-v { font-weight: 650; text-align: right; white-space: nowrap; }
 .card-head .seg { flex: none; }
 .card-head .seg button { flex: none; padding: 4px 12px; }
+.chart.bars .bar.sel { stroke: var(--text); stroke-width: 1.5; }
+.chart-box .tip span { display: block; }
