@@ -342,7 +342,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await routed(page, 'aktivitas');
     const tx2 = txs().find((t) => t.symbol === 'NVDA');
     check('T9 jual habis: aset dihapus dari Sheet, pindah ke Aktivitas; rugi tercatat dalam rupiah dan dolar dengan kurs', !asset('NVDA') && tx2 && tx2.pnlIdr === -960_000 && tx2.pnl === -60 && tx2.fx === 16_000 && tx2.currency === 'USD', JSON.stringify(tx2));
-    check('T9b total terealisasi = untung − rugi (−Rp 760.000), 2 penjualan', nb(flat(await page.locator('#realized').innerText())).includes(nb(`−${idr.format(760_000)}`)) && /2 penjualan/.test(await page.locator('#realized').innerText()));
+    check('T9b total terealisasi = untung − rugi (−Rp 760.000, bertanda minus dan merah), 2 penjualan', nb(await page.locator('#realized .sum-value').innerText()) === nb(`−${idr.format(760_000)}`) && (await page.locator('#realized .sum-value').getAttribute('class')).includes('neg') && /2 penjualan/.test(await page.locator('#realized').innerText()));
     await nav(page, 'beranda');
     check('T9c Beranda: NVDA tidak ada lagi, 8 aset', !(await holdSyms(page)).includes('NVDA') && (await page.locator('#holdings .hold').count()) === 8);
 
@@ -393,7 +393,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.locator('#x-del').click();
     await page.waitForFunction(() => !document.getElementById('tx-dlg').open);
     check('T15 hapus catatan: hilang dari Sheet dan Aktivitas, total terealisasi ikut berubah, jumlah aset TIDAK berubah', txs().length === 3 && !txs().some((t) => t.symbol === 'BBCA') && asset('BBCA').qty === 600
-      && nb(flat(await page.locator('#realized').innerText())).includes(nb(`−${idr.format(930_000)}`)) && (await page.locator('#txs .tx').count()) === 3);
+      && nb(await page.locator('#realized .sum-value').innerText()) === nb(`−${idr.format(930_000)}`) && (await page.locator('#txs .tx').count()) === 3);
 
     // nominal tersembunyi: Aktivitas tanpa rupiah dan tanpa jumlah unit
     await page.locator('#privacy').click();

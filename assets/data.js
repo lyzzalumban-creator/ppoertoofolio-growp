@@ -47,7 +47,7 @@ export async function saveAssets(next) {
 export async function trade(next, tx) {
   await send('trade', { assets: next, tx });
   state.assets = next;
-  if (!state.txs.some((t) => t.id === tx.id)) state.txs = [...state.txs, tx];
+  state.txs = [...state.txs, tx]; // gagal kirim = melempar sebelum baris ini, jadi tidak pernah dobel
   recompute();
   notify();
 }
