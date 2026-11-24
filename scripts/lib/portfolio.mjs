@@ -139,6 +139,9 @@ export function buildSnapshot({ date, assets, quotes, fx, prev }) {
     dayPnl: round(dayBase > 0 ? dayPnl : null, 2),
     dayPct: round(dayBase > 0 ? dayPnl / dayBase : null, 6),
     byType,
+    // Harga per aset dalam rupiah, kunci "jenis:kode". Tidak ikut dipangkas Apps Script (yang hanya membuang
+    // `positions` dari snapshot lama), jadi riwayat harga tiap aset tersedia untuk grafik per aset.
+    px: Object.fromEntries(rows.map((p) => [keyOf(p), round(p.priceIdr, 4)])),
     positions: rows.map((p) => ({
       ...p,
       price: round(p.price, 6),

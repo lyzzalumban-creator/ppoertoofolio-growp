@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { byTypePnl, cashSplit, concentration, currentDrawdown, dayMovers, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, riskStats, sortPositions } from '../assets/stats.js';
+import { liveView, byTypePnl, cashSplit, concentration, currentDrawdown, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, riskStats, sortPositions } from '../assets/stats.js';
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ''} ${a} != ${b}`);
 const snap = (date, dayPct) => ({ date, dayPct });
@@ -70,22 +70,6 @@ test('sortPositions: persen kosong selalu di bawah, nama memakai urutan Indonesi
 });
 
 const P = (symbol, o = {}) => ({ type: 'idx', symbol, name: symbol, value: 100, weight: 0.1, dayPct: null, ...o });
-
-test('dayMovers: urut menurut persen, hanya yang bergerak, rupiah dari dayPct', () => {
-  const rows = [P('A', { dayPct: 0.1, value: 110 }), P('B', { dayPct: -0.05, value: 95 }), P('C', { dayPct: 0 }), P('D'), P('E', { dayPct: 0.02 }), P('F', { dayPct: -0.2, value: 80 })];
-  const { gainers, losers } = dayMovers(rows);
-  assert.deepEqual(gainers.map((p) => p.symbol), ['A', 'E']);
-  assert.deepEqual(losers.map((p) => p.symbol), ['F', 'B']);
-  near(gainers[0].dayAmt, 10, 'harga kemarin 100 -> hari ini 110');
-  near(losers[0].dayAmt, -20, 'harga kemarin 100 -> hari ini 80');
-});
-
-test('dayMovers: dibatasi n per sisi; kosong bila tidak ada pembanding', () => {
-  const rows = Array.from({ length: 6 }, (_, i) => P(`S${i}`, { dayPct: (i + 1) / 100 }));
-  assert.equal(dayMovers(rows, 3).gainers.length, 3);
-  assert.equal(dayMovers(rows, 3).gainers[0].symbol, 'S5');
-  assert.deepEqual(dayMovers([P('X'), P('Y')]), { gainers: [], losers: [] });
-});
 
 const pt = (w) => `${Math.round(w * 100)}%`;
 const LB = { crypto: 'Kripto', idx: 'Saham IDX' };
@@ -188,4 +172,48 @@ test('cashSplit: kas, yang diinvestasikan, dan porsi kas; tanpa kas = 0', () => 
   assert.deepEqual([r.cash, r.invested, r.weight], [250, 750, 0.25]);
   assert.deepEqual(cashSplit({ total: 500, byType: { idx: { value: 500 } } }), { cash: 0, invested: 500, weight: 0 });
   assert.deepEqual(cashSplit({ total: 0, byType: {} }), { cash: 0, invested: 0, weight: 0 });
+});
+
+// ---------- tampilan langsung ----------
+import { buildSnapshot as bs } from '../scripts/lib/portfolio.mjs';
+
+const A1 = { type: 'idx', symbol: 'BBCA', qty: 100, avgCost: 9000 };
+const A2 = { type: 'us', symbol: 'AAPL', qty: 2, avgCost: 150 };
+const q = (p1, p2, d) => new Map([['idx:BBCA', { price: p1, asOf: d }], ['us:AAPL', { price: p2, asOf: d }]]);
+const s1 = bs({ date: '2026-11-22', assets: [A1, A2], quotes: q(10_000, 200, '2026-11-22'), fx: 16_000 });
+const s2 = { ...bs({ date: '2026-11-23', assets: [A1, A2], quotes: q(10_500, 210, '2026-11-23'), fx: 16_000, prev: s1 }), at: '2026-11-23T06:00:00Z' };
+
+test('liveView tanpa perubahan = snapshot terakhir robot (angka identik)', () => {
+  const { snap, pending } = liveView([A1, A2], [s1, s2]);
+  assert.deepEqual(pending, []);
+  for (const k of ['total', 'cost', 'pnl', 'pnlPct', 'dayPnl', 'dayPct', 'at']) assert.equal(snap[k], s2[k], k);
+});
+
+test('liveView: jumlah diubah (jual/beli) langsung dihitung dengan harga terakhir', () => {
+  const { snap } = liveView([{ ...A1, qty: 40 }, A2], [s1, s2]);
+  assert.equal(snap.positions.find((p) => p.symbol === 'BBCA').value, 420_000);
+  assert.equal(snap.total, 420_000 + 2 * 210 * 16_000);
+});
+
+test('liveView: aset baru tanpa harga -> pending; kas dan manual langsung dihitung', () => {
+  const baru = { type: 'crypto', symbol: 'SOL', coingeckoId: 'solana', qty: 3, avgCost: 1 };
+  const kas = { type: 'cash', symbol: 'BCA', qty: 5_000_000 };
+  const depo = { type: 'manual', symbol: 'DEPO', qty: 1, price: 2_000_000, avgCost: 2_000_000 };
+  const { snap, pending } = liveView([A1, baru, kas, depo], [s1, s2]);
+  assert.deepEqual(pending.map((a) => a.symbol), ['SOL']);
+  assert.deepEqual(snap.positions.map((p) => p.symbol).sort(), ['BBCA', 'BCA', 'DEPO']);
+});
+
+test('liveView tanpa riwayat: kas/manual tetap terhitung (tanggal hari ini), aset pasar menunggu harga', () => {
+  const { snap, pending } = liveView([A1, { type: 'cash', symbol: 'BCA', qty: 1000 }], [], '2026-11-24');
+  assert.equal(snap.total, 1000);
+  assert.equal(snap.date, '2026-11-24');
+  assert.deepEqual(pending.map((a) => a.symbol), ['BBCA']);
+  assert.deepEqual(liveView([], []), { snap: null, pending: [] });
+});
+
+test('liveView: aset dolar tanpa kurs di snapshot -> menunggu, bukan angka salah', () => {
+  const sNoFx = { ...s2, fx: null };
+  const { pending } = liveView([A2, { type: 'cash', symbol: 'USD', qty: 10, currency: 'USD' }], [s1, sNoFx]);
+  assert.deepEqual(pending.map((a) => a.symbol), ['AAPL', 'USD']);
 });

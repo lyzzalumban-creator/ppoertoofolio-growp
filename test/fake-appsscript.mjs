@@ -43,6 +43,7 @@ class FakeSheet {
 /** Buat satu "spreadsheet" baru lengkap dengan kode Apps Script-nya. */
 export function createFake({ token = 'rahasia-panjang' } = {}) {
   const sheets = new Map();
+  const locks = { held: 0 };
   const ctx = {
     SpreadsheetApp: { getActive: () => ({
       getSheetByName: (n) => sheets.get(n) || null,
@@ -55,6 +56,8 @@ export function createFake({ token = 'rahasia-panjang' } = {}) {
         return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
       },
     },
+    // Kunci skrip: di tiruan tidak ada pemanggilan serentak, cukup dicatat agar tes bisa memastikan kunci dilepas.
+    LockService: { getScriptLock: () => ({ waitLock() { locks.held += 1; }, releaseLock() { locks.held -= 1; } }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => (k === 'TOKEN' ? token : null) }) },
     ContentService: {
       MimeType: { JSON: 'json' },
@@ -67,6 +70,7 @@ export function createFake({ token = 'rahasia-panjang' } = {}) {
 
   return {
     sheets,
+    locks,
     /** Panggil seperti web app: kirim JSON, terima objek hasil. */
     call(payload) {
       const out = ctx.__doPost({ postData: { contents: typeof payload === 'string' ? payload : JSON.stringify(payload) } });

@@ -19,8 +19,8 @@ test('penanda versi web cocok dengan isi berkas (bila gagal: jalankan npm run ve
   }
 });
 
-test('graf modul menemukan modul bertingkat (views -> lib/stats, kelola -> portfolio)', () => {
+test('graf modul menemukan modul bertingkat (views -> lib/stats, sheets -> portfolio/trade)', () => {
   const app = moduleGraph(['assets/app.js']);
   for (const f of ['assets/lib.js', 'assets/stats.js', 'assets/views/chart.js', 'scripts/lib/api.mjs']) assert.ok(app.includes(f), f);
-  assert.ok(moduleGraph(['assets/kelola.js']).includes('scripts/lib/portfolio.mjs'));
+  assert.ok(app.includes('scripts/lib/portfolio.mjs') && app.includes('scripts/lib/trade.mjs'));
 });

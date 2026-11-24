@@ -11,7 +11,7 @@ const none = (msg) => `<div class="empty">${msg}</div>`;
 
 function renderKinerja() {
   const { index, months, dd } = state.perf;
-  if (state.snapshots.length < 2) {
+  if (state.series.length < 2) {
     $('metrics').innerHTML = '';
     $('months').innerHTML = '<li class="empty">Butuh data minimal 2 hari.</li>';
   } else {
@@ -36,7 +36,7 @@ function renderKinerja() {
 
   // Batang untung/rugi per aset, berpusat di nol bila ada yang rugi.
   // Kas tidak ikut: untung/ruginya selalu nol, hanya mengotori batang.
-  const rows = (latest().positions || []).filter((p) => p.pnlPct != null && p.type !== 'cash').sort((a, b) => b.pnlPct - a.pnlPct);
+  const rows = ((latest() && latest().positions) || []).filter((p) => p.pnlPct != null && p.type !== 'cash').sort((a, b) => b.pnlPct - a.pnlPct);
   const lo = Math.min(0, ...rows.map((p) => p.pnlPct));
   const hi = Math.max(0, ...rows.map((p) => p.pnlPct));
   const span = hi - lo || 1;
@@ -54,6 +54,7 @@ function renderKinerja() {
 
 function renderAlokasi() {
   const L = latest();
+  if (!L) { $('conc').innerHTML = none('Belum ada aset yang berharga.'); $('types').innerHTML = ''; return; }
   const pos = L.positions || [];
   const split = cashSplit(L);
   const invested = pos.filter((p) => p.type !== 'cash'); // konsentrasi dihitung di antara yang diinvestasikan, tanpa kas
@@ -73,7 +74,7 @@ function renderAlokasi() {
   $('types').innerHTML = types.map((t) => {
     const s = stats[t];
     const w = s.value / total;
-    return `<li><a class="ty" href="#/aset/${t}">
+    return `<li><a class="ty" href="#/beranda" data-filter="${esc(t)}">
       <i class="dot" style="background:${colorOf(t)}"></i>
       <span class="nm">${esc(typeOf(t).label)}<small>${s.count} aset · ${weightText(w)} dari total</small></span>
       <span class="v"><b>${money(s.value)}</b>${t === 'cash' ? '' : delta(s.pnlPct)}</span>
@@ -84,7 +85,7 @@ function renderAlokasi() {
 // -- Risiko --
 
 function renderRisiko() {
-  const r = riskStats(state.snapshots);
+  const r = riskStats(state.series);
   if (!r) { $('risk').innerHTML = none('Butuh minimal 14 hari data agar angka risiko layak dipercaya.'); return; }
   const dd = currentDrawdown(state.perf.index);
   $('risk').innerHTML = [
@@ -98,7 +99,7 @@ function renderRisiko() {
 // -- Riwayat --
 
 function renderRiwayat() {
-  const all = [...state.snapshots].reverse();
+  const all = [...state.series].reverse();
   const shown = all.slice(0, state.histN);
   $('hist').tBodies[0].innerHTML = shown.map((s) => `<tr><td>${esc(longDate(s.date))}</td><td>${money(s.total)}</td><td>${delta(s.dayPct)}</td><td>${delta(s.pnlPct)}</td></tr>`).join('');
   $('hist-more').hidden = shown.length >= all.length;

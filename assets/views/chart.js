@@ -1,7 +1,17 @@
-// Grafik nilai portofolio (SVG tanpa library): rentang waktu, garis modal, tooltip.
-import { $, DAY, esc, fCompact, fDay, fIdr, fMonth, longDate, pct, state, toMs } from '../lib.js';
+// Grafik garis SVG tanpa library, dipakai grafik portofolio (Beranda) dan grafik harga aset (halaman aset).
+// Warna garis mengikuti arah dalam rentang yang dipilih (naik hijau, turun merah), dengan area berbayang di bawahnya.
+import { DAY, esc, fDay, fMonth, longDate, toMs, tone } from '../lib.js';
 
-const RANGES = [['1 bln', 31], ['3 bln', 92], ['6 bln', 183], ['1 thn', 366], ['Semua', Infinity]];
+export const RANGES = [['1 bln', 31], ['3 bln', 92], ['6 bln', 183], ['1 thn', 366], ['Semua', Infinity]];
+
+export function inRange(snaps, range) {
+  const days = (RANGES.find((r) => r[0] === range) || [])[1] ?? Infinity;
+  if (!Number.isFinite(days) || !snaps.length) return snaps;
+  const end = toMs(snaps[snaps.length - 1].date);
+  return snaps.filter((s) => end - toMs(s.date) <= days * DAY);
+}
+
+export const rangesHtml = (cur) => RANGES.map(([l]) => `<button type="button" data-range="${l}" aria-pressed="${l === cur}">${l}</button>`).join('');
 
 function niceTicks(min, max, n = 4) {
   const span = max - min || Math.abs(max) || 1;
@@ -19,88 +29,55 @@ function niceTicks(min, max, n = 4) {
   return ticks;
 }
 
-function inRange(snaps) {
-  const days = (RANGES.find((r) => r[0] === state.range) || [])[1] ?? Infinity;
-  if (!Number.isFinite(days)) return snaps;
-  const end = toMs(snaps[snaps.length - 1].date);
-  return snaps.filter((s) => end - toMs(s.date) <= days * DAY);
-}
-
-// Saat nominal disembunyikan, grafik beralih dari nilai rupiah ke untung/rugi dalam persen.
-function series() {
-  const amt = !state.hidden;
-  const pts = inRange(state.snapshots)
-    .filter((s) => (amt ? s.total != null : s.pnlPct != null))
-    .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100, c: amt ? s.cost : null }));
-  return { pts, amt };
-}
-
-export function renderRanges() {
-  $('ranges').innerHTML = RANGES.map(([l]) => `<button type="button" data-range="${l}" aria-pressed="${l === state.range}">${l}</button>`).join('');
-}
-
-export function renderChart() {
-  const { pts, amt } = series();
-  $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
-  const box = $('chart');
-  // Garis modal (putus-putus) hanya saat nominal tampil; saat tersembunyi grafiknya persen.
-  const withCost = amt && pts.some((p) => p.c != null);
-  $('chart-key').innerHTML = withCost && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
-
+/**
+ * Gambar grafik ke `box`. pts = [{ t, date, y, c? }] (c = garis modal, opsional).
+ * opts: { fmtY, fmtTip, label, empty, height }
+ */
+export function lineChart(box, pts, { fmtY, fmtTip, label, empty, height } = {}) {
   if (pts.length < 2) {
-    box.innerHTML = `<div class="empty">${pts.length ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> di <a href="kelola.html">Kelola aset</a>, lalu jalankan workflow: riwayat langsung terisi sejak tanggal beli.' : 'Belum ada data untuk rentang ini.'}</div>`;
+    box.innerHTML = `<div class="empty">${empty || 'Belum ada data untuk rentang ini.'}</div>`;
     return;
   }
-  // Halaman tersembunyi: kosongkan (jangan sisakan grafik rupiah lama), digambar lagi saat halamannya dibuka.
+  // Halaman tersembunyi: kosongkan (jangan sisakan angka lama), digambar lagi saat halamannya dibuka.
   if (!box.clientWidth) { box.innerHTML = ''; return; }
 
-  const W = Math.max(280, Math.floor(box.clientWidth));
-  // Di layar lebar grafik berdampingan dengan kartu Alokasi dan Target; samakan tingginya agar tidak ada ruang kosong.
-  const sideBySide = window.matchMedia('(min-width: 900px)').matches;
-  const H = sideBySide ? 300 : W < 520 ? 220 : 280;
-  const ml = amt ? 62 : 50, mr = 12, mt = 12, mb = 26;
+  const W = Math.max(260, Math.floor(box.clientWidth));
+  const H = height || (W < 520 ? 210 : 260);
+  const withCost = pts.some((p) => p.c != null);
+  const ml = 8, mr = 52, mt = 10, mb = 24; // sumbu nilai di kanan, seperti aplikasi saham pada umumnya
   const iw = W - ml - mr, ih = H - mt - mb;
   const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
-
   const ys = withCost ? pts.flatMap((p) => (p.c != null ? [p.y, p.c] : [p.y])) : pts.map((p) => p.y);
   let lo = Math.min(...ys);
   let hi = Math.max(...ys);
-  if (lo === hi) { lo -= 1; hi += 1; }
+  if (lo === hi) { lo -= Math.abs(lo) * 0.01 || 1; hi += Math.abs(hi) * 0.01 || 1; }
   const pad = (hi - lo) * 0.08;
-  // Bila semua nilai >= 0 (mis. nilai portofolio), bantalan tidak boleh memunculkan sumbu di bawah nol.
   const floor = lo >= 0 ? Math.max(0, lo - pad) : lo - pad;
   const ticks = niceTicks(floor, hi + pad);
   const y0 = ticks[0], y1 = ticks[ticks.length - 1];
-
   const X = (t) => ml + ((t - t0) / (t1 - t0)) * iw;
   const Y = (v) => mt + (1 - (v - y0) / (y1 - y0)) * ih;
-  const fmtY = (v) => (amt ? fCompact.format(v) : `${v.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`);
-  const fmtTip = (v) => (amt ? fIdr.format(v) : pct(v / 100));
 
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.y).toFixed(1)}`).join('');
   const area = `${line}L${X(t1).toFixed(1)},${(mt + ih).toFixed(1)}L${X(t0).toFixed(1)},${(mt + ih).toFixed(1)}Z`;
-  const costPts = withCost ? pts.filter((p) => p.c != null) : [];
-  const costLine = costPts.map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.c).toFixed(1)}`).join('');
-
+  const costLine = withCost ? pts.filter((p) => p.c != null).map((p, i) => `${i ? 'L' : 'M'}${X(p.t).toFixed(1)},${Y(p.c).toFixed(1)}`).join('') : '';
+  const dir = tone(pts[pts.length - 1].y - pts[0].y);
   const longSpan = t1 - t0 > 330 * DAY;
-  const xLabels = [0, 1, 2, 3].map((k) => {
-    const t = t0 + ((t1 - t0) * k) / 3;
-    const txt = longSpan ? fMonth.format(t) : fDay.format(t);
-    const anchor = k === 0 ? 'start' : k === 3 ? 'end' : 'middle';
-    return `<text x="${X(t).toFixed(1)}" y="${H - 6}" text-anchor="${anchor}">${txt}</text>`;
+  const xLabels = [0, 1, 2].map((k) => {
+    const t = t0 + ((t1 - t0) * k) / 2;
+    return `<text x="${X(t).toFixed(1)}" y="${H - 6}" text-anchor="${['start', 'middle', 'end'][k]}">${(longSpan ? fMonth : fDay).format(t)}</text>`;
   }).join('');
-
-  const grid = ticks.map((v) => `<line class="grid-line" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${ml - 8}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${fmtY(v)}</text>`).join('');
+  const grid = ticks.map((v) => `<line class="grid-line" x1="${ml}" x2="${W - mr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${W - mr + 6}" y="${(Y(v) + 4).toFixed(1)}">${esc(fmtY(v))}</text>`).join('');
   const zero = y0 < 0 && y1 > 0 ? `<line class="zero-line" x1="${ml}" x2="${W - mr}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"/>` : '';
   const last = pts[pts.length - 1];
-  const label = `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${fmtTip(pts[0].y)} pada ${longDate(pts[0].date)} menjadi ${fmtTip(last.y)} pada ${longDate(last.date)}`;
+  const gid = `g-${box.id}`;
 
   box.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(label)}">
-      <defs><linearGradient id="fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent);stop-opacity:.25"/><stop offset="1" style="stop-color:var(--accent);stop-opacity:0"/></linearGradient></defs>
+    <svg class="chart ${dir}" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(label(pts[0], last))}">
+      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".22"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
       <g class="axis">${grid}${xLabels}</g>
       ${zero}
-      <path d="${area}" fill="url(#fill)"/>
+      <path d="${area}" fill="url(#${gid})"/>
       ${costLine ? `<path class="cost" d="${costLine}"/>` : ''}
       <path class="line" d="${line}"/>
       <circle class="dot" cx="${X(last.t).toFixed(1)}" cy="${Y(last.y).toFixed(1)}" r="4"/>
@@ -120,7 +97,7 @@ export function renderChart() {
     cur.querySelector('line').setAttribute('x1', cx); cur.querySelector('line').setAttribute('x2', cx);
     cur.querySelector('circle').setAttribute('cx', cx); cur.querySelector('circle').setAttribute('cy', cy);
     tip.hidden = false;
-    tip.innerHTML = `<b>${esc(fmtTip(best.y))}</b>${withCost && best.c != null ? `Modal ${esc(fIdr.format(best.c))}<br>` : ''}${longDate(best.date)}`;
+    tip.innerHTML = fmtTip(best);
     const w = tip.offsetWidth;
     tip.style.left = `${Math.min(Math.max(4, (cx / W) * r.width - w / 2), r.width - w - 4)}px`;
   };
@@ -131,27 +108,26 @@ export function renderChart() {
   hit.addEventListener('pointerleave', hide);
 }
 
-let raf = 0, lastW = 0;
-
-/** Gambar sekarang (dipanggil saat Beranda dibuka); ResizeObserver tidak perlu menggambar ulang lagi. */
-export function drawChart() {
-  renderChart();
-  lastW = Math.floor($('chart').clientWidth);
+/** Gambar ulang saat lebar kotak berubah (termasuk saat halamannya baru dibuka). */
+export function watch(box, draw) {
+  let w = -1, raf = 0;
+  new ResizeObserver(() => {
+    const nw = Math.floor(box.clientWidth);
+    if (nw === w) return;
+    w = nw;
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(draw);
+  }).observe(box);
+  return () => { w = Math.floor(box.clientWidth); }; // panggil sesudah menggambar langsung: RO tidak menggambar dobel
 }
 
-export function initChart() {
-  $('ranges').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-range]');
-    if (!b) return;
-    state.range = b.dataset.range;
-    renderRanges();
-    renderChart();
-  });
-  new ResizeObserver(() => {
-    const w = Math.floor($('chart').clientWidth);
-    if (!state.snapshots.length || w === lastW) return;
-    lastW = w;
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(renderChart);
-  }).observe($('chart'));
+/** Mini-grafik bentuk saja (tanpa angka): aman walau nominal disembunyikan. */
+export function sparkline(values, cls = '') {
+  const pts = values.filter(Number.isFinite);
+  if (pts.length < 2) return '';
+  const lo = Math.min(...pts);
+  const hi = Math.max(...pts);
+  const span = hi - lo || 1;
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (pts.length - 1)) * 100).toFixed(2)},${(29 - ((v - lo) / span) * 27).toFixed(2)}`).join('');
+  return `<svg class="spark ${tone(pts[pts.length - 1] - pts[0])} ${cls}" viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="area" d="${d}L100,32L0,32Z"/><path class="line" d="${d}"/></svg>`;
 }

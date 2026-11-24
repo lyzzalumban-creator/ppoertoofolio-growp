@@ -3,12 +3,16 @@
 // Pasang: di Google Sheet buka Extensions > Apps Script, tempel seluruh file ini,
 // lalu Project Settings > Script properties > tambah TOKEN (kata sandi panjang).
 // Deploy > New deployment > Web app > Execute as: Me, Who has access: Anyone.
-// Tab "Aset" dan "Riwayat" dibuat otomatis.
+// Tab "Aset", "Riwayat", dan "Transaksi" dibuat otomatis.
 
 const COLS = ['type', 'symbol', 'name', 'qty', 'avgCost', 'coingeckoId', 'price', 'currency', 'costIdr', 'yahoo', 'buyDate'];
 const TEXT = ['type', 'symbol', 'name', 'coingeckoId', 'currency', 'yahoo', 'buyDate'];
+// Catatan jual-beli (tab Transaksi). id dibuat web, dipakai agar kiriman ulang tidak tercatat dua kali.
+const TX = ['id', 'date', 'kind', 'type', 'symbol', 'name', 'qty', 'price', 'currency', 'fx', 'costIdr', 'pnl', 'pnlIdr', 'at'];
+const TX_TEXT = ['id', 'date', 'kind', 'type', 'symbol', 'name', 'currency', 'at'];
 // Naikkan bila format data berubah; web memeriksanya agar tidak mengirim kolom yang belum dikenal skrip lama.
-const VERSION = 2;
+// 3: tab Transaksi, aksi trade dan deleteTx.
+const VERSION = 3;
 
 // shortcut: kata sandi dibandingkan biasa (bukan constant-time) dan tanpa batas percobaan, cukup untuk
 // satu pemilik dengan kata sandi panjang; tambahkan penundaan/penguncian bila URL ini bocor.
@@ -28,7 +32,7 @@ function doPost(e) {
 
 const ACTIONS = {
   // Dasbor dan robot membaca semuanya sekaligus.
-  list: () => ({ version: VERSION, assets: readAssets(), history: readHistory() }),
+  list: () => ({ version: VERSION, assets: readAssets(), history: readHistory(), transactions: readTx() }),
 
   // Halaman Kelola mengirim seluruh daftar aset. shortcut: yang terakhir menyimpan menang (satu pengguna).
   saveAssets: (req) => {
@@ -36,6 +40,41 @@ const ACTIONS = {
     const rows = req.assets.map((a) => COLS.map((c) => safe(a[c], c)));
     put(tab('Aset', COLS), [COLS].concat(rows), COLS.length);
     return { saved: rows.length };
+  },
+
+  // Beli lagi / jual: simpan daftar aset yang sudah diubah web DAN catat transaksinya, di bawah kunci.
+  // Aman dikirim ulang (mis. balasan pertama hilang): daftar aset yang sama ditulis lagi, catatan ber-id sama tidak dobel.
+  trade: (req) => {
+    const t = req.tx;
+    if (!t || !/^[A-Za-z0-9_-]{8,64}$/.test(String(t.id || ''))) throw new Error('tx.id tidak valid');
+    if (t.kind !== 'buy' && t.kind !== 'sell') throw new Error('tx.kind harus buy atau sell');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(t.date || ''))) throw new Error('tx.date harus YYYY-MM-DD');
+    if (!(typeof t.qty === 'number' && t.qty > 0)) throw new Error('tx.qty harus angka lebih dari 0');
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const saved = ACTIONS.saveAssets(req).saved;
+      const all = readTx();
+      const fresh = !all.some((x) => x.id === t.id);
+      if (fresh) writeTx(all.concat([t]));
+      return { saved, recorded: fresh };
+    } finally {
+      lock.releaseLock();
+    }
+  },
+
+  // Hapus satu catatan (salah input). Daftar aset tidak ikut berubah.
+  deleteTx: (req) => {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      const all = readTx();
+      const rest = all.filter((x) => x.id !== String(req.id));
+      writeTx(rest);
+      return { deleted: all.length - rest.length };
+    } finally {
+      lock.releaseLock();
+    }
   },
 
   // Robot harian menambah/mengganti snapshot satu tanggal.
@@ -68,6 +107,24 @@ function readAssets() {
       });
       return a;
     });
+}
+
+function readTx() {
+  return tab('Transaksi', TX).getDataRange().getValues().slice(1)
+    .filter((r) => r[0] !== '')
+    .map((r) => {
+      const t = {};
+      TX.forEach((c, i) => {
+        const v = r[i];
+        if (v === '' || v == null) return;
+        t[c] = c === 'date' ? dateText(v) : TX_TEXT.indexOf(c) >= 0 ? String(v) : v;
+      });
+      return t;
+    });
+}
+
+function writeTx(list) {
+  put(tab('Transaksi', TX), [TX].concat(list.map((t) => TX.map((c) => safe(t[c], c)))), TX.length);
 }
 
 function readHistory() {
@@ -105,6 +162,6 @@ function dateText(v) {
 // apostrof di depan menjaganya tetap teks (apostrofnya sendiri tidak tersimpan).
 function safe(v, col) {
   if (v === undefined || v === null || v === '') return '';
-  if (col === 'buyDate') return "'" + v;
+  if (col === 'buyDate' || col === 'date' || col === 'at') return "'" + v;
   return typeof v === 'string' && /^[=+\-@]/.test(v) ? "'" + v : v;
 }

@@ -30,14 +30,26 @@ const GURL = 'https://script.google.com/macros/s/AKfycbTEST/exec';
 const results = [];
 const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? '  -> ' + extra : ''}`); };
 
+const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+const usdF = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'USD' });
+const nb = (x) => x.replace(/\s/g, ' '); // Intl memakai spasi tak-terputus; teks halaman dinormalkan, jadi harapan juga
+const flat = (x) => x.replace(/\s+/g, ' ').trim();
+const p2 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v * 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const p1 = (v) => `${(v * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
+const todayWib = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu aset
+
 (async () => {
   const { createFake } = await load('test/fake-appsscript.mjs');
   const { seedFake } = await load('test/e2e/seed.mjs');
+  const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+  const stats = await load('assets/stats.js');
   const server = await serve();
   BASE = `http://127.0.0.1:${server.address().port}`;
   const browser = await chromium.launch();
 
   // Satu "Google" tiruan per skenario; request ke script.google.com dialihkan ke sana.
+  // env.mode: ok | abort (jaringan putus) | html (halaman masuk Google) | lost (Sheet sudah berubah, balasannya hilang)
   async function newPage({ w = 1280, h = 900, dark = false, withHistory = true, fake: given, seedOpts = {}, freshStorage = false } = {}) {
     const fake = given || createFake();
     if (!given) seedFake(fake, { withHistory, ...seedOpts });
@@ -45,7 +57,7 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     // Bawaan aplikasi: nominal tersembunyi. Tes lama mengharapkan terlihat, jadi diatur '0' kecuali freshStorage.
     if (!freshStorage) await ctx.addInitScript(() => { try { if (localStorage.getItem('pf-hidden') === null) localStorage.setItem('pf-hidden', '0'); } catch {} });
     const page = await ctx.newPage();
-    const env = { mode: 'ok', fake, delay: 0, calls: [], other: [], contentTypes: [] };
+    const env = { mode: 'ok', fake, delay: 0, calls: [], actions: [], other: [], contentTypes: [] };
     const errors = [];
     page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
     page.on('pageerror', (e) => errors.push(String(e)));
@@ -55,9 +67,11 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
       if (env.delay) await new Promise((r) => setTimeout(r, env.delay));
       env.calls.push(req.method());
       env.contentTypes.push(req.headers()['content-type']);
+      try { env.actions.push(JSON.parse(req.postData() || '{}').action); } catch { env.actions.push('?'); }
       if (env.mode === 'abort') return route.abort();
       if (env.mode === 'html') return route.fulfill({ status: 200, contentType: 'text/html', body: '<html>Sign in</html>' });
       const out = env.fake.call(req.postData() || '');
+      if (env.mode === 'lost') return route.abort();
       return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(out) });
     });
     return { ctx, page, fake, env, errors };
@@ -68,25 +82,33 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.getByRole('button', { name: 'Sambungkan' }).click();
   };
   // Pindah halaman lewat hashchange (asinkron): tunggu sampai app menandai rute selesai diproses.
-  const routed = (page, path) => page.waitForFunction((x) => document.body.dataset.route === x, path);
+  const routed = (page, p) => page.waitForFunction((x) => document.body.dataset.route === x, p);
   const nav = async (page, key) => { await page.locator(`#nav-${key}`).click(); await routed(page, key); };
   const goto = async (page, hash) => { await page.evaluate((h) => { location.hash = h; }, hash); await routed(page, hash.replace(/^#\/?/, '')); };
+  const openDash = async (page, fake, hash = '') => {
+    await page.goto(`${BASE}/index.html${hash}`);
+    await connect(page, { token: fake.token });
+    await page.waitForSelector('#nav:not([hidden])');
+  };
+  const sheetOf = (fake) => fake.call({ token: fake.token, action: 'list' });
   const secretsOf = (fake) => {
-    const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
-    const L = fake.call({ token: fake.token, action: 'list' }).history.at(-1);
+    const L = sheetOf(fake).history.at(-1);
     return [L.total, L.cost, Math.abs(L.pnl), ...L.positions.flatMap((p) => [p.value, Math.abs(p.pnl)]), ...Object.values(L.byType).map((t) => t.value)].map((v) => idr.format(Math.abs(v)));
   };
+  const holdSyms = (page) => page.locator('#holdings .hold .h-id b').allInnerTexts();
+  const isOpen = (page, id) => page.locator(`#${id}`).evaluate((d) => d.open);
+  const toastText = (page) => page.locator('#toast').innerText();
 
   // ============ A. sambung ============
   {
     const { ctx, page, fake, env, errors } = await newPage();
     await page.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
-    check('A1 awal: form sambung tampil, dasbor tersembunyi', (await page.locator('#connect').isVisible()) && !(await page.locator('#dash').isVisible()));
+    check('A1 awal: form sambung tampil, dasbor dan menu tersembunyi', (await page.locator('#connect').isVisible()) && !(await page.locator('#dash').isVisible()) && !(await page.locator('#nav').isVisible()));
     const raw = await (await ctx.request.get(`${BASE}/index.html`)).text();
     const bodyText = await page.locator('body').innerText();
     check('A1b halaman sebelum tersambung tidak berisi angka portofolio (HTML maupun teks)', !/Rp\s?\d/.test(raw + bodyText) && !/\d{1,3}(\.\d{3}){2,}/.test(bodyText));
     check('A2 belum ada request ke Google sebelum disambungkan', env.calls.length === 0);
-    await shot(page, 'v2-connect.png');
+    await shot(page, 'connect.png');
 
     await connect(page, { url: 'https://evil.example.com/exec', token: 'rahasia' });
     check('A3 URL bukan script.google.com ditolak', /script\.google\.com/.test(await page.locator('#c-err').innerText()));
@@ -101,189 +123,348 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
 
     await connect(page, { token: fake.token });
     await page.waitForSelector('#dash:not([hidden])');
-    check('A7 kata sandi benar -> dasbor tampil', await page.locator('.kpi').first().isVisible());
+    check('A7 kata sandi benar -> Beranda dengan ringkasan', await page.locator('#summary .sum-value').isVisible());
     check('A8 permintaan memakai text/plain (simple request, tanpa preflight)', env.contentTypes.every((t) => /^text\/plain/.test(t)), [...new Set(env.contentTypes)].join());
     check('A9 kredensial tersimpan di browser', !!(await page.evaluate(() => localStorage.getItem('pf-api'))));
 
     const before = env.calls.length;
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
-    check('A10 muat ulang -> langsung dasbor tanpa form', !(await page.locator('#connect').isVisible()) && env.calls.length === before + 1);
+    check('A10 muat ulang -> langsung dasbor tanpa form, satu panggilan', !(await page.locator('#connect').isVisible()) && env.calls.length === before + 1);
     check('A11 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 
-  // ============ B. dasbor ============
+  // ============ B. Beranda dan sembunyikan nominal ============
   {
     const { ctx, page, fake, errors } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
-    check('B1 3 kartu KPI (utama + 2), 9 baris aset, 6 jenis di legenda', (await page.locator('.kpi').count()) === 3 && (await page.locator('#holdings > li').count()) === 9 && (await page.locator('.lg').count()) === 6);
-    await nav(page, 'aset');
-    const bbcaRow = await page.locator('#holdings > li', { hasText: 'BBCA' }).innerText();
-    check('B13 dasbor menampilkan tanggal beli dan lama dimiliki', /dibeli 3 Mar 2025 \(20 bln\)/.test(bbcaRow), bbcaRow.replace(/\n/g, ' | ').slice(0, 110));
-    await nav(page, 'beranda');
-    const total = await page.locator('.kpi').first().innerText();
-    check('B2 total berformat rupiah', /Rp\s?\d{1,3}(\.\d{3})+/.test(total), total.replace(/\n/g, ' | '));
-    const navs = await page.locator('#nav a').evaluateAll((as) => as.map((a) => `${a.textContent.trim()}${a.getAttribute('aria-current') ? '*' : ''}`).join());
-    check('B3 menu utama: Beranda, Analisis, Aset, Kelola, Profil; hanya Beranda yang aktif', navs === 'Beranda*,Analisis,Aset,Kelola,Profil', navs);
+    check('B1 Beranda: ringkasan, 9 aset di daftar, 6 jenis di alokasi', (await page.locator('#holdings .hold').count()) === 9 && (await page.locator('#legend .lg').count()) === 6 && /9 aset/.test(await page.locator('#hold-count').innerText()));
+    const total = await page.locator('#summary .sum-value').innerText();
+    check('B2 total berformat rupiah = total robot (tanpa perubahan, tampilan langsung sama persis)', nb(total) === nb(idr.format(sheetOf(fake).history.at(-1).total)), total);
+    const navs = await page.locator('#nav a, #nav button').evaluateAll((els) => els.map((a) => `${a.textContent.trim()}${a.getAttribute('aria-current') ? '*' : ''}`).join());
+    check('B3 menu: Beranda, Analisis, tombol Tambah, Aktivitas, Profil; hanya Beranda yang aktif', navs === 'Beranda*,Analisis,Tambah,Aktivitas,Profil', navs);
     const box = await page.locator('#chart svg').boundingBox();
     await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5);
     check('B4 grafik + tooltip', await page.locator('#chart .tip').isVisible());
-    await page.getByRole('button', { name: '1 bln' }).click();
-    check('B5 rentang waktu berfungsi', (await page.getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
-    await page.getByRole('button', { name: 'Semua' }).click();
-    await page.locator('.lg[data-type="crypto"]').click();
-    await routed(page, 'aset/crypto');
-    check('B6 ketuk jenis di Alokasi -> halaman Aset terbuka, hanya jenis itu, filter ada di alamat', (await page.locator('#nav-aset').getAttribute('aria-current')) === 'page' && (await page.locator('#v-aset').isVisible()) && (await page.locator('#holdings > li').count()) === 2 && /2 dari 9 aset/.test(await page.locator('#filter-note').innerText()) && page.url().endsWith('#/aset/crypto'), page.url());
-    await page.getByRole('link', { name: /^Semua/ }).click();
-    await routed(page, 'aset');
-    check('B6b chip "Semua" melepas filter', (await page.locator('#holdings > li').count()) === 9 && page.url().endsWith('#/aset'));
-    await nav(page, 'beranda');
-    await shot(page, 'v6-beranda.png', { fullPage: true });
+    await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
+    check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
+    await page.locator('#ranges').getByRole('button', { name: 'Semua' }).click();
 
-    // textContent (bukan innerText): ikut memeriksa tab yang sedang tertutup dan rincian yang belum dibuka.
+    await page.locator('#legend [data-filter="crypto"]').click();
+    check('B6 ketuk Kripto di Alokasi -> daftar hanya kripto, chip dan baris alokasi menandai pilihan', JSON.stringify((await holdSyms(page)).sort()) === '["BTC","ETH"]' && /2 dari 9 aset/.test(await page.locator('#filter-note').innerText()) && (await page.locator('#chips [data-filter="crypto"]').getAttribute('aria-pressed')) === 'true' && (await page.locator('#legend [data-filter="crypto"]').getAttribute('aria-pressed')) === 'true');
+    await page.locator('#legend [data-filter="crypto"]').click();
+    check('B6b ketuk lagi -> filter lepas', (await page.locator('#holdings .hold').count()) === 9 && (await page.locator('#filter-note').innerText()) === '');
+    await page.locator('#chips [data-filter="idx"]').click();
+    await page.locator('#chips [data-filter=""]').click();
+    check('B6c chip "Semua" melepas filter', (await page.locator('#holdings .hold').count()) === 9);
+    await shot(page, 'beranda.png', { fullPage: true });
+
+    // textContent (bukan innerText): ikut memeriksa halaman yang sedang tertutup.
     const secrets = secretsOf(fake);
+    await page.locator('#holdings .hold', { hasText: 'BBCA' }).click();
+    await routed(page, `aset/${encodeURIComponent('idx:BBCA')}`);
     const normal = await page.locator('main').textContent();
-    check('B7 kontrol: mode normal menampilkan angka milikmu', secrets.filter((s) => normal.includes(s)).length >= 2);
-    await nav(page, 'aset'); // sembunyikan saat grafik tertutup: grafik rupiah lama tidak boleh tertinggal
-    await page.getByRole('button', { name: 'Sembunyikan nominal' }).click();
+    check('B7 kontrol: mode normal menampilkan angka milikmu (termasuk jumlah lembar di halaman aset)', secrets.filter((s) => normal.includes(s)).length >= 2 && /1\.000 lembar/.test(normal));
+    await page.getByRole('button', { name: 'Sembunyikan nominal' }).click(); // disembunyikan saat grafik Beranda tertutup
     const hidden = await page.locator('main').textContent();
     const leaked = secrets.filter((s) => hidden.includes(s));
     check('B8 sembunyikan nominal: tidak ada angka milikmu di halaman mana pun (termasuk harga aset manual)', leaked.length === 0, leaked.join(','));
-    check('B8b saat tersembunyi grafik tidak menyimpan sumbu rupiah ("jt")', !/\d+ jt/.test(hidden));
-    check('B9 jumlah unit tersembunyi, persentase tetap', !/lembar/.test(hidden) && /[+−]\d+,\d{2}%/.test(hidden));
+    check('B8b saat tersembunyi tidak ada sumbu rupiah ("jt") yang tertinggal', !/\d+ jt/.test(hidden));
+    check('B9 jumlah unit tersembunyi, persentase tetap', !/\d\s(lembar|gram)\b/.test(hidden) && /[+−]\d+,\d{2}%/.test(hidden), (hidden.match(/.{30}(lembar|gram\b).{10}/g) || []).join(' | '));
     await nav(page, 'beranda');
     check('B9b kembali ke Beranda: grafik digambar ulang dalam persen', (await page.locator('#chart svg').count()) === 1 && /%/.test(await page.locator('#chart .axis').textContent()));
-    await shot(page, 'v6-hidden.png', { fullPage: true });
+    await shot(page, 'beranda-hidden.png', { fullPage: true });
     check('B10 tanpa error konsol', errors.length === 0, errors.join(' | '));
 
     await nav(page, 'profil');
     await page.locator('#logout').click();
     check('B11 Keluar (di Profil) -> form sambung & kredensial terhapus', (await page.locator('#connect').isVisible()) && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null);
-    check('B12 setelah Keluar, dasbor dan datanya tidak ada di halaman', !(await page.locator('#dash').isVisible()));
+    check('B12 setelah Keluar, dasbor, menu, dan datanya tidak tampil', !(await page.locator('#dash').isVisible()) && !(await page.locator('#nav').isVisible()) && !/Rp\s?\d/.test(await page.locator('body').innerText()));
     await ctx.close();
   }
 
-  // ============ C. kelola ============
+  // ============ C. tambah, ubah, hapus aset (lembar dari tombol + dan dari halaman aset) ============
   {
-    const { ctx, page, fake } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
-    await page.waitForSelector('#dash:not([hidden])');
-    await page.locator('#nav-kelola').click();
-    await page.waitForSelector('#list-card:not([hidden])');
-    const list = () => fake.call({ token: fake.token, action: 'list' }).assets;
-    check('C1 daftar menampilkan 9 aset', (await page.locator('#assets li').count()) === 9 && list().length === 9);
-
-    // tambah kripto
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
+    const { ctx, page, fake, errors } = await newPage();
+    await openDash(page, fake);
+    const list = () => sheetOf(fake).assets;
+    await page.locator('#nav-add').click();
+    check('C1 tombol + membuka lembar "Tambah aset" tanpa tombol Hapus', (await isOpen(page, 'asset-dlg')) && (await page.locator('#f-h').innerText()) === 'Tambah aset' && !(await page.locator('#f-del').isVisible()));
     await page.selectOption('#f-type', 'crypto');
-    check('C2 jenis kripto menampilkan kolom ID CoinGecko; kolom manual tersembunyi', (await page.locator('label[data-for="crypto"]').isVisible()) && !(await page.locator('label[data-for="manual"]').first().isVisible()));
+    check('C2 jenis kripto menampilkan kolom ID CoinGecko; kolom manual tersembunyi', (await page.locator('label[data-for="crypto"]').isVisible()) && !(await page.locator('label[data-for="manual"]').isVisible()));
     await page.fill('#f-symbol', 'sol'); // diketik huruf kecil, harus tersimpan SOL
     await page.fill('#f-name', 'Solana');
     await page.fill('#f-coingeckoId', 'Solana'); // harus tersimpan huruf kecil
     await page.fill('#f-qty', '3.5');
     await page.fill('#f-avgCost', '2000000');
-    await shot(page, 'v2-kelola-form.png');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    await shot(page, 'form-tambah.png');
+    await page.locator('#f-save').click();
+    await routed(page, `aset/${encodeURIComponent('crypto:SOL')}`);
     const sol = list().find((a) => a.symbol === 'SOL');
     check('C3 aset baru tersimpan di Sheet dengan tipe yang benar', sol && sol.qty === 3.5 && sol.avgCost === 2_000_000 && sol.coingeckoId === 'solana' && sol.type === 'crypto' && !('price' in sol), JSON.stringify(sol));
-    check('C4 daftar ikut bertambah & ada pesan tersimpan', (await page.locator('#assets li').count()) === 10 && /Tersimpan/.test(await page.locator('#status').innerText()));
+    check('C3b setelah simpan: lembar tertutup, halaman aset baru terbuka "Menunggu harga", ada pesan', !(await isOpen(page, 'asset-dlg')) && (await page.locator('#detail .d-name').innerText()) === 'Solana' && /Menunggu harga/.test(await page.locator('#detail').innerText()) && /Tersimpan/.test(await toastText(page)));
+    await nav(page, 'beranda');
+    const wait = page.locator('#holdings .hold.wait');
+    check('C3c Beranda: aset baru ada di daftar dengan tanda "Menunggu harga"; ringkasan memberi tahu belum masuk total', (await wait.count()) === 1 && /SOL/.test(await wait.innerText()) && /1 aset menunggu harga/.test(await page.locator('#summary').innerText()));
 
     // validasi: duplikat dan kosong
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
+    await page.locator('#nav-add').click();
     await page.selectOption('#f-type', 'idx');
     await page.fill('#f-symbol', 'BBCA');
     await page.fill('#f-qty', '5');
     await page.fill('#f-avgCost', '9000');
-    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.locator('#f-save').click();
     await page.waitForSelector('#f-err:not([hidden])');
-    check('C5 duplikat ditolak dengan pesan jelas, dialog tetap terbuka', /duplikat/.test(await page.locator('#f-err').innerText()) && (await page.locator('#dlg').evaluate((d) => d.open)));
+    check('C5 duplikat ditolak dengan pesan jelas, lembar tetap terbuka', /duplikat/.test(await page.locator('#f-err').innerText()) && (await isOpen(page, 'asset-dlg')));
     await page.fill('#f-symbol', 'ASII');
     await page.fill('#f-qty', '');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    check('C6 jumlah kosong ditolak', /qty/.test(await page.locator('#f-err').innerText()));
+    await page.locator('#f-save').click();
+    await page.waitForFunction(() => /qty/.test(document.getElementById('f-err').textContent));
+    check('C6 jumlah kosong ditolak; tombol Simpan bisa dipakai lagi', /qty/.test(await page.locator('#f-err').innerText()) && (await page.locator('#f-save').isEnabled()));
     check('C7 penolakan tidak mengubah Sheet', list().length === 10);
-    await page.getByRole('button', { name: 'Batal' }).click();
+    await page.locator('#f-cancel').click();
 
-    // ubah
-    await page.locator('[data-edit="0"]').click();
-    const sym0 = await page.inputValue('#f-symbol');
+    // ubah dari halaman aset
+    await goto(page, AH('idx:BBCA'));
+    await page.locator('[data-act="edit"]').click();
+    check('C8 Ubah: lembar berjudul nama aset, terisi ulang, ada tombol Hapus', (await page.locator('#f-h').innerText()) === 'Ubah Bank Central Asia' && (await page.inputValue('#f-symbol')) === 'BBCA' && (await page.inputValue('#f-qty')) === '1000' && (await page.locator('#f-del').isVisible()));
     await page.fill('#f-qty', '1234');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
-    check('C8 ubah jumlah tersimpan pada aset yang benar', list().find((a) => a.symbol === sym0).qty === 1234, sym0);
+    await page.locator('#f-save').click();
+    await page.waitForFunction(() => !document.getElementById('asset-dlg').open);
+    check('C8b jumlah baru tersimpan di aset yang benar dan langsung tampil', list().find((a) => a.symbol === 'BBCA').qty === 1234 && /1\.234 lembar/.test(await page.locator('#detail').innerText()) && /Perubahan tersimpan/.test(await toastText(page)));
 
-    // hapus
-    page.once('dialog', (d) => d.accept());
-    await page.locator('[data-del="9"]').click();
-    await page.waitForFunction(() => document.querySelectorAll('#assets li').length === 9);
-    check('C9 hapus (setelah konfirmasi) menghapus dari Sheet', !list().some((a) => a.symbol === 'SOL') && list().length === 9);
+    // hapus dari halaman aset
+    await goto(page, AH('crypto:SOL'));
     page.once('dialog', (d) => d.dismiss());
-    await page.locator('[data-del="0"]').click();
-    check('C10 batal konfirmasi tidak menghapus', list().length === 9);
+    await page.locator('[data-act="del"]').click();
+    check('C9 batal konfirmasi tidak menghapus', list().some((a) => a.symbol === 'SOL'));
+    let confirmText = '';
+    page.once('dialog', (d) => { confirmText = d.message(); d.accept(); });
+    await page.locator('[data-act="del"]').click();
+    await routed(page, 'beranda');
+    check('C10 hapus (setelah konfirmasi): hilang dari Sheet, kembali ke Beranda; konfirmasi menyarankan Jual bila terjual', !list().some((a) => a.symbol === 'SOL') && (await page.locator('#holdings .hold').count()) === 9 && /Jual/.test(confirmText), confirmText);
 
-    // dolar & manual
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
+    // manual: harga dan mata uang
+    await page.locator('#nav-add').click();
     await page.selectOption('#f-type', 'manual');
     await page.fill('#f-symbol', 'DEPO');
     await page.fill('#f-qty', '1');
     await page.fill('#f-price', '50000000');
     await page.fill('#f-avgCost', '48000000');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    await page.locator('#f-save').click();
+    await routed(page, `aset/${encodeURIComponent('manual:DEPO')}`);
     const depo = list().find((a) => a.symbol === 'DEPO');
-    check('C11 aset manual menyimpan harga & mata uang bawaan', depo && depo.price === 50_000_000 && depo.currency === 'IDR', JSON.stringify(depo));
-    // ---- tanggal beli
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
+    check('C11 aset manual menyimpan harga & mata uang bawaan, dan langsung terhitung (tanpa menunggu robot)', depo && depo.price === 50_000_000 && depo.currency === 'IDR' && (await page.locator('#detail .d-value').innerText()) === idr.format(50_000_000), JSON.stringify(depo));
+
+    // tanggal beli
+    await page.locator('#nav-add').click();
     await page.selectOption('#f-type', 'us');
     await page.fill('#f-symbol', 'PANW'); await page.fill('#f-qty', '1.5'); await page.fill('#f-avgCost', '335.08');
     await page.fill('#f-buyDate', '2099-01-01');
-    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.locator('#f-save').click();
     await page.waitForSelector('#f-err:not([hidden])');
     check('C12 tanggal beli di masa depan ditolak dan tidak tersimpan', /masa depan/.test(await page.locator('#f-err').innerText()) && !list().some((a) => a.symbol === 'PANW'));
     await page.fill('#f-buyDate', '2025-03-03');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    await page.locator('#f-save').click();
+    await routed(page, `aset/${encodeURIComponent('us:PANW')}`);
     const panw = list().find((a) => a.symbol === 'PANW');
     check('C13 tanggal beli tersimpan sebagai teks YYYY-MM-DD', panw && panw.buyDate === '2025-03-03' && typeof panw.buyDate === 'string', JSON.stringify(panw));
-    check('C14 daftar menampilkan tanggal beli', /dibeli 3 Mar 2025/.test(await page.locator('#assets').innerText()));
-    const last = (await page.locator('#assets li').count()) - 1;
-    await page.locator(`[data-edit="${last}"]`).click();
+    await goto(page, AH('idx:BBCA'));
+    check('C14 halaman aset menampilkan tanggal beli dan lama dimiliki', /Dibeli\s*3 Mar 2025\s*20 bln/i.test(await page.locator('#detail .stats').innerText()));
+    await goto(page, AH('us:PANW'));
+    await page.locator('[data-act="edit"]').click();
     check('C15 form ubah mengisi ulang tanggal', (await page.inputValue('#f-buyDate')) === '2025-03-03');
-    await shot(page, 'v3-form-date.png');
     await page.fill('#f-buyDate', '');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    await page.locator('#f-save').click();
+    await page.waitForFunction(() => !document.getElementById('asset-dlg').open);
     check('C16 mengosongkan tanggal menghapusnya dari Sheet', !('buyDate' in list().find((a) => a.symbol === 'PANW')));
-    await shot(page, 'v2-kelola.png', { fullPage: true });
+
+    // hapus lewat tombol di lembar Ubah
+    await page.locator('[data-act="edit"]').click();
+    page.once('dialog', (d) => d.accept());
+    await page.locator('#f-del').click();
+    await routed(page, 'beranda');
+    check('C17 tombol "Hapus aset" di lembar Ubah juga menghapus dan menutup lembar', !list().some((a) => a.symbol === 'PANW') && !(await isOpen(page, 'asset-dlg')));
+    check('C18 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 
-  // ============ D. kegagalan ============
+  // ============ T. beli / jual -> keuntungan terealisasi ============
+  {
+    const { ctx, page, fake, env, errors } = await newPage();
+    await openDash(page, fake);
+    const L0 = sheetOf(fake).history.at(-1);
+    const pos0 = (s) => L0.positions.find((p) => p.symbol === s);
+    const asset = (s) => sheetOf(fake).assets.find((a) => a.symbol === s);
+    const txs = () => sheetOf(fake).transactions;
+    const tradeDone = () => page.waitForFunction(() => !document.getElementById('trade-dlg').open);
+
+    await goto(page, AH('idx:BBCA'));
+    check('T1 halaman aset: tombol Beli, Jual, Ubah, Hapus (skrip versi 3)', (await page.locator('#detail .act').allInnerTexts()).map(flat).join() === 'Beli,Jual,Ubah,Hapus' && (await page.locator('[data-act="sell"]').getAttribute('aria-disabled')) === null);
+    await page.locator('[data-act="sell"]').click();
+    const kind = await page.locator('#trade-form input[name="kind"]:checked').inputValue();
+    check('T2 Jual: lembar terbuka; harga terisi harga terakhir, tanggal hari ini (WIB), kepemilikan tampil', (await isOpen(page, 'trade-dlg')) && kind === 'sell' && (await page.locator('#t-h').innerText()) === 'Jual BBCA'
+      && Number(await page.inputValue('#t-price')) === pos0('BBCA').price && (await page.inputValue('#t-date')) === todayWib() && /Dimiliki 1\.000 lembar/.test(await page.locator('#t-own').innerText()) && !(await page.locator('#t-fx-f').isVisible()));
+    await page.fill('#t-qty', '1001');
+    check('T3 jumlah melebihi kepemilikan: pratinjau memperingatkan', /Melebihi/.test(await page.locator('#t-preview').innerText()));
+    await page.locator('#t-save').click();
+    await page.waitForSelector('#t-err:not([hidden])');
+    check('T3b menyimpan jumlah berlebih ditolak; Sheet tidak berubah, tanpa panggilan simpan', /melebihi/.test(await page.locator('#t-err').innerText()) && asset('BBCA').qty === 1000 && txs().length === 0 && !env.actions.includes('trade'));
+    await page.fill('#t-qty', '400');
+    await page.fill('#t-price', '10000');
+    const pv = nb(flat(await page.locator('#t-preview').innerText()));
+    check('T4 pratinjau jual: hasil, modal porsi (harga rata-rata), keuntungan terealisasi dengan persen, sisa', pv.includes(nb(`Hasil jual ${idr.format(4_000_000)}`)) && pv.includes(nb(`Modal porsi ini ${idr.format(3_800_000)}`)) && pv.includes(nb(`▲ +${idr.format(200_000)} (+5,26%)`)) && /Sisa 600/.test(pv), pv);
+    await shot(page, 'jual.png');
+    await page.locator('#t-save').click();
+    await tradeDone();
+    const tx1 = txs()[0];
+    check('T5 jual tersimpan: jumlah di Sheet berkurang, harga rata-rata tetap, transaksi tercatat lengkap', asset('BBCA').qty === 600 && asset('BBCA').avgCost === 9500 && txs().length === 1
+      && tx1.kind === 'sell' && tx1.qty === 400 && tx1.price === 10_000 && tx1.costIdr === 3_800_000 && tx1.pnlIdr === 200_000 && tx1.date === todayWib() && /^tx-/.test(tx1.id), JSON.stringify(tx1));
+    check('T5b pesan menyebut keuntungannya; tetap di halaman aset yang kini 600 lembar dengan 1 aktivitas', nb(await toastText(page)).includes(nb(`+${idr.format(200_000)}`)) && /600 lembar/.test(await page.locator('#detail').innerText()) && (await page.locator('#detail .tx').count()) === 1);
+    const v600 = idr.format(600 * pos0('BBCA').price);
+    await nav(page, 'beranda');
+    check('T6 Beranda langsung berubah: Terealisasi +Rp 200.000, nilai BBCA = 600 × harga terakhir', nb(flat(await page.locator('#summary').innerText())).toLowerCase().includes(nb(`terealisasi +${idr.format(200_000)}`).toLowerCase()) && nb(await page.locator('#holdings .hold', { hasText: 'BBCA' }).innerText()).includes(nb(v600)));
+    await nav(page, 'aktivitas');
+    const real1 = nb(flat(await page.locator('#realized').innerText()));
+    check('T7 Aktivitas: total terealisasi, tahun ini, 1 penjualan; baris Jual BBCA', real1.includes(nb(`+${idr.format(200_000)}`)) && /1 penjualan/.test(real1) && new RegExp(`Tahun ${todayWib().slice(0, 4)}`, 'i').test(real1) && /Jual\s*BBCA\s*400/.test(await page.locator('#txs').innerText()), real1);
+
+    // rugi, aset dolar, jual semua -> aset hilang dari daftar
+    await goto(page, AH('us:NVDA'));
+    await page.locator('[data-act="sell"]').click();
+    check('T8 aset dolar: kolom kurs tampil dan terisi kurs terakhir', (await page.locator('#t-fx-f').isVisible()) && Number(await page.inputValue('#t-fx')) === L0.fx && /US\$/.test(await page.locator('#t-price-l').innerText()));
+    await page.locator('#t-all').click();
+    await page.fill('#t-price', '100');
+    await page.fill('#t-fx', '16000');
+    check('T8b "Jual semua" mengisi seluruh kepemilikan; pratinjau rugi −Rp 960.000 dan "habis"', (await page.inputValue('#t-qty')) === '3' && nb(flat(await page.locator('#t-preview').innerText())).includes(nb(`▼ −${idr.format(960_000)}`)) && /habis/.test(await page.locator('#t-preview').innerText()));
+    await page.locator('#t-save').click();
+    await routed(page, 'aktivitas');
+    const tx2 = txs().find((t) => t.symbol === 'NVDA');
+    check('T9 jual habis: aset dihapus dari Sheet, pindah ke Aktivitas; rugi tercatat dalam rupiah dan dolar dengan kurs', !asset('NVDA') && tx2 && tx2.pnlIdr === -960_000 && tx2.pnl === -60 && tx2.fx === 16_000 && tx2.currency === 'USD', JSON.stringify(tx2));
+    check('T9b total terealisasi = untung − rugi (−Rp 760.000), 2 penjualan', nb(flat(await page.locator('#realized').innerText())).includes(nb(`−${idr.format(760_000)}`)) && /2 penjualan/.test(await page.locator('#realized').innerText()));
+    await nav(page, 'beranda');
+    check('T9c Beranda: NVDA tidak ada lagi, 8 aset', !(await holdSyms(page)).includes('NVDA') && (await page.locator('#holdings .hold').count()) === 8);
+
+    // beli lagi: harga rata-rata tertimbang
+    await goto(page, AH('us:AAPL'));
+    await page.locator('[data-act="buy"]').click();
+    await page.fill('#t-qty', '2');
+    await page.fill('#t-price', '200');
+    await page.fill('#t-fx', '16000');
+    const pvb = nb(flat(await page.locator('#t-preview').innerText()));
+    check('T10 pratinjau beli: total (dengan rupiahnya), jumlah jadi, harga rata-rata baru', pvb.includes(nb(`Total beli ${usdF.format(400)} (${idr.format(6_400_000)})`)) && /Jumlah jadi 7/.test(pvb) && pvb.includes(nb(usdF.format(185.71))), pvb);
+    await page.fill('#t-date', '2099-01-01');
+    await page.locator('#t-save').click();
+    await page.waitForSelector('#t-err:not([hidden])');
+    check('T10b tanggal di masa depan ditolak, Sheet tidak berubah', /masa depan/.test(await page.locator('#t-err').innerText()) && asset('AAPL').qty === 5);
+    await page.fill('#t-date', todayWib());
+    await page.locator('#t-save').click();
+    await tradeDone();
+    const aapl = asset('AAPL');
+    check('T11 beli tersimpan: jumlah 7, harga rata-rata tertimbang; transaksi beli tanpa untung/rugi', aapl.qty === 7 && Math.abs(aapl.avgCost - (5 * 180 + 2 * 200) / 7) < 1e-6 && txs().some((t) => t.kind === 'buy' && t.symbol === 'AAPL' && t.qty === 2 && !('pnlIdr' in t)) && /Pembelian tercatat/.test(await toastText(page)), JSON.stringify(aapl));
+
+    // kiriman ulang aman: Sheet sudah berubah tapi balasannya hilang -> ulangi -> tidak dobel
+    await goto(page, AH('idx:TLKM'));
+    await page.locator('[data-act="sell"]').click();
+    await page.fill('#t-qty', '100');
+    await page.fill('#t-price', '3500');
+    env.mode = 'lost';
+    await page.locator('#t-save').click();
+    await page.waitForSelector('#t-err:not([hidden])');
+    const afterLost = { qty: asset('TLKM').qty, n: txs().filter((t) => t.symbol === 'TLKM').length };
+    check('T12 balasan hilang: pesan galat, lembar tetap terbuka, tombol bisa diketuk lagi', (await isOpen(page, 'trade-dlg')) && (await page.locator('#t-save').isEnabled()) && afterLost.qty === 1900 && afterLost.n === 1, JSON.stringify(afterLost));
+    env.mode = 'ok';
+    await page.locator('#t-save').click();
+    await tradeDone();
+    check('T12b ulangi: TIDAK terjual dua kali dan transaksinya tetap satu', asset('TLKM').qty === 1900 && txs().filter((t) => t.symbol === 'TLKM').length === 1 && /1\.900 lembar/.test(await page.locator('#detail').innerText()));
+
+    // rincian dan hapus catatan
+    await nav(page, 'aktivitas');
+    check('T13 Aktivitas: 4 transaksi, terbaru di atas', (await page.locator('#txs .tx').count()) === 4 && /TLKM/.test(await page.locator('#txs .tx').first().innerText()));
+    await page.locator('#txs .tx', { hasText: 'BBCA' }).click();
+    const xb = nb(flat(await page.locator('#x-body').innerText()));
+    check('T14 rincian transaksi: Penjualan, jumlah × harga, modal porsi, keuntungan dengan persen', (await isOpen(page, 'tx-dlg')) && (await page.locator('#x-h').innerText()) === 'Penjualan' && xb.includes(nb(`400 × ${idr.format(10_000)}`)) && xb.includes(nb(`+${idr.format(200_000)} (+5,26%)`)), xb);
+    await shot(page, 'rincian-transaksi.png');
+    page.once('dialog', (d) => d.dismiss());
+    await page.locator('#x-del').click();
+    check('T14b batal hapus catatan: tidak berubah', txs().length === 4 && (await isOpen(page, 'tx-dlg')));
+    page.once('dialog', (d) => d.accept());
+    await page.locator('#x-del').click();
+    await page.waitForFunction(() => !document.getElementById('tx-dlg').open);
+    check('T15 hapus catatan: hilang dari Sheet dan Aktivitas, total terealisasi ikut berubah, jumlah aset TIDAK berubah', txs().length === 3 && !txs().some((t) => t.symbol === 'BBCA') && asset('BBCA').qty === 600
+      && nb(flat(await page.locator('#realized').innerText())).includes(nb(`−${idr.format(930_000)}`)) && (await page.locator('#txs .tx').count()) === 3);
+
+    // nominal tersembunyi: Aktivitas tanpa rupiah dan tanpa jumlah unit
+    await page.locator('#privacy').click();
+    const act = await page.locator('#v-aktivitas').textContent();
+    const qtyTexts = await page.locator('#txs .tx-main small').allInnerTexts();
+    check('T16 nominal tersembunyi: Aktivitas tanpa rupiah, jumlah unit tersamar', !/Rp\s?\d/.test(act) && qtyTexts.every((t) => t.startsWith('••••••')) && /••••••/.test(await page.locator('#realized .sum-value').innerText()), qtyTexts.join(' | '));
+    await page.locator('#txs .tx').first().click();
+    const xh = nb(flat(await page.locator('#x-body').innerText())); // transaksi teratas: jual 100 TLKM @ 3.500, modal 320.000, untung 30.000
+    check('T16b rincian transaksi saat tersembunyi: jumlah, modal, dan keuntungan tersamar (harga pasar per unit boleh)', xh.includes('•••••• ×') && !xh.includes('320.000') && !xh.includes('30.000') && !/\b100 ×/.test(xh), xh);
+    await page.locator('#x-close').click();
+    await page.locator('#privacy').click();
+
+    // kas: tanpa jual-beli
+    await goto(page, AH('cash:KAS'));
+    check('T17 Kas: tanpa Beli/Jual, hanya "Ubah saldo" dan Hapus', (await page.locator('#detail .act').allInnerTexts()).map(flat).join() === 'Ubah saldo,Hapus');
+    check('T18 tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+
+  // ============ V. skrip Apps Script lama ============
+  {
+    // versi 2: tanggal beli bisa, jual-beli belum
+    const { ctx, page, fake, env, errors } = await newPage();
+    env.fake = { token: fake.token, call: (p) => { const r = fake.call(p); if (r && r.version) r.version = 2; delete r.transactions; return r; } };
+    await openDash(page, fake, `#/aset/${encodeURIComponent('idx:BBCA')}`);
+    await page.waitForSelector('#v-aset:not([hidden])');
+    check('V1 skrip versi 2: tombol Beli/Jual dinonaktifkan dengan catatan cara memperbarui', (await page.locator('[data-act="sell"]').getAttribute('aria-disabled')) === 'true' && /versi 3/.test(await page.locator('#detail .note').innerText()));
+    await page.locator('[data-act="sell"]').click({ force: true }); // aria-disabled: tetap bisa diketuk, harus menjelaskan
+    check('V1b mengetuk Jual: lembar tidak terbuka, pesan menjelaskan', !(await isOpen(page, 'trade-dlg')) && /versi 3/.test(await toastText(page)) && !env.actions.includes('trade'));
+    await nav(page, 'profil');
+    check('V1c Profil > Data menyebut jual-beli belum bisa dicatat', /jual-beli belum bisa dicatat/.test(await page.locator('#set-data').innerText()));
+    check('V1d tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  {
+    // tanpa versi (skrip paling lama): tanggal beli tidak dikirim
+    const { ctx, page, fake, env } = await newPage();
+    const sent = [];
+    env.fake = { token: fake.token, call: (p) => {
+      try { const q = JSON.parse(p); if (q.action === 'saveAssets') sent.push(...q.assets); } catch {}
+      const r = fake.call(p);
+      if (r) { delete r.version; delete r.transactions; }
+      return r;
+    } };
+    await openDash(page, fake);
+    await page.locator('#nav-add').click();
+    check('V2 skrip lama: lembar Tambah memberi catatan versi lama dan menyembunyikan tanggal beli', (await page.locator('#f-old').isVisible()) && !(await page.locator('#buy-field').isVisible()));
+    await page.fill('#f-symbol', 'ASII'); await page.fill('#f-qty', '1'); await page.fill('#f-avgCost', '5000');
+    await page.locator('#f-save').click();
+    await page.waitForFunction(() => !document.getElementById('asset-dlg').open);
+    const asii = sheetOf(fake).assets.find((a) => a.symbol === 'ASII');
+    check('V3 menyimpan tetap berhasil, tanpa pernah mengirim buyDate ke skrip lama', !!asii && !sent.some((a) => 'buyDate' in a && a.symbol !== 'BBCA'), `terkirim buyDate: ${sent.filter((a) => 'buyDate' in a).map((a) => a.symbol).join() || 'tidak ada'}`);
+    await ctx.close();
+  }
+
+  // ============ D. kegagalan dan keadaan kosong ============
   {
     const { ctx, page, fake, env } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
-    await page.waitForSelector('#dash:not([hidden])');
-    // kata sandi di Apps Script diganti: tiruan baru menolak token lama yang tersimpan di browser
-    env.fake = createFake({ token: 'sudah-diganti' });
+    await openDash(page, fake);
+    env.fake = createFake({ token: 'sudah-diganti' }); // kata sandi di Apps Script diganti
     await page.reload();
     await page.waitForSelector('#c-err:not([hidden])');
     check('D1 kata sandi sudah diganti -> form sambung dengan pesan, URL terisi', /tidak cocok/.test(await page.locator('#c-err').innerText()) && (await page.inputValue('#c-url')) === GURL);
     await page.goto(`${BASE}/kelola.html`);
-    await page.waitForSelector('#banner:not([hidden])');
-    check('D2 kelola dengan kata sandi usang -> banner dan tautan ke dasbor', /tidak cocok/.test(await page.locator('#banner').innerText()) && (await page.locator('#banner a').getAttribute('href')) === 'index.html');
+    await page.waitForURL(/index\.html#\/beranda$/);
+    check('D2 tautan lama kelola.html diteruskan ke dasbor', /index\.html#\/beranda$/.test(page.url()), page.url());
     await ctx.close();
   }
   {
     const { ctx, page, fake, env } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
-    await page.waitForSelector('#dash:not([hidden])');
+    await openDash(page, fake);
     env.mode = 'abort';
     await page.reload();
     await page.waitForSelector('#banner:not([hidden])');
@@ -292,52 +473,69 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.reload();
     await page.waitForSelector('#banner:not([hidden])');
     check('D4 Google membalas halaman HTML -> pesan ramah', /bukan JSON/.test(await page.locator('#banner').innerText()));
+    await nav(page, 'profil');
+    check('D4b saat gagal: Profil tetap bisa dibuka (Keluar terjangkau)', (await page.locator('#v-profil').isVisible()) && (await page.locator('#logout').isVisible()));
     await page.locator('#relink').click();
     check('D5 "Sambungkan ulang" membersihkan dan membuka form', (await page.locator('#connect').isVisible()) && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null);
     await ctx.close();
   }
   {
-    const { ctx, page, fake } = await newPage({ withHistory: false });
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
-    await page.waitForSelector('#banner:not([hidden])');
-    const t = await page.locator('#banner').innerText();
-    check('D6 aset ada tapi riwayat kosong -> petunjuk jalankan workflow + tautan Kelola', /Belum ada data/.test(t) && (await page.locator('#banner a[href="kelola.html"]').count()) === 1, t.replace(/\n/g, ' '));
-    check('D6b keadaan kosong BUKAN kegagalan: subjudul netral, banner tidak merah', !/Gagal/.test(await page.locator('#subtitle').innerText()) && !(await page.locator('#banner').evaluate((b) => b.classList.contains('error'))), await page.locator('#subtitle').innerText());
-    check('D6c keadaan kosong: menu tampil (Kelola terjangkau), tombol nominal tidak, halaman data tidak', (await page.locator('#nav-kelola').isVisible()) && !(await page.locator('#privacy').isVisible()) && !(await page.locator('#v-beranda').isVisible()));
-    await nav(page, 'profil');
-    check('D6d keadaan kosong: Profil tetap bisa dibuka, ada Keluar dan teks "Belum ada data"', (await page.locator('#v-profil').isVisible()) && (await page.locator('#logout').isVisible()) && /Belum ada data/.test(await page.locator('#set-data').innerText()));
-    await shot(page, 'v2-empty.png');
+    // aset ada, riwayat belum ada (robot belum jalan)
+    const { ctx, page, fake, errors } = await newPage({ withHistory: false });
+    await openDash(page, fake);
+    await page.waitForSelector('#dash:not([hidden])');
+    const sum = await page.locator('#summary').innerText();
+    check('D6 riwayat kosong: aset pasar "Menunggu harga", kas dan manual langsung terhitung', (await page.locator('#holdings .hold.wait').count()) === 7 && (await page.locator('#holdings .hold:not(.wait)').count()) === 2 && sum.includes(idr.format(8_000_000).replace(/\s/g, ' ').slice(0, 2)) && /7 aset menunggu harga/.test(sum), flat(sum));
+    check('D6b keadaan ini BUKAN kegagalan: subjudul netral, tanpa banner merah, grafik menjelaskan butuh 2 hari', !/Gagal/.test(await page.locator('#subtitle').innerText()) && !(await page.locator('#banner').isVisible()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()), await page.locator('#subtitle').innerText());
+    await page.locator('#holdings .hold.wait', { hasText: 'BBCA' }).click();
+    await routed(page, `aset/${encodeURIComponent('idx:BBCA')}`);
+    check('D6c halaman aset yang belum berharga: "Menunggu harga" dan penjelasan, tetap bisa diubah', /Menunggu harga/.test(await page.locator('#detail').innerText()) && (await page.locator('[data-act="edit"]').isVisible()));
+    check('D6d tanpa error konsol', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  {
+    // Sheet kosong sama sekali: ajakan menambah aset pertama
+    const fk = createFake();
+    const { ctx, page, errors } = await newPage({ fake: fk });
+    await openDash(page, fk);
+    await page.waitForSelector('#dash:not([hidden])');
+    check('D7 Sheet kosong: ajakan "Tambah aset pertama", tanpa grafik, alokasi, dan alat daftar', /Mulai catat portofoliomu/.test(await page.locator('#summary').innerText()) && !(await page.locator('#chart-card').isVisible()) && !(await page.locator('#alloc-card').isVisible()) && !(await page.locator('#hold-tools').isVisible()));
+    await page.locator('#summary [data-add]').click();
+    check('D7b tombolnya membuka lembar Tambah aset', await isOpen(page, 'asset-dlg'));
+    await page.selectOption('#f-type', 'cash');
+    await page.fill('#f-symbol', 'BCA');
+    await page.fill('#f-qty', '1000000');
+    await page.locator('#f-save').click();
+    await routed(page, `aset/${encodeURIComponent('cash:BCA')}`);
+    await nav(page, 'beranda');
+    check('D7c aset pertama (kas) langsung terhitung di total tanpa menunggu robot', (await page.locator('#summary .sum-value').innerText()) === idr.format(1_000_000));
+    check('D7d tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
   {
     const ctx = await browser.newContext({ viewport: { width: 800, height: 500 } });
     const page = await ctx.newPage();
-    for (const f of ['index.html', 'kelola.html']) {
-      await page.goto(pathToFileURL(path.join(ROOT, f)).href);
-      await page.waitForTimeout(300);
-      check(`D7 ${f} dari file:// -> petunjuk npm run serve`, /npm run serve/.test(await page.locator('#banner').innerText()));
-    }
+    await page.goto(pathToFileURL(path.join(ROOT, 'index.html')).href);
+    await page.waitForTimeout(300);
+    check('D8 index.html dari file:// -> petunjuk npm run serve', /npm run serve/.test(await page.locator('#banner').innerText()));
     await ctx.close();
   }
 
   // ============ G. jam pembaruan & penanda basi ============
   for (const [label, seedOpts, want] of [
-    ['G1 ada jam pembaruan', {}, { text: /^Diperbarui 23 Nov, 13\.30 WIB \(.+[\s\u00a0]lalu\)$/, stale: null }],
-    ['G2 jam pembaruan sudah 3 hari -> bertanda basi', { at: '2026-11-20T06:30:00Z' }, { text: /^Diperbarui 20 Nov, 13\.30 WIB \(\d+[\s\u00a0]hari[\s\u00a0]lalu\)$/, stale: true }],
+    ['G1 ada jam pembaruan', {}, { text: /^Diperbarui 23 Nov, 13\.30 WIB \(.+[\s ]lalu\)$/, stale: null }],
+    ['G2 jam pembaruan sudah 3 hari -> bertanda basi', { at: '2026-11-20T06:30:00Z' }, { text: /^Diperbarui 20 Nov, 13\.30 WIB \(\d+[\s ]hari[\s ]lalu\)$/, stale: true }],
     ['G3 snapshot lama tanpa jam -> tampil data per tanggal, tidak bertanda basi', { at: null }, { text: /^Data per 23 Nov 2026$/, stale: false }],
   ]) {
     const { ctx, page, fake } = await newPage({ seedOpts });
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     const sub = (await page.locator('#subtitle').innerText()).trim();
     const stale = await page.locator('#subtitle').evaluate((n) => n.classList.contains('stale'));
     check(`${label}`, want.text.test(sub) && (want.stale === null || stale === want.stale), `"${sub}" stale=${stale}`);
     if (label.startsWith('G1')) {
-      await nav(page, 'aset');
-      const price = await page.locator('#holdings dd[data-label="Harga"]').first().getAttribute('title');
-      check('G4 tooltip harga tidak lagi menyebut "Penutupan" (bisa harga tengah sesi)', /^Harga per /.test(price), price);
+      await goto(page, AH('idx:BBCA'));
+      check('G4 halaman aset: harga terakhir bertanggal ("per 23 Nov 2026"), bukan "penutupan"', /Harga terakhir\s*Rp\s[\d.]+\s*per 23 Nov 2026/i.test(await page.locator('#detail .stats').innerText()) && !/[Pp]enutupan/.test(await page.locator('#detail').innerText()));
       await nav(page, 'profil');
       const about = await page.locator('#v-profil .prose').innerText();
       check('G5 Profil > Tentang menyebut 4 kali sehari dan bukan "sekali sehari"', /4 kali sehari/.test(about) && !/sekali sehari/.test(about));
@@ -345,53 +543,37 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await ctx.close();
   }
 
-  // ============ H. tampilan baru ============
+  // ============ H. bawaan tersembunyi, kartu aset, muat ulang, kerangka ============
   {
-    // H1-H2: nominal tersembunyi secara bawaan; pilihan diingat
     const { ctx, page, fake } = await newPage({ freshStorage: true });
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     const secrets = secretsOf(fake);
     const t0 = await page.locator('main').textContent();
-    check('H1 kunjungan pertama: nominal tersembunyi (tanpa pernah menekan apa pun)', (await page.locator('#privacy').getAttribute('aria-label')) === 'Tampilkan nominal' && /••••••/.test(await page.locator('.kpi.hero .value').innerText()) && secrets.every((x) => !t0.includes(x)));
+    check('H1 kunjungan pertama: nominal tersembunyi (tanpa pernah menekan apa pun)', (await page.locator('#privacy').getAttribute('aria-label')) === 'Tampilkan nominal' && /••••••/.test(await page.locator('#summary .sum-value').innerText()) && secrets.every((x) => !t0.includes(x)));
     await page.getByRole('button', { name: 'Tampilkan nominal' }).click();
-    check('H2a setelah diketuk: nominal tampil dan tombol berganti nama', /Rp\s?\d/.test(await page.locator('.kpi.hero .value').innerText()) && (await page.locator('#privacy').getAttribute('aria-label')) === 'Sembunyikan nominal');
+    check('H2a setelah diketuk: nominal tampil dan tombol berganti nama', /Rp\s?\d/.test(await page.locator('#summary .sum-value').innerText()) && (await page.locator('#privacy').getAttribute('aria-label')) === 'Sembunyikan nominal');
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
-    check('H2b pilihan "tampil" diingat setelah muat ulang', /Rp\s?\d/.test(await page.locator('.kpi.hero .value').innerText()));
+    check('H2b pilihan "tampil" diingat setelah muat ulang', /Rp\s?\d/.test(await page.locator('#summary .sum-value').innerText()));
     await page.getByRole('button', { name: 'Sembunyikan nominal' }).click();
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
-    check('H2c pilihan "sembunyi" juga diingat', /••••••/.test(await page.locator('.kpi.hero .value').innerText()));
+    check('H2c pilihan "sembunyi" juga diingat', /••••••/.test(await page.locator('#summary .sum-value').innerText()));
     await ctx.close();
   }
   {
-    // H3-H6: kartu utama, rincian aset, muat ulang
     const { ctx, page, fake, env } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
-    check('H3 kartu utama punya mini-grafik tanpa teks/angka (aman saat nominal disembunyikan), berlabel "30 hari"', (await page.locator('.kpi.hero svg.spark path.line').count()) === 1 && (await page.locator('.kpi.hero svg.spark text').count()) === 0 && (await page.locator('.kpi.hero .spark-label').innerText()) === '30 hari');
-    const heroTxt = (await page.locator('.kpi.hero').innerText()).replace(/\n/g, ' ');
-    check('H4 kartu utama menampilkan "Hari ini" dan "Sejak beli" dengan panah dan tanda', /Hari ini\s*[▲▼]\s*[+−]\d+,\d{2}%/.test(heroTxt) && /Sejak beli\s*[▲▼]\s*[+−]\d+,\d{2}%/.test(heroTxt), heroTxt);
-    await nav(page, 'aset');
-    const row = page.locator('#holdings > li', { hasText: 'BBCA' });
-    check('H5a baris aset tertutup: rincian tidak terlihat', !(await row.locator('dd[data-label="Harga"]').isVisible()));
-    await row.locator('summary').click();
-    check('H5b ketuk baris -> rincian terbuka (harga, jumlah, untung/rugi, modal)', (await row.locator('dd[data-label="Harga"]').isVisible()) && /Jumlah/.test(await row.innerText()) && /Modal/.test(await row.innerText()));
-    await page.locator('#privacy').click(); // render ulang
-    check('H5c baris yang terbuka tetap terbuka setelah render ulang', await row.locator('dd[data-label="Harga"]').isVisible());
-    await nav(page, 'beranda');
-    await page.locator('.lg[data-type="idx"]').click();
-    await routed(page, 'aset/idx');
-    await page.getByRole('link', { name: /^Semua/ }).click();
-    await routed(page, 'aset');
-    check('H5d dan tetap terbuka setelah filter dipasang-dilepas', await row.locator('dd[data-label="Harga"]').isVisible());
+    const sum = flat(await page.locator('#summary').innerText());
+    check('H3 ringkasan: "hari ini" dengan panah dan tanda, lalu Modal, Untung, Terealisasi, Bulan ini', /[▲▼]\s?[+−]\d+,\d{2}%.*hari ini/.test(sum) && /Modal.*Untung\s*[▲▼]\s?[+−]\d+,\d{2}%.*Terealisasi\s*–.*Bulan ini/i.test(sum), sum);
+    check('H4 kartu aset: mini-grafik harga (bentuk saja, tanpa teks) untuk aset non-kas', (await page.locator('#holdings .hold svg.spark').count()) === 8 && (await page.locator('#holdings svg.spark text').count()) === 0);
+    const bbca = await page.locator('#holdings .hold', { hasText: 'BBCA' }).getAttribute('href');
+    check('H5 kartu aset menaut ke halaman asetnya', bbca === AH('idx:BBCA'), bbca);
 
     // muat ulang: panggilan baru ke Sheet, dan jam pembaruan ikut berganti
-    const hist = fake.call({ token: fake.token, action: 'list' }).history;
-    const lastSnap = hist.at(-1);
+    const lastSnap = sheetOf(fake).history.at(-1);
     const n0 = env.calls.length;
     fake.call({ token: fake.token, action: 'appendSnapshot', snapshot: { ...lastSnap, at: '2026-11-23T09:45:00Z' } });
     await page.getByRole('button', { name: 'Muat ulang', exact: true }).click();
@@ -401,10 +583,8 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await ctx.close();
   }
   {
-    // H7: kerangka pemuatan selama data lambat datang
     const { ctx, page, fake, env } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     env.delay = 1500;
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -415,134 +595,120 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await ctx.close();
   }
   {
-    // H8: kode aset pasar tampil huruf besar walau tersimpan huruf kecil; label manual dibiarkan
-    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+    // kode pasar huruf besar, label manual apa adanya; hanya satu hari data
     const fk = createFake();
     const assets = [{ type: 'us', symbol: 'panw', qty: 1, avgCost: 100 }, { type: 'manual', symbol: 'Depo Bca', qty: 1, price: 5_000_000, avgCost: 4_000_000 }];
     fk.call({ token: fk.token, action: 'saveAssets', assets });
     const snap = buildSnapshot({ date: '2026-11-23', assets, quotes: new Map([['us:panw', { price: 120, asOf: '2026-11-20' }], ['manual:Depo Bca', { price: 5_000_000, asOf: '2026-11-23' }]]), fx: 16_000 });
     fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...snap, at: '2026-11-23T06:30:00Z' } });
     const { ctx, page } = await newPage({ fake: fk });
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fk.token });
+    await openDash(page, fk);
     await page.waitForSelector('#dash:not([hidden])');
     const list = await page.locator('#holdings').innerText();
-    check('H8 "panw" tampil PANW; label manual "Depo Bca" tidak diubah', /PANW/.test(list) && !/panw/.test(list) && /Depo Bca/.test(list), list.replace(/\n/g, ' | ').slice(0, 120));
-    check('H8b hanya satu hari data: kartu utama tanpa mini-grafik dan memberi tahu "belum ada pembanding"', (await page.locator('.kpi.hero svg.spark').count()) === 0 && /belum ada pembanding/.test(await page.locator('.kpi.hero .today').innerText()));
+    check('H8 "panw" tampil PANW; label manual "Depo Bca" tidak diubah', /PANW/.test(list) && !/panw/.test(list) && /Depo Bca/.test(list), flat(list).slice(0, 120));
+    check('H8b hanya satu hari data: ringkasan memberi tahu "belum ada pembanding", grafik butuh 2 hari', /belum ada pembanding/.test(await page.locator('#summary .today').innerText()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()));
     await goto(page, '#/analisis/kinerja');
-    check('H8c hanya satu hari data: tab Kinerja memberi tahu butuh 2 hari, tanpa metrik palsu', /minimal 2 hari/.test(await page.locator('#months').innerText()) && (await page.locator('#metrics .tile').count()) === 0);
+    check('H8c hanya satu hari data: Kinerja memberi tahu butuh 2 hari, tanpa metrik palsu', /minimal 2 hari/.test(await page.locator('#months').innerText()) && (await page.locator('#metrics .tile').count()) === 0);
     await ctx.close();
   }
 
   // ============ I. identitas, menu, rute, urutan, garis modal, kinerja ============
   {
     const { ctx, page, fake, env, errors } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     check('I0 identitas: judul halaman dan nama Lumbung', (await page.title()) === 'Beranda · Lumbung' && (await page.locator('h1').innerText()) === 'Lumbung');
-
-    const views = () => page.evaluate(() => ['beranda', 'analisis', 'aset', 'profil'].map((k) => `${k}:${!document.getElementById(`v-${k}`).hidden}`).join());
-    check('I1 awal: hanya Beranda yang tampil', (await views()) === 'beranda:true,analisis:false,aset:false,profil:false', await views());
+    const views = () => page.evaluate(() => ['beranda', 'aset', 'analisis', 'aktivitas', 'profil'].map((k) => `${k}:${!document.getElementById(`v-${k}`).hidden}`).join());
+    check('I1 awal: hanya Beranda yang tampil', (await views()) === 'beranda:true,aset:false,analisis:false,aktivitas:false,profil:false', await views());
 
     // Pindah halaman tidak boleh mengambil data lagi (Apps Script lambat).
     const n0 = env.calls.length;
     const seen = [];
-    for (const k of ['analisis', 'aset', 'profil', 'beranda']) { await nav(page, k); seen.push(await views()); }
-    check('I2 pindah halaman lewat menu: satu halaman tampil tiap kali, TANPA memanggil Sheet lagi', env.calls.length === n0 && seen.every((v) => v.split(',').filter((x) => x.endsWith('true')).length === 1), `${env.calls.length - n0} panggilan tambahan`);
+    for (const k of ['analisis', 'aktivitas', 'profil', 'beranda']) { await nav(page, k); seen.push(await views()); }
+    await page.locator('#holdings .hold').first().click();
+    await page.waitForFunction(() => document.body.dataset.route.startsWith('aset/'));
+    seen.push(await views());
+    check('I2 pindah halaman (menu dan kartu aset): satu halaman tampil tiap kali, TANPA memanggil Sheet lagi', env.calls.length === n0 && seen.every((v) => v.split(',').filter((x) => x.endsWith('true')).length === 1), `${env.calls.length - n0} panggilan tambahan`);
+    check('I2b halaman aset: menu Beranda tetap aktif, judul dokumen "Aset"', (await page.locator('#nav-beranda').getAttribute('aria-current')) === 'page' && (await page.title()) === 'Aset · Lumbung');
+    await page.locator('#detail .back').click();
+    await routed(page, 'beranda');
     await nav(page, 'analisis');
     check('I3 judul dokumen dan fokus ikut pindah (pembaca layar tahu halaman berganti)', (await page.title()) === 'Analisis · Lumbung' && (await page.evaluate(() => document.activeElement.id)) === 'vt-analisis');
     await page.goBack();
     check('I4 tombol kembali membawa ke halaman sebelumnya', (await views()).startsWith('beranda:true') && (await page.locator('#nav-beranda').getAttribute('aria-current')) === 'page');
-    await page.goto(`${BASE}/index.html#/aset/crypto`);
+    await page.goto(`${BASE}/index.html${AH('crypto:ETH')}`);
     await page.waitForSelector('#v-aset:not([hidden])');
-    check('I5 tautan langsung #/aset/crypto: daftar Aset terfilter, chip Kripto aktif', (await page.locator('#holdings > li').count()) === 2 && /Kripto/.test(await page.locator('#chips a[aria-current="page"]').innerText()));
-    await goto(page, '#/aset/ngawur');
-    check('I5b jenis tak dikenal = Semua', (await page.locator('#holdings > li').count()) === 9 && /^Semua/.test(await page.locator('#chips a[aria-current="page"]').innerText()));
+    check('I5 tautan langsung ke satu aset: halaman aset terbuka setelah data dimuat', (await page.locator('#detail .d-name').innerText()) === 'Ethereum' && (await page.locator('#achart svg').count()) === 1);
+    await goto(page, AH('idx:ZZZZ'));
+    check('I5b aset yang tidak ada (mis. sudah terjual): pesan jelas dan tautan ke Aktivitas', /tidak ada lagi/.test(await page.locator('#detail').innerText()) && (await page.locator('#detail a[href="#/aktivitas"]').count()) === 1);
     await goto(page, '#/halaman-tidak-ada');
     check('I5c rute tak dikenal = Beranda', (await views()).startsWith('beranda:true'));
 
     // urutan aset
-    const L = fake.call({ token: fake.token, action: 'list' }).history.at(-1);
-    const want = (f) => [...L.positions].sort(f).map((p) => p.symbol).join();
-    const order = () => page.evaluate(() => [...document.querySelectorAll('#holdings details')].map((d) => d.dataset.key.split(':')[1]).join());
-    await nav(page, 'aset');
-    const byVal = await order();
-    await page.selectOption('#sort', 'pnlPct');
-    const byPnl = await order();
-    await page.selectOption('#sort', 'name');
-    const byName = await order();
-    check('I6 Urutkan: nilai, untung/rugi, nama', byVal === want((a, b) => b.value - a.value) && byPnl === want((a, b) => b.pnlPct - a.pnlPct) && byName === want((a, b) => a.name.localeCompare(b.name, 'id')), `${byPnl} | ${byName}`);
+    const L = sheetOf(fake).history.at(-1);
+    const want = (k) => stats.sortPositions(L.positions, k).map((p) => p.symbol).join();
+    const got = {};
+    for (const k of ['value', 'pnlPct', 'dayPct', 'name']) { await page.selectOption('#sort', k); got[k] = (await holdSyms(page)).join(); }
+    check('I6 Urutkan: nilai, untung, naik hari ini, nama', ['value', 'pnlPct', 'dayPct', 'name'].every((k) => got[k] === want(k)) && got.value !== got.name, JSON.stringify(got));
     await page.selectOption('#sort', 'value');
 
     // garis modal
-    await nav(page, 'beranda');
     check('I7 grafik nominal punya garis modal putus-putus dan keterangannya', (await page.locator('#chart path.cost').count()) === 1 && /Modal/.test(await page.locator('#chart-key').innerText()));
     await page.locator('#privacy').click();
     check('I7b saat tersembunyi (grafik persen): tanpa garis modal', (await page.locator('#chart path.cost').count()) === 0 && (await page.locator('#chart-key').innerText()) === '');
     await page.locator('#privacy').click();
 
     // kinerja, dibandingkan dengan hitungan dari riwayat tiruan
-    const { returnIndex, monthlyReturns } = await load('assets/stats.js');
-    const hist = fake.call({ token: fake.token, action: 'list' }).history;
-    const months = monthlyReturns(hist);
-    const p2 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v * 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+    const hist = sheetOf(fake).history;
+    const months = stats.monthlyReturns(hist);
     await goto(page, '#/analisis/kinerja');
     const tiles = await page.locator('#metrics .tile').allInnerTexts();
-    check('I8 Kinerja: 4 metrik; return tertimbang waktu = hitungan berantai dari dayPct', tiles.length === 4 && tiles[0].includes(p2(returnIndex(hist).at(-1).idx - 1)), tiles[0].replace(/\n/g, ' '));
+    check('I8 Kinerja: 4 metrik; return tertimbang waktu = hitungan berantai dari dayPct', tiles.length === 4 && tiles[0].includes(p2(stats.returnIndex(hist).at(-1).idx - 1)), flat(tiles[0]));
     check('I9 kalender: satu kotak per bulan (maks. 12) dengan panah dan tanda', (await page.locator('#months .mo').count()) === Math.min(12, months.length) && (await page.locator('#months .mo').last().innerText()).includes(p2(months.at(-1).ret)));
     const prOrder = (await page.locator('#perf .pr-n').allInnerTexts()).join();
     check('I10 untung/rugi per aset: satu batang per aset (tanpa Kas), terurut dari tertinggi', prOrder === [...L.positions].filter((p) => p.type !== 'cash').sort((a, b) => b.pnlPct - a.pnlPct).map((p) => p.symbol).join(), prOrder);
     await nav(page, 'beranda');
-    check('I11 kartu "Bulan ini" sama dengan bulan terakhir di kalender', (await page.locator('.kpi', { hasText: 'Bulan ini' }).innerText()).includes(p2(months.at(-1).ret)));
+    check('I11 ringkasan "Bulan ini" sama dengan bulan terakhir di kalender', flat(await page.locator('#summary').innerText()).includes(`Bulan ini ${months.at(-1).ret > 0 ? '▲' : '▼'} ${p2(months.at(-1).ret)}`.replace('▲ ', '▲').replace('▼ ', '▼')) || flat(await page.locator('#summary').innerText()).includes(p2(months.at(-1).ret)));
     check('I12 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 
   // ============ K. Analisis, cari aset, Profil, tema ============
   {
-    const stats = await load('assets/stats.js');
     const { ctx, page, fake, errors } = await newPage();
-    await page.goto(`${BASE}/index.html#/analisis`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake, '#/analisis');
     await page.waitForSelector('#v-analisis:not([hidden])');
-    const hist = fake.call({ token: fake.token, action: 'list' }).history;
+    const hist = sheetOf(fake).history;
     const L = hist.at(-1);
-    const p2 = (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v * 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-    const p1 = (v) => `${(v * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
     check('K1 #/analisis tanpa bagian = Kinerja; sub-menu menandai bagian yang aktif', (await page.locator('#an-kinerja').isVisible()) && !(await page.locator('#an-risiko').isVisible()) && /Kinerja/.test(await page.locator('#subnav a[aria-current="page"]').innerText()));
 
-    // Alokasi
     await page.locator('#subnav').getByRole('link', { name: 'Alokasi' }).click();
     await routed(page, 'analisis/alokasi');
     const ts = stats.byTypePnl(L.positions);
     const tOrder = Object.keys(ts).sort((a, b) => ts[b].value - ts[a].value);
-    const hrefs = await page.locator('#types a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
-    check('K2 Alokasi: satu baris per jenis, urut dari nilai terbesar, tiap baris menaut ke Aset terfilter', JSON.stringify(hrefs) === JSON.stringify(tOrder.map((t) => `#/aset/${t}`)), hrefs.join());
-    check('K2b untung/rugi jenis terbesar = hitungan dari posisi', (await page.locator('#types a').first().innerText()).includes(p2(ts[tOrder[0]].pnlPct)));
+    const filters = await page.locator('#types .ty').evaluateAll((as) => as.map((a) => a.dataset.filter));
+    check('K2 Alokasi: satu baris per jenis, urut dari nilai terbesar', JSON.stringify(filters) === JSON.stringify(tOrder), filters.join());
+    check('K2b untung/rugi jenis terbesar = hitungan dari posisi', (await page.locator('#types .ty').first().innerText()).includes(p2(ts[tOrder[0]].pnlPct)));
     const c = stats.concentration(L.positions.filter((p) => p.type !== 'cash'));
     const split = stats.cashSplit(L);
     const ct = await page.locator('#conc .tile').allInnerTexts();
-    check('K3 Alokasi: Kas, Diinvestasikan, lalu 3 aset terbesar dan "setara N aset" (di luar kas) sesuai hitungan', ct.length === 4 && /^Kas/.test(ct[0]) && ct[0].includes(p1(split.weight)) && /^Diinvestasikan/.test(ct[1]) && ct[2].includes(p1(c.top3)) && ct[3].includes(`${c.effective.toLocaleString('id-ID', { maximumFractionDigits: 1 })} aset`), ct.join(' | ').replace(/\n/g, ' '));
-    check('K3b baris jenis Kas tidak menampilkan untung/rugi (selalu nol)', !/[▲▼]|0,00%/.test(await page.locator('#types a[href="#/aset/cash"]').innerText()));
+    check('K3 Alokasi: Kas, Diinvestasikan, lalu 3 aset terbesar dan "setara N aset" (di luar kas) sesuai hitungan', ct.length === 4 && /^Kas/i.test(ct[0]) && ct[0].includes(p1(split.weight)) && /^Diinvestasikan/i.test(ct[1]) && ct[2].includes(p1(c.top3)) && ct[3].includes(`${c.effective.toLocaleString('id-ID', { maximumFractionDigits: 1 })} aset`), flat(ct.join(' | ')));
+    check('K3b baris jenis Kas tidak menampilkan untung/rugi (selalu nol)', !/[▲▼]|0,00%/.test(await page.locator('#types .ty[data-filter="cash"]').innerText()));
+    await page.locator('#types .ty[data-filter="crypto"]').click();
+    await routed(page, 'beranda');
+    check('K3c ketuk jenis di Analisis > Alokasi -> Beranda dengan daftar tersaring jenis itu', JSON.stringify((await holdSyms(page)).sort()) === '["BTC","ETH"]' && (await page.locator('#chips [data-filter="crypto"]').getAttribute('aria-pressed')) === 'true');
+    await page.locator('#chips [data-filter=""]').click();
 
-    await goto(page, '#/analisis/kinerja');
-    check('K3c batang untung/rugi per aset tidak memuat Kas', !(await page.locator('#perf .pr-n').allInnerTexts()).includes('KAS'));
-
-    // Risiko
-    await goto(page, '#/analisis/alokasi');
-    await page.locator('#subnav').getByRole('link', { name: 'Risiko' }).click();
-    await routed(page, 'analisis/risiko');
+    await goto(page, '#/analisis/risiko');
     const r = stats.riskStats(hist);
     const dd = stats.currentDrawdown(stats.returnIndex(hist));
     const rt = await page.locator('#risk .tile').allInnerTexts();
-    check('K4 Risiko: volatilitas, penurunan saat ini, hari terbaik dan terburuk sesuai hitungan', rt.length === 4 && rt[0].includes(p1(r.vol)) && rt[1].includes(p2(dd.pct)) && rt[2].includes(p2(r.best.pct)) && rt[3].includes(p2(r.worst.pct)), rt.join(' | ').replace(/\n/g, ' '));
+    check('K4 Risiko: volatilitas, penurunan saat ini, hari terbaik dan terburuk sesuai hitungan', rt.length === 4 && rt[0].includes(p1(r.vol)) && rt[1].includes(p2(dd.pct)) && rt[2].includes(p2(r.best.pct)) && rt[3].includes(p2(r.worst.pct)), flat(rt.join(' | ')));
 
-    // Riwayat
     await page.locator('#subnav').getByRole('link', { name: 'Riwayat' }).click();
     await routed(page, 'analisis/riwayat');
     const rows = () => page.locator('#hist tbody tr').count();
-    const first = (await page.locator('#hist tbody tr').first().innerText()).replace(/\s+/g, ' ');
+    const first = flat(await page.locator('#hist tbody tr').first().innerText());
     check('K5 Riwayat: 30 hari dulu, terbaru di atas (23 Nov 2026), dengan nilai dan persen', (await rows()) === 30 && /^23 Nov 2026 Rp/.test(first) && /[▲▼]/.test(first), first);
     await page.locator('#hist-more').click();
     const after1 = await rows();
@@ -552,9 +718,9 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     check('K5c nominal tersembunyi: kolom Nilai tersamar, persen tetap', !/\d{1,3}(\.\d{3}){2,}/.test(await page.locator('#hist tbody').innerText()) && /[+−]\d+,\d{2}%/.test(await page.locator('#hist tbody').innerText()));
     await page.locator('#privacy').click();
 
-    // Cari aset
-    await goto(page, '#/aset');
-    const nAset = () => page.locator('#holdings details').count();
+    // Cari aset (di Beranda)
+    await nav(page, 'beranda');
+    const nAset = () => page.locator('#holdings .hold').count();
     await page.locator('#q').pressSequentially('ba');
     check('K6 mengetik di kolom cari tidak menghilangkan fokus atau isinya', (await page.evaluate(() => document.activeElement.id)) === 'q' && (await page.inputValue('#q')) === 'ba');
     await page.fill('#q', 'bank');
@@ -563,10 +729,11 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     check('K6c cari lewat kode (besar/kecil sama saja)', (await nAset()) === 1 && /Telkom/.test(await page.locator('#holdings').innerText()));
     await page.fill('#q', 'zzz');
     check('K6d tidak ada yang cocok: pesan jelas', (await nAset()) === 0 && /Tidak ada aset yang cocok/.test(await page.locator('#holdings').innerText()));
-    await goto(page, '#/aset/crypto');
     await page.fill('#q', 'eth');
+    await page.locator('#chips [data-filter="crypto"]').click();
     check('K6e filter jenis dan cari digabung', (await nAset()) === 1 && /Ethereum/.test(await page.locator('#holdings').innerText()) && /1 dari 9 aset/.test(await page.locator('#filter-note').innerText()));
     await page.fill('#q', '');
+    await page.locator('#chips [data-filter=""]').click();
 
     // Profil
     await nav(page, 'profil');
@@ -575,25 +742,26 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     check('K7b saklar -> nominal tersembunyi; tombol mata di header dan penyimpanan ikut', (await page.locator('#set-hide').getAttribute('aria-checked')) === 'true' && (await page.locator('#privacy').getAttribute('aria-label')) === 'Tampilkan nominal' && (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === '1');
     await page.locator('#privacy').click();
     check('K7c tombol mata di header mengembalikan saklar', (await page.locator('#set-hide').getAttribute('aria-checked')) === 'false');
-    check('K7d data: jumlah aset, hari riwayat, versi skrip', new RegExp(`^9 aset, riwayat ${hist.length} hari\\. Skrip Apps Script versi \\d`).test(await page.locator('#set-data').innerText()), await page.locator('#set-data').innerText());
+    check('K7d data: jumlah aset, hari riwayat, transaksi, versi skrip', new RegExp(`^9 aset, riwayat ${hist.length} hari, 0 transaksi\\. Skrip Apps Script versi 3\\.$`).test(await page.locator('#set-data').innerText()), await page.locator('#set-data').innerText());
     check('K7e target belum diatur', /Belum diatur/.test(await page.locator('#set-goal').innerText()));
     await page.locator('#v-profil [data-goal="open"]').click();
     await page.fill('#goal-input', '150000000');
     await page.getByRole('button', { name: 'Simpan' }).click();
-    const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
     check('K8 target diatur dari Profil: tampil di Profil, dan di Beranda', (await page.locator('#set-goal').innerText()).includes(idr.format(150_000_000)) && (await page.locator('#goal').textContent()).includes(idr.format(150_000_000)));
     await page.locator('#set-hide').click();
     check('K8b nominal tersembunyi: target di Profil ikut tersamar', !(await page.locator('#set-goal').innerText()).includes('150.000.000'));
+    await page.locator('#v-profil [data-add]').click();
+    check('K8c Profil > Data > "Tambah aset" membuka lembar Tambah', await isOpen(page, 'asset-dlg'));
+    await page.locator('#f-cancel').click();
     check('K9 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
   {
     // Tema: Otomatis mengikuti perangkat; Terang/Gelap memaksa; pilihan diingat dan terpasang sebelum halaman digambar
-    const LIGHT = 'rgb(245, 241, 234)', DARK = 'rgb(17, 18, 37)';
+    const LIGHT = 'rgb(242, 243, 247)', DARK = 'rgb(13, 14, 19)';
     for (const [deviceDark, forced, forcedBg, deviceBg] of [[false, 'dark', DARK, LIGHT], [true, 'light', LIGHT, DARK]]) {
       const { ctx, page, fake } = await newPage({ dark: deviceDark });
-      await page.goto(`${BASE}/index.html#/profil`);
-      await connect(page, { token: fake.token });
+      await openDash(page, fake, '#/profil');
       await page.waitForSelector('#v-profil:not([hidden])');
       const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       const tag = deviceDark ? 'perangkat gelap' : 'perangkat terang';
@@ -610,82 +778,65 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     }
   }
 
-  // ============ J. halaman depan: sorotan, pergerakan hari ini, target ============
+  // ============ J. sorotan dan target ============
   {
-    const { dayMovers } = await load('assets/stats.js');
     const { ctx, page, fake, errors } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
-    const L = fake.call({ token: fake.token, action: 'list' }).history.at(-1);
-    const pctTxt = (w) => `${(w * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`;
-
-    // Sorotan
+    const L = sheetOf(fake).history.at(-1);
     const top = [...L.positions].filter((p) => !['manual', 'cash'].includes(p.type)).sort((a, b) => b.weight - a.weight)[0];
     const ins = await page.locator('#insight-list').innerText();
-    check('J1 sorotan: aset terbesar (≥30%) diperingatkan dengan bobotnya, tanpa nominal', top.weight >= 0.3 && ins.includes(top.name) && ins.includes(pctTxt(top.weight)) && !/Rp|\d{1,3}(\.\d{3}){2,}/.test(ins), ins.replace(/\n/g, ' '));
-    check('J1b sorotan punya judul tersembunyi untuk pembaca layar dan tidak menyaingi tab', (await page.locator('#ins-h').innerText()) === 'Perlu diperhatikan');
+    check('J1 sorotan: aset terbesar (≥30%) diperingatkan dengan bobotnya, tanpa nominal', top.weight >= 0.3 && ins.includes(top.name) && ins.includes(p1(top.weight)) && !/Rp|\d{1,3}(\.\d{3}){2,}/.test(ins), flat(ins));
+    check('J1b sorotan punya judul tersembunyi untuk pembaca layar', (await page.locator('#ins-h').textContent()) === 'Perlu diperhatikan');
 
-    // Pergerakan hari ini
-    const mv = dayMovers(L.positions);
-    const names = (grp) => page.locator('.mv-group', { hasText: grp }).locator('.n').evaluateAll((els) => els.map((e) => e.firstChild.textContent.trim()));
-    const sym = (p) => (p.type === 'manual' ? p.symbol : String(p.symbol).toUpperCase());
-    check('J2 pergerakan hari ini: naik dan turun terbanyak sesuai hitungan, urut menurut persen', JSON.stringify(await names('Naik terbanyak')) === JSON.stringify(mv.gainers.map(sym)) && JSON.stringify(await names('Turun terbanyak')) === JSON.stringify(mv.losers.map(sym)), `${await names('Naik terbanyak')} | ${await names('Turun terbanyak')}`);
-    check('J2b setiap baris pergerakan memakai panah dan tanda', /▲\s*\+\d/.test(await page.locator('.mv-group', { hasText: 'Naik terbanyak' }).innerText()) && /▼\s*−\d/.test(await page.locator('.mv-group', { hasText: 'Turun terbanyak' }).innerText()));
-
-    // Target
     check('J3 belum ada target: ajakan dan tombol Atur target', /Tetapkan target/.test(await page.locator('#goal').innerText()) && (await page.locator('#goal [data-goal="open"]').innerText()) === 'Atur target');
     await page.locator('#goal [data-goal="open"]').click();
-    check('J3b dialog terbuka, "Hapus target" belum tampil', (await page.locator('#goal-dlg').evaluate((d) => d.open)) && !(await page.locator('#goal-del').isVisible()));
+    check('J3b dialog terbuka, "Hapus target" belum tampil', (await isOpen(page, 'goal-dlg')) && !(await page.locator('#goal-del').isVisible()));
     for (const bad of ['', '0', '-5']) {
       await page.fill('#goal-input', bad);
-      await page.getByRole('button', { name: 'Simpan' }).click();
-      if (!(await page.locator('#goal-err').isVisible()) || !(await page.locator('#goal-dlg').evaluate((d) => d.open))) { check(`J4 target "${bad}" ditolak dan dialog tetap terbuka`, false); break; }
+      await page.locator('#goal-form').getByRole('button', { name: 'Simpan' }).click();
+      if (!(await page.locator('#goal-err').isVisible()) || !(await isOpen(page, 'goal-dlg'))) { check(`J4 target "${bad}" ditolak dan dialog tetap terbuka`, false); break; }
     }
     check('J4 target kosong, 0, atau negatif ditolak; tidak ada yang tersimpan', (await page.evaluate(() => localStorage.getItem('pf-goal'))) === null);
     const goal = 150_000_000;
     await page.fill('#goal-input', String(goal));
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
+    await page.locator('#goal-form').getByRole('button', { name: 'Simpan' }).click();
     const wantPct = Math.floor((L.total / goal) * 100);
-    const gtxt = await page.locator('#goal').innerText();
-    check('J5 target tersimpan: persen = total ÷ target (dibulatkan ke bawah), sisa dan target tampil', !(await page.locator('#goal-dlg').evaluate((d) => d.open)) && gtxt.includes(`${wantPct}%`) && gtxt.includes(idr.format(goal)) && gtxt.includes(`Sisa ${idr.format(goal - L.total)}`), gtxt.replace(/\n/g, ' '));
-    check('J5b cincin punya label untuk pembaca layar', (await page.locator('#goal .ring').getAttribute('aria-label')) === `${wantPct} persen menuju target`);
+    const gtxt = nb(await page.locator('#goal').innerText());
+    check('J5 target tersimpan: persen = total ÷ target (dibulatkan ke bawah), sisa dan target tampil', !(await isOpen(page, 'goal-dlg')) && gtxt.includes(`${wantPct}%`) && gtxt.includes(nb(idr.format(goal))) && gtxt.includes(nb(`Sisa ${idr.format(goal - L.total)}`)), flat(gtxt));
+    check('J5b cincin punya label untuk pembaca layar; ringkasan menampilkan garis kemajuan', (await page.locator('#goal .ring').getAttribute('aria-label')) === `${wantPct} persen menuju target` && (await page.locator('#summary .goal-line').innerText()).includes(`${wantPct}% dari target`));
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
     check('J6 target diingat setelah muat ulang', (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
 
-    // nominal tersembunyi: target dan sisa ikut disamarkan, persen tetap
     await page.locator('#privacy').click();
     const hid = await page.locator('main').textContent();
     check('J7 nominal tersembunyi: target dan sisa tidak bocor, persen tetap', !hid.includes(idr.format(goal)) && !hid.includes(idr.format(goal - L.total)) && (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
     await page.locator('#privacy').click();
 
-    // ubah, batal, hapus
     await page.locator('#goal [data-goal="open"]').click();
     check('J8 dialog ubah terisi target lama dan menawarkan Hapus', (await page.inputValue('#goal-input')) === String(goal) && (await page.locator('#goal-del').isVisible()));
     await page.fill('#goal-input', '1000');
-    await page.getByRole('button', { name: 'Batal' }).click();
+    await page.locator('#goal-form').getByRole('button', { name: 'Batal' }).click();
     check('J8b Batal tidak mengubah target', (await page.evaluate(() => localStorage.getItem('pf-goal'))) === String(goal));
     await page.locator('#goal [data-goal="open"]').click();
-    await page.fill('#goal-input', '1000'); // jauh di bawah total
-    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.fill('#goal-input', '1000');
+    await page.locator('#goal-form').getByRole('button', { name: 'Simpan' }).click();
     check('J9 target sudah terlewati: "Target tercapai", cincin 100%', /Target tercapai/.test(await page.locator('#goal').innerText()) && (await page.locator('#goal .hole').innerText()) === '100%');
     await page.locator('#goal [data-goal="open"]').click();
     await page.getByRole('button', { name: 'Hapus target' }).click();
     check('J10 Hapus target: kembali ke ajakan dan localStorage bersih', /Tetapkan target/.test(await page.locator('#goal').innerText()) && (await page.evaluate(() => localStorage.getItem('pf-goal'))) === null);
 
-    // tata letak desktop: Alokasi dan Target bertumpuk di kanan grafik, Pergerakan di bawah keduanya
+    // tata letak desktop: grafik dan daftar di kiri, Alokasi dan Target bertumpuk di kanan
     const bb = (sel) => page.locator(sel).boundingBox();
-    const [chart, alloc, g, mvBox] = [await bb('.g-chart'), await bb('.g-alloc'), await bb('.g-goal'), await bb('.g-moves')];
-    check('J11 desktop: Alokasi dan Target bertumpuk di kolom kanan; Pergerakan di bawah grafik', Math.abs(alloc.x - g.x) < 1 && g.y >= alloc.y + alloc.height && alloc.x > chart.x + chart.width - 1 && mvBox.y >= chart.y + chart.height && mvBox.y >= g.y + g.height - 1, JSON.stringify({ chart, alloc, g, mvBox }));
+    const [sumB, chart, hold, alloc, g] = [await bb('#summary'), await bb('#chart-card'), await bb('#holdings-sec'), await bb('#alloc-card'), await bb('#goal')];
+    check('J11 desktop: ringkasan, grafik, daftar di kolom kiri; Alokasi lalu Target di kolom kanan', alloc.x > chart.x + chart.width - 1 && Math.abs(alloc.y - sumB.y) < 2 && g.y > alloc.y + alloc.height && hold.y > chart.y + chart.height && Math.abs(hold.x - chart.x) < 1, JSON.stringify({ chart, alloc, g, hold }));
     check('J12 tanpa error konsol', errors.length === 0, errors.join(' | '));
-    await shot(page, 'v5-dash.png', { fullPage: true });
+    await shot(page, 'beranda-desktop.png', { fullPage: true });
     await ctx.close();
   }
   {
-    // portofolio seimbang (5 aset x 20%, 5 jenis) dan hanya satu hari data: tanpa sorotan, tanpa pembanding
-    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+    // portofolio seimbang (5 aset x 20%, 5 jenis): tanpa sorotan
     const fk = createFake();
     const assets = [
       { type: 'idx', symbol: 'AAA', qty: 1, avgCost: 90 }, { type: 'us', symbol: 'BBB', qty: 1, avgCost: 90 },
@@ -696,28 +847,22 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     const quotes = new Map(assets.map((a) => [`${a.type}:${a.symbol}`, { price: 100, asOf: '2026-11-23' }]));
     fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...buildSnapshot({ date: '2026-11-23', assets, quotes, fx: 1 }), at: '2026-11-23T06:30:00Z' } });
     const { ctx, page } = await newPage({ fake: fk });
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fk.token });
+    await openDash(page, fk);
     await page.waitForSelector('#dash:not([hidden])');
     check('J13 portofolio seimbang: tidak ada sorotan sama sekali', !(await page.locator('#insights').isVisible()) && (await page.locator('.insight').count()) === 0);
-    check('J14 satu hari data: pergerakan hari ini memberi tahu belum ada pembanding', /Belum ada pergerakan/.test(await page.locator('#movers').innerText()) && (await page.locator('.mv-group').count()) === 0);
     await ctx.close();
   }
 
   // ============ L. Kas ============
   {
-    // Form Kelola: jenis Kas hanya label, saldo, dan mata uang
     const { ctx, page, fake, errors } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
-    await page.waitForSelector('#dash:not([hidden])');
-    await page.locator('#nav-kelola').click();
-    await page.waitForSelector('#list-card:not([hidden])');
-    const list = () => fake.call({ token: fake.token, action: 'list' }).assets;
-    const kas = (await page.locator('#assets li', { hasText: 'KAS' }).innerText()).replace(/\s+/g, ' ');
-    check('L1 Kas contoh tampil sebagai Kas dengan saldo (bukan harga/modal)', /Kas · KAS · saldo Rp\s?3\.000\.000/.test(kas) && !/modal/.test(kas), kas);
+    await openDash(page, fake);
+    const list = () => sheetOf(fake).assets;
+    await goto(page, AH('cash:KAS'));
+    const kas = flat(await page.locator('#detail .stats').textContent());
+    check('L1 halaman Kas: Saldo dan bobot, tanpa Harga, Modal, Untung', nb(kas).includes(nb(`Saldo${idr.format(3_000_000)}`)) && !/Harga|Modal|Untung/.test(kas) && !(await page.locator('#achart').count()), kas);
 
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
+    await page.locator('#nav-add').click();
     // Isi dulu sebagai saham lalu ganti ke Kas: kolom yang sempat terisi tidak boleh ikut tersimpan.
     await page.selectOption('#f-type', 'idx');
     await page.fill('#f-avgCost', '9999');
@@ -725,40 +870,39 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.selectOption('#f-type', 'cash');
     const shown = async (sels) => Promise.all(sels.map((q) => page.locator(q).isVisible()));
     const yes = await shown(['#f-symbol', '#f-name', '#f-qty', '#f-currency']);
-    const no = await shown(['#f-avgCost', '#f-buyDate', '#f-price', '#f-coingeckoId', '#form .adv']);
+    const no = await shown(['#f-avgCost', '#f-buyDate', '#f-price', '#f-coingeckoId', '#asset-form .adv']);
     check('L2 jenis Kas: hanya label, nama, saldo, mata uang; harga beli, tanggal, harga, ID CoinGecko, opsi lanjutan tersembunyi', yes.every(Boolean) && no.every((v) => !v), `tampil ${yes} | tersembunyi ${no}`);
     check('L2b label menyesuaikan jenis: "Label" dan "Saldo"', /^Label/.test(await page.locator('#l-symbol').innerText()) && /^Saldo/.test(await page.locator('#l-qty').innerText()));
     await page.fill('#f-symbol', 'dolar');
     await page.fill('#f-qty', '0');
     await page.selectOption('#f-currency', 'USD');
-    await page.getByRole('button', { name: 'Simpan' }).click();
+    await page.locator('#f-save').click();
     await page.waitForSelector('#f-err:not([hidden])');
-    check('L3 saldo 0 ditolak dengan pesan jelas, dialog tetap terbuka, Sheet tidak berubah', /qty harus/.test(await page.locator('#f-err').innerText()) && (await page.locator('#dlg').evaluate((d) => d.open)) && list().length === 9);
+    check('L3 saldo 0 ditolak dengan pesan jelas, lembar tetap terbuka, Sheet tidak berubah', /qty harus/.test(await page.locator('#f-err').innerText()) && (await isOpen(page, 'asset-dlg')) && list().length === 9);
     await page.fill('#f-qty', '1500');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    await page.locator('#f-save').click();
+    await routed(page, `aset/${encodeURIComponent('cash:dolar')}`);
     const usd = list().find((a) => a.symbol === 'dolar');
     check('L4 Kas dolar tersimpan: label apa adanya (tidak dibesarkan), saldo, USD; tanpa harga beli, harga, tanggal', !!usd && usd.type === 'cash' && usd.qty === 1500 && usd.currency === 'USD' && !usd.avgCost && !usd.price && !usd.buyDate, JSON.stringify(usd));
-    check('L4b daftar menampilkan saldo dalam dolar', /saldo US\$\s?1\.500,00/.test((await page.locator('#assets li', { hasText: 'dolar' }).innerText()).replace(/\s+/g, ' ')));
+    const L = sheetOf(fake).history.at(-1);
+    const dol = nb(flat(await page.locator('#detail .stats').textContent()));
+    check('L4b halaman kas dolar langsung terhitung: saldo dolar, setara rupiah dengan kurs terakhir', dol.includes(nb(`Saldo${usdF.format(1500)}`)) && dol.includes(nb(`Setara rupiah${idr.format(Math.round(1500 * L.fx))}`)) && dol.includes(nb(`kurs ${idr.format(L.fx)}`)), dol);
 
-    // ubah: terisi ulang, lalu ganti jenis memunculkan kembali kolom yang disembunyikan
-    const idx = list().findIndex((a) => a.symbol === 'dolar');
-    await page.locator(`[data-edit="${idx}"]`).click();
+    await page.locator('[data-act="edit"]').click();
     check('L5 ubah Kas: jenis, saldo, dan mata uang terisi ulang', (await page.inputValue('#f-type')) === 'cash' && (await page.inputValue('#f-qty')) === '1500' && (await page.inputValue('#f-currency')) === 'USD');
     await page.selectOption('#f-type', 'idx');
     check('L5b ganti jenis ke Saham IDX: harga beli dan tanggal muncul lagi', (await page.locator('#f-avgCost').isVisible()) && (await page.locator('#f-buyDate').isVisible()));
     await page.selectOption('#f-type', 'cash');
     await page.fill('#f-qty', '2000');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
+    await page.locator('#f-save').click();
+    await page.waitForFunction(() => !document.getElementById('asset-dlg').open);
     const after = list().find((a) => a.symbol === 'dolar');
     check('L5c saldo diubah dan tetap Kas dolar tanpa kolom lain', after.qty === 2000 && after.type === 'cash' && after.currency === 'USD' && !after.avgCost);
     check('L6 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
   {
-    // Tampilan Kas: 2 kas (rupiah + dolar) dan 1 saham. Kas dikecualikan dari konsentrasi dan batang untung/rugi.
-    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+    // 2 kas (rupiah + dolar) dan 1 saham. Kas dikecualikan dari konsentrasi dan batang untung/rugi.
     const fk = createFake();
     const assets = [
       { type: 'cash', symbol: 'BCA', name: 'Rekening BCA', qty: 5_000_000 },
@@ -768,32 +912,24 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     fk.call({ token: fk.token, action: 'saveAssets', assets });
     const quotes = new Map([['cash:BCA', { price: 1, asOf: '2026-11-23' }], ['cash:DOLAR', { price: 1, asOf: '2026-11-23' }], ['idx:BBCA', { price: 10_000, asOf: '2026-11-23' }]]);
     fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...buildSnapshot({ date: '2026-11-23', assets, quotes, fx: 16_000 }), at: '2026-11-23T06:30:00Z' } });
-    const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 });
-    const usdF = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'USD' });
-    const nb = (x) => x.replace(/\s/g, ' '); // Intl memakai spasi tak-terputus; teks halaman dinormalkan, jadi harapan juga
     const secrets = [idr.format(21_000_000), idr.format(5_000_000), usdF.format(1000), idr.format(16_000_000), idr.format(22_000_000), idr.format(1_000_000)];
 
     const { ctx, page, errors } = await newPage({ fake: fk });
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fk.token });
+    await openDash(page, fk);
     await page.waitForSelector('#dash:not([hidden])');
-    check('L7 Beranda: Kas masuk alokasi (95,5%), dan kas yang mendominasi TIDAK memicu sorotan konsentrasi', /Kas\s*95,5%/.test((await page.locator('#legend').innerText()).replace(/\s+/g, ' ')) && !(await page.locator('#insights').isVisible()));
-
-    await goto(page, '#/aset/cash');
-    check('L8 Aset > Kas: dua baris; chip "Kas (2)" aktif', (await page.locator('#holdings details').count()) === 2 && /Kas \(2\)/.test(await page.locator('#chips a[aria-current="page"]').innerText()));
-    await page.evaluate(() => document.querySelectorAll('#holdings details').forEach((d) => { d.open = true; }));
-    const bca = (await page.locator('#holdings li', { hasText: 'Rekening BCA' }).innerText()).replace(/\s+/g, ' ');
-    const dol = (await page.locator('#holdings li', { hasText: 'DOLAR' }).innerText()).replace(/\s+/g, ' ');
-    check('L8b rincian Kas rupiah: hanya Saldo (tanpa Harga, Modal, Untung/rugi)', bca.includes(nb(`Saldo ${idr.format(5_000_000)}`)) && !/Harga|Modal|Untung/.test(bca), bca);
-    check('L8c rincian Kas dolar: saldo dalam dolar, setara rupiah, dan kurs', dol.includes(nb(`Saldo ${usdF.format(1000)}`)) && dol.includes(nb(`Setara rupiah ${idr.format(16_000_000)}`)) && dol.includes(nb(`kurs ${idr.format(16_000)}`)), dol);
+    check('L7 Beranda: Kas masuk alokasi (95,5%), dan kas yang mendominasi TIDAK memicu sorotan konsentrasi', /Kas\s*95,5%/.test(flat(await page.locator('#legend').innerText())) && !(await page.locator('#insights').isVisible()));
+    await page.locator('#chips [data-filter="cash"]').click();
+    check('L8 chip Kas: dua kartu kas, tanpa mini-grafik', (await page.locator('#holdings .hold').count()) === 2 && (await page.locator('#holdings svg.spark').count()) === 0);
+    await page.locator('#chips [data-filter=""]').click();
 
     await goto(page, '#/analisis/alokasi');
-    const t = (await page.locator('#conc .tile').allInnerTexts()).map((x) => x.replace(/\s+/g, ' '));
-    check('L9 Alokasi: Kas = rekening + dolar, Diinvestasikan = saham saja', t[0].includes(nb(idr.format(21_000_000))) && t[0].includes('95,5%') && t[1].includes(nb(idr.format(1_000_000))), t.join(' | '));
+    const t = (await page.locator('#conc .tile').allInnerTexts()).map(flat);
+    check('L9 Alokasi: Kas = rekening + dolar, Diinvestasikan = saham saja', nb(t[0]).includes(nb(idr.format(21_000_000))) && t[0].includes('95,5%') && nb(t[1]).includes(nb(idr.format(1_000_000))), t.join(' | '));
     check('L9b konsentrasi dihitung di antara yang diinvestasikan: satu saham = "setara 1 aset", 100%', t[2].includes('100%') && t[3].includes('1 aset'), t[2] + ' | ' + t[3]);
     await goto(page, '#/analisis/kinerja');
     check('L9c batang untung/rugi hanya saham (Kas tidak ikut)', (await page.locator('#perf .pr-n').allInnerTexts()).join() === 'BBCA');
 
+    await goto(page, AH('cash:DOLAR'));
     const normal = await page.locator('main').textContent();
     check('L10 kontrol: saat nominal tampil, saldo kas ada di halaman', secrets.filter((x) => normal.includes(x)).length >= 4);
     await page.locator('#privacy').click();
@@ -806,12 +942,10 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
   // ============ M. ketahanan: web lama vs data baru, galat terisolasi, berkas berversi ============
   {
     // M1: jenis aset yang belum dikenal (mis. robot sudah lebih baru dari web di cache HP) tidak boleh membekukan dasbor
-    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
     const fk = createFake();
     const assets = [{ type: 'idx', symbol: 'BBCA', qty: 100, avgCost: 9000 }, { type: 'cash', symbol: 'KAS', qty: 1_000_000 }];
     fk.call({ token: fk.token, action: 'saveAssets', assets });
     const snap = buildSnapshot({ date: '2026-11-23', assets, quotes: new Map([['idx:BBCA', { price: 10_000, asOf: '2026-11-23' }], ['cash:KAS', { price: 1, asOf: '2026-11-23' }]]), fx: null });
-    // ubah jenis kas jadi jenis yang belum ada di versi web ini
     for (const p of snap.positions) if (p.type === 'cash') p.type = 'jenisbaru';
     snap.byType = { idx: snap.byType.idx, jenisbaru: snap.byType.cash };
     fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...snap, at: '2026-11-23T06:30:00Z' } });
@@ -821,115 +955,115 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await page.goto(`${BASE}/index.html`);
     await connect(page, { token: fk.token });
     await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).catch(() => {}); // bila membeku: gagal jelas, bukan menghentikan suite
-    check('M1 jenis aset tak dikenal: dasbor tetap terbuka (kerangka hilang, menu tampil), tanpa pesan galat', !(await page.locator('#skeleton').isVisible()) && (await page.locator('#kpis .hero').isVisible()) && !(await page.locator('#render-err').isVisible()) && errors.length === 0, errors.join(' | '));
-    await goto(page, '#/aset').catch(() => {});
-    check('M1b aset berjenis tak dikenal tetap terdaftar dengan labelnya', /jenisbaru/.test(await page.locator('#holdings').innerText()) && (await page.locator('#holdings details').count()) === 2);
+    check('M1 riwayat memuat jenis aset tak dikenal: dasbor tetap terbuka (kerangka hilang, ringkasan tampil), tanpa pesan galat', !(await page.locator('#skeleton').isVisible()) && (await page.locator('#summary .sum-value').isVisible()) && !(await page.locator('#render-err').isVisible()) && errors.length === 0, errors.join(' | '));
     const unversioned = reqs.filter((u) => !/\?v=[0-9a-f]{10}$/.test(u));
     check('M3 semua JS/CSS dimuat dengan penanda versi (?v=), termasuk impor di dalam modul', reqs.length >= 10 && unversioned.length === 0, unversioned.join(', ') || `${reqs.length} berkas`);
     await ctx.close();
   }
   {
-    // M2: bila satu bagian gagal digambar, bagian lain tetap jalan dan pesannya terlihat (bukan kerangka abadi)
+    // M1b: daftar aset di Sheet berisi jenis tak dikenal: tetap terdaftar, tidak bisa dibuka di form (agar tidak tersimpan rusak)
     const fk = createFake();
-    const { seedFake } = await load('test/e2e/seed.mjs');
+    fk.call({ token: fk.token, action: 'saveAssets', assets: [{ type: 'idx', symbol: 'BBCA', qty: 1, avgCost: 1 }] });
+    const { ctx, page, env, errors } = await newPage({ fake: fk });
+    env.fake = { token: fk.token, call: (p) => { const r = fk.call(p); if (r.assets) r.assets.push({ type: 'jenisbaru', symbol: 'X', qty: 1 }); return r; } };
+    await openDash(page, fk);
+    await page.waitForSelector('#dash:not([hidden])');
+    check('M1b aset berjenis tak dikenal tetap terdaftar dengan labelnya', /jenisbaru/.test(await page.locator('#holdings').innerText()));
+    await goto(page, AH('jenisbaru:X'));
+    await page.locator('[data-act="edit"]').click();
+    check('M1c membuka Ubah untuk jenis tak dikenal: lembar tidak terbuka, ada pesan', !(await isOpen(page, 'asset-dlg')) && /belum dikenal/.test(await toastText(page)) && errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+  {
+    // M2: riwayat berbentuk aneh: bukan kerangka abadi, tapi pesan jelas; Profil (Keluar) tetap terjangkau
+    const fk = createFake();
     seedFake(fk, { days: 3 });
-    const env0 = fk.call({ token: fk.token, action: 'list' }).history;
-    fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...env0.at(-1), positions: 'rusak' } }); // data cacat
+    const last = sheetOf(fk).history.at(-1);
+    fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...last, positions: 'rusak' } }); // data cacat
     const { ctx, page } = await newPage({ fake: fk });
     await page.goto(`${BASE}/index.html`);
     await connect(page, { token: fk.token });
     await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).catch(() => {});
-    const msg = await page.locator('#render-err').innerText();
-    check('M2 data cacat: kerangka tetap hilang, menu tampil, pesan galat menyebut bagian yang gagal', !(await page.locator('#skeleton').isVisible()) && /gagal digambar/.test(msg) && /Beranda/.test(msg), msg.replace(/\n/g, ' '));
+    const msg = await page.locator('#banner').innerText();
+    check('M2 data cacat: kerangka hilang, menu tampil, pesan menyebut data tidak terbaca', !(await page.locator('#skeleton').isVisible()) && (await page.locator('#nav').isVisible()) && /tidak terbaca/.test(msg), flat(msg));
     await nav(page, 'profil');
-    check('M2b bagian yang sehat (Profil) tetap bisa dipakai', (await page.locator('#v-profil').isVisible()) && (await page.locator('#logout').isVisible()));
+    check('M2b Profil tetap bisa dipakai', (await page.locator('#v-profil').isVisible()) && (await page.locator('#logout').isVisible()));
     await ctx.close();
   }
-
-  // ============ F. skrip Apps Script LAMA (belum mengenal tanggal beli) ============
   {
-    const { ctx, page, fake, env } = await newPage();
-    const sent = [];
-    env.fake = { token: fake.token, call: (p) => {
-      try { const q = JSON.parse(p); if (q.action === 'saveAssets') sent.push(...q.assets); } catch {}
-      const r = fake.call(p);
-      if (r && r.version) delete r.version; // skrip lama tidak melaporkan versi
-      return r;
-    } };
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
-    await page.waitForSelector('#dash:not([hidden])');
-    await page.goto(`${BASE}/kelola.html`);
-    await page.waitForSelector('#list-card:not([hidden])');
-    const bn = await page.locator('#banner');
-    check('F1 skrip lama -> banner peringatan (bukan merah) dengan petunjuk Deploy', /versi lama/.test(await bn.innerText()) && /New version/.test(await bn.innerText()) && !(await bn.evaluate((b) => b.classList.contains('error'))));
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
-    check('F2 kolom tanggal beli disembunyikan di form', !(await page.locator('#buy-field').isVisible()));
-    await page.fill('#f-symbol', 'ASII'); await page.fill('#f-qty', '1'); await page.fill('#f-avgCost', '5000');
-    await page.getByRole('button', { name: 'Simpan' }).click();
-    await page.waitForFunction(() => !document.getElementById('dlg').open);
-    const asii = fake.call({ token: fake.token, action: 'list' }).assets.find((a) => a.symbol === 'ASII');
-    check('F3 menyimpan tetap berhasil, tanpa pernah mengirim buyDate ke skrip lama', !!asii && !sent.some((a) => 'buyDate' in a && a.symbol !== 'BBCA'), `terkirim buyDate: ${sent.filter((a) => 'buyDate' in a).map((a) => a.symbol).join() || 'tidak ada'}`);
+    // M2c: satu bagian gagal digambar (catatan transaksi rusak): bagian lain tetap jalan dan pesannya terlihat
+    const fk = createFake();
+    seedFake(fk, { days: 20 });
+    const { ctx, page, env } = await newPage({ fake: fk });
+    env.fake = { token: fk.token, call: (p) => { const r = fk.call(p); if (r.history) r.transactions = 'rusak'; return r; } };
+    await openDash(page, fk);
+    await page.waitForSelector('#render-err:not([hidden])', { timeout: 5000 }).catch(() => {});
+    const msg = await page.locator('#render-err').innerText();
+    check('M2c bagian yang gagal disebut namanya (Beranda, Aktivitas), kerangka hilang', /gagal digambar/.test(msg) && /Beranda/.test(msg) && /Aktivitas/.test(msg) && !(await page.locator('#skeleton').isVisible()), flat(msg));
+    await nav(page, 'analisis');
+    check('M2d bagian yang sehat (Analisis) tetap tampil dengan angkanya', (await page.locator('#metrics .tile').count()) === 4);
     await ctx.close();
   }
 
-  // ============ E. HP, gelap ============
+  // ============ E. HP (gelap) dan desktop ============
   {
     const { ctx, page, fake, errors } = await newPage({ w: 390, h: 844, dark: true });
     await page.goto(`${BASE}/index.html`);
-    await shot(page, 'v2-m-connect.png');
+    await shot(page, 'm-connect.png');
     check('E0 sebelum tersambung: menu utama belum tampil', !(await page.locator('#nav').isVisible()));
     await connect(page, { token: fake.token });
     await page.waitForSelector('#dash:not([hidden])');
+    // ada satu transaksi supaya baris Aktivitas ikut diperiksa
+    await goto(page, AH('idx:BBCA'));
+    await page.locator('[data-act="sell"]').click();
+    await page.fill('#t-qty', '100');
+    await shot(page, 'm-jual.png');
+    const sheetFits = await page.locator('#trade-dlg').evaluate((d) => { const r = d.getBoundingClientRect(); const s = document.getElementById('t-save').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && s.bottom <= innerHeight && s.top >= 0; });
+    check('E3 HP: lembar Jual muat di layar dan tombol simpannya terlihat', sheetFits);
+    await page.locator('#t-save').click();
+    await page.waitForFunction(() => !document.getElementById('trade-dlg').open);
 
     // Target sentuh: aturan proyek minimal 44 px (HP dulu). Elemen yang tersembunyi tidak ikut (lebar 0).
     const tooSmall = (sel) => page.evaluate((q) => [...document.querySelectorAll(q)].filter((el) => { const r = el.getBoundingClientRect(); return r.width && (r.height < 44 || r.width < 44); }).map((el) => `${el.id || el.textContent.trim().slice(0, 20)} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`), sel);
-    const TOUCH = '#nav a, #subnav a, .seg button, .lg, .ty, .chips a, #q, #sort, .asset-row summary, .switch, #set-theme, .set-actions .btn, .set-row .btn, #hist-more, #privacy, #reload, #goal .btn, #logout';
+    const TOUCH = '#nav a, #nav-add, #subnav a, .seg button, .lg, .ty, #chips button, #q, #sort, .hold, .act, .back, .tx, .switch, #set-theme, .set-actions .btn, .set-row .btn, #hist-more, #privacy, #reload, #goal .btn, #logout';
     const small = [], over = [];
-    for (const r of ['beranda', 'analisis/kinerja', 'analisis/alokasi', 'analisis/risiko', 'analisis/riwayat', 'aset', 'aset/crypto', 'profil']) {
+    for (const r of ['beranda', 'analisis/kinerja', 'analisis/alokasi', 'analisis/risiko', 'analisis/riwayat', 'aktivitas', 'profil', `aset/${encodeURIComponent('crypto:ETH')}`, `aset/${encodeURIComponent('cash:KAS')}`]) {
       await goto(page, `#/${r}`);
       await page.waitForTimeout(60);
       const o = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
       if (o > 0) over.push(`${r}:${o}px`);
       small.push(...(await tooSmall(TOUCH)).map((x) => `${r}> ${x}`));
-      await shot(page, `v6-m-${r.replace('/', '_')}.png`, { fullPage: true });
+      await shot(page, `m-${r.replace(/[/%]/g, '_')}.png`, { fullPage: true });
     }
-    check('E1 HP: setiap halaman (8 rute) tanpa scroll horizontal', over.length === 0, over.join());
+    check('E1 HP: setiap halaman (9 rute, termasuk halaman aset dan Aktivitas) tanpa scroll horizontal', over.length === 0, over.join());
+    for (const id of ['asset-dlg']) {
+      await page.locator('#nav-add').click();
+      small.push(...(await tooSmall('#asset-dlg .btn, #asset-dlg input, #asset-dlg select, #asset-dlg summary')).map((x) => `${id}> ${x}`));
+      await page.locator('#f-cancel').click();
+    }
+    check('E5 HP: tombol, menu, kartu, kolom, dan pilihan di semua halaman minimal 44×44 px', small.length === 0, small.join(', '));
 
-    // Menu bawah: menempel di dasar layar walau halaman digulir, dan tidak menutupi isi paling bawah
     await goto(page, '#/beranda');
     await page.evaluate(() => scrollTo(0, document.body.scrollHeight));
-    const nb = await page.locator('#nav').boundingBox();
-    check('E6 HP: menu utama menempel di dasar layar walau halaman digulir ke bawah', Math.abs(nb.y + nb.height - 844) <= 1 && nb.width === 390, JSON.stringify(nb));
+    const nbx = await page.locator('#nav').boundingBox();
+    check('E6 HP: menu utama menempel di dasar layar walau halaman digulir ke bawah', Math.abs(nbx.y + nbx.height - 844) <= 1 && nbx.width === 390, JSON.stringify(nbx));
     const clear = await page.evaluate(() => document.querySelector('#v-beranda .foot').getBoundingClientRect().bottom <= document.getElementById('nav').getBoundingClientRect().top + 0.5);
     check('E7 HP: isi paling bawah tidak tertutup menu', clear);
-
-    await page.goto(`${BASE}/kelola.html`);
-    await page.waitForSelector('#list-card:not([hidden])');
-    const ov2 = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
-    check('E2 HP kelola: tanpa scroll horizontal', ov2.sw <= ov2.iw, JSON.stringify(ov2));
-    const kn = await page.locator('#nav a').evaluateAll((as) => as.map((a) => `${a.textContent.trim()}${a.getAttribute('aria-current') ? '*' : ''}`).join());
-    check('E2b kelola memakai menu yang sama; Kelola aktif', kn === 'Beranda,Analisis,Aset,Kelola*,Profil', kn);
-    check('E2c kelola: tautan menu menuju halaman yang benar', (await page.locator('#nav-beranda').getAttribute('href')) === 'index.html#/beranda' && (await page.locator('#nav-profil').getAttribute('href')) === 'index.html#/profil');
-    small.push(...(await tooSmall(`${TOUCH}, #assets .btn, #add`)).map((x) => `kelola> ${x}`));
-    check('E5 HP: tombol, menu, tautan, kolom, dan pilihan di semua halaman minimal 44×44 px', small.length === 0, small.join(', '));
-    await shot(page, 'v6-m-kelola.png', { fullPage: true });
-    await page.getByRole('button', { name: '+ Tambah aset' }).click();
-    await shot(page, 'v2-m-form.png');
-    const fits = await page.locator('#dlg').evaluate((d) => { const r = d.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; });
-    check('E3 HP: dialog form muat di layar', fits);
+    const addBox = await page.locator('#nav-add svg').boundingBox();
+    check('E7b HP: tombol + di tengah menu bawah', Math.abs(addBox.x + addBox.width / 2 - 195) < 4, JSON.stringify(addBox));
     check('E4 HP: tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
   {
-    // Desktop: menu jadi bilah atas yang menempel saat menggulir
     const { ctx, page, fake } = await newPage();
-    await page.goto(`${BASE}/index.html`);
-    await connect(page, { token: fake.token });
+    await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     await page.evaluate(() => scrollTo(0, 600));
-    const nb = await page.locator('#nav').boundingBox();
-    check('E8 desktop: menu utama jadi bilah atas yang menempel saat menggulir', Math.abs(nb.y) <= 1 && nb.width > 600 && nb.height < 80, JSON.stringify(nb));
+    const nbx = await page.locator('#nav').boundingBox();
+    check('E8 desktop: menu utama jadi bilah atas yang menempel saat menggulir, dengan tombol Tambah berlabel', Math.abs(nbx.y) <= 1 && nbx.width > 600 && nbx.height < 80 && (await page.locator('#nav-add').innerText()).trim() === 'Tambah', JSON.stringify(nbx));
+    await page.locator('#nav-add').click();
+    const dlg = await page.locator('#asset-dlg').boundingBox();
+    check('E9 desktop: lembar tampil di tengah layar, bukan menempel di bawah', dlg.y > 10 && Math.abs(dlg.x + dlg.width / 2 - 640) < 2, JSON.stringify(dlg));
     await ctx.close();
   }
 

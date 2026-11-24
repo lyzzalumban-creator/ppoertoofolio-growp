@@ -2,14 +2,14 @@
 // HTML baru dengan modul lama (atau sebaliknya); dasbor pernah macet karenanya. Setiap URL web diberi ?v=<hash isi
 // semua berkas web>, dan import map di HTML memetakan tiap modul (termasuk impor di dalam modul) ke URL berversi itu.
 // Begitu isi berubah, versinya berubah, browser wajib mengambil semuanya baru.
-//   npm run versi   -> perbarui index.html dan kelola.html (test/version.test.mjs gagal bila lupa)
+//   npm run versi   -> perbarui index.html (test/version.test.mjs gagal bila lupa)
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const PAGES = { 'index.html': 'assets/app.js', 'kelola.html': 'assets/kelola.js' };
+export const PAGES = { 'index.html': 'assets/app.js' };
 const CLASSIC = ['assets/theme.js', 'assets/nofile.js', 'assets/style.css'];
 
 /** Semua modul yang dicapai dari entry lewat `import ... from './…'` (path relatif dari akar repo). */
