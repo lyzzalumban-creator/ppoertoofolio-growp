@@ -1,6 +1,6 @@
 // Aktivitas: dua bagian. Jual-beli (keuntungan terealisasi, tukar mata uang) dan Trading emas (profit per bulan).
 // Ketuk satu baris untuk rinciannya (dan menghapus catatan).
-import { $, MASK, reveal, ticker, arrow, esc, fMonth, fNum, fUsd, longDate, monthName, money, state, symDisp, toMs, todayWib, tone } from '../lib.js';
+import { $, MASK, arrow, esc, fMonth, fNum, fUsd, longDate, monthName, money, state, symDisp, toMs, todayWib, tone } from '../lib.js';
 import { fxStats, realized } from '../../scripts/lib/trade.mjs';
 import { barChart, sparkline, watch } from './chart.js';
 import { openTx } from './sheets.js';
@@ -105,8 +105,6 @@ function renderTrading() {
 export function render() {
   renderJualBeli();
   renderTrading();
-  ticker($('realized').querySelector('.sum-value'));
-  ticker($('fxsum').querySelector('.sum-value'));
 }
 
 const SUBS = ['jual-beli', 'trading'];
@@ -120,7 +118,6 @@ export function show(sub) {
     else a.removeAttribute('aria-current');
   }
   if (s === 'trading') drawFx();
-  reveal($(s === 'trading' ? 'fxlist' : 'txs'));
 }
 
 for (const id of ['txs', 'fxlist']) {

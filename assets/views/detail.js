@@ -1,6 +1,6 @@
 // Halaman satu aset (#/aset/<jenis:kode>): nilai, grafik harga, statistik, tombol Beli/Jual/Ubah/Hapus, aktivitasnya.
 import { currencyOf } from '../../scripts/lib/portfolio.mjs';
-import { $, ICON, MASK, ticker, toast, assetName, canFx, canTrade, colorOf, delta, esc, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
+import { $, ICON, MASK, toast, assetName, canFx, canTrade, colorOf, delta, esc, fIdr, fNum, fUsd, heldText, keyOf, latest, longDate, money, pct, state, symDisp, toMs, tone, arrow, typeOf, weightText } from '../lib.js';
 import { inRange, lineChart, rangesHtml, watch } from './chart.js';
 import { openAssetForm, openConvert, openTrade, openTx, openWithdraw, removeAsset } from './sheets.js';
 import { txRow } from './aktivitas.js';
@@ -92,7 +92,6 @@ export function render() {
     <section class="card" aria-labelledby="d-act-h"><h2 id="d-act-h">Aktivitas</h2>
       ${trades.length ? `<ul class="tx-list">${trades.map(txRow).join('')}</ul>` : '<p class="muted">Belum ada jual-beli untuk aset ini.</p>'}
     </section>`;
-  ticker($('detail').querySelector('.d-value'));
   if (!cash) drawChart();
 }
 

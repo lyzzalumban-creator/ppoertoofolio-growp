@@ -1,6 +1,6 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, MASK, ORDER, reveal, replay, ticker, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
@@ -179,7 +179,7 @@ function renderGoal() {
   }
   const p = Math.floor(f * 100); // 99,8% tampil 99%, bukan 100% sebelum benar-benar tercapai
   $('goal').innerHTML = `<div class="goal">
-    <div class="ring" role="img" aria-label="${p} persen menuju target" style="--p:${(f * 100).toFixed(2)}%"><div class="hole">${p}%</div></div>
+    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(var(--accent) ${(f * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
     <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
       <p class="g-sub">${f >= 1 ? 'Target tercapai' : `Sisa ${money(state.goal - L.total)}`}</p>
       <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
@@ -194,7 +194,6 @@ function setGoal(v) {
 
 export function render() {
   renderSummary();
-  ticker($('summary').querySelector('.sum-value'));
   renderInsights();
   renderHeat();
   renderHoldings();
@@ -207,9 +206,6 @@ export function render() {
 
 export function show() {
   if (state.series.length) drawChart();
-  reveal($('holdings'));
-  replay($('donut'));
-  replay($('goal').querySelector('.ring'));
 }
 
 // ---------- interaksi ----------

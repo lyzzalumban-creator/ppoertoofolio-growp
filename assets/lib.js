@@ -133,60 +133,6 @@ export function heldText(buyDate) {
 
 export const tile = (label, value, note) => `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
 
-// ---------- efek gerak (ala Magic UI, ditulis murni tanpa library) ----------
-
-/** Tenang = tanpa animasi: perangkat meminta gerak dikurangi, atau dijalankan tes otomatis (hasil akhir langsung terbaca). */
-const calm = () => navigator.webdriver || matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/**
- * Number Ticker: angka di `el` (sudah berisi teks akhir) berhitung dari nilai sebelumnya ke nilai baru (dari 0 saat
- * pertama muncul). Hanya bagian angka yang berubah; nominal tersembunyi (tanpa angka) dibiarkan.
- */
-const TOKEN = /\d[\d.]*(?:,\d+)?/;
-export function ticker(el) {
-  if (!el) return;
-  const text = el.textContent;
-  const m = TOKEN.exec(text);
-  const was = el._tick;
-  el._tick = null;
-  if (!m || calm() || text === el._last) { el._last = text; return; }
-  el._last = text;
-  const to = Number(m[0].replace(/\./g, '').replace(',', '.'));
-  const dec = m[0].includes(',') ? m[0].split(',')[1].length : 0;
-  const nf = new Intl.NumberFormat('id-ID', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-  const from = Number.isFinite(was) ? was : 0;
-  const t0 = performance.now();
-  const dur = 700;
-  const step = (now) => {
-    const k = Math.min(1, (now - t0) / dur);
-    const v = from + (to - from) * (1 - (1 - k) ** 3);
-    el._tick = v;
-    el.textContent = text.replace(m[0], nf.format(k === 1 ? to : v));
-    if (k < 1 && el._last === text) requestAnimationFrame(step);
-    else el._tick = to;
-  };
-  requestAnimationFrame(step);
-}
-
-/** Animated List: anak-anak (li) masuk satu per satu dari bawah; dipanggil saat halaman dibuka. */
-export function reveal(el) {
-  if (!el || calm()) return;
-  [...el.querySelectorAll('li')].slice(0, 12).forEach((c, i) => c.style.setProperty('--i', i));
-  el.classList.remove('reveal');
-  void el.offsetWidth;
-  el.classList.add('reveal');
-  clearTimeout(el._rv);
-  el._rv = setTimeout(() => el.classList.remove('reveal'), 900);
-}
-
-/** Putar ulang animasi CSS (cincin/donat terisi) pada elemen yang tetap ada. */
-export function replay(el, cls = 'sweep') {
-  if (!el || calm()) return;
-  el.classList.remove(cls);
-  void el.offsetWidth;
-  el.classList.add(cls);
-}
-
 // Pesan singkat di bawah layar (mis. "Tersimpan"). role=status: dibacakan pembaca layar.
 let toastT = 0;
 export function toast(msg) {
