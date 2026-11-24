@@ -228,3 +228,21 @@ test('liveView: aset dolar tanpa kurs di snapshot -> menunggu, bukan angka salah
   const { pending } = liveView([A2, { type: 'cash', symbol: 'USD', qty: 10, currency: 'USD' }], [s1, sNoFx]);
   assert.deepEqual(pending.map((a) => a.symbol), ['AAPL', 'USD']);
 });
+
+import { treemap } from '../assets/stats.js';
+test('treemap: luas petak sebanding nilai, semua di dalam kotak, tanpa tumpang tindih', () => {
+  const items = [50, 25, 12, 8, 4, 1].map((value, i) => ({ id: i, value }));
+  const r = treemap(items, 100, 90);
+  assert.equal(r.length, 6);
+  const total = 100;
+  for (const t of r) {
+    assert.ok(t.x >= -1e-9 && t.y >= -1e-9 && t.x + t.w <= 100 + 1e-9 && t.y + t.h <= 90 + 1e-9);
+    assert.ok(Math.abs((t.w * t.h) / (100 * 90) - t.item.value / total) < 1e-9);
+  }
+  for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+    const a = r[i], b = r[j];
+    assert.ok(a.x + a.w <= b.x + 1e-9 || b.x + b.w <= a.x + 1e-9 || a.y + a.h <= b.y + 1e-9 || b.y + b.h <= a.y + 1e-9, `petak ${i} dan ${j} bertumpuk`);
+  }
+  assert.equal(treemap([{ value: 0 }, { value: -3 }]).length, 0); // nilai nol/negatif diabaikan
+  assert.equal(treemap([{ value: 5 }], 100, 50)[0].w, 100);
+});
