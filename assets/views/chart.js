@@ -36,7 +36,7 @@ function niceTicks(min, max, n = 4) {
 
 /**
  * Gambar grafik area ke `box`: isi berwarna penuh selebar kotak, garis putus-putus vertikal di titik terpilih,
- * gelembung nilai di titik itu, dan tanggalnya di bawah. Bawaan menunjuk titik terakhir; sentuh/geser untuk memilih.
+ * gelembung nilai di titik itu, dan tanggalnya di bawah. Detail dan garis modal hanya tampil saat disentuh/diarahkan.
  * pts = [{ t, date, y, c? }] (c = garis modal, opsional). opts: { fmtTip(p) -> html nilai, label, empty, height }.
  */
 export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
@@ -105,6 +105,7 @@ export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
   const last = pts[pts.length - 1];
   place(last);
   const show = (ev) => {
+    box.classList.add('on');
     const r = svg.getBoundingClientRect();
     const px = ((ev.clientX - r.left) / r.width) * W;
     let best = pts[0];
@@ -114,9 +115,10 @@ export function lineChart(box, pts, { fmtTip, label, empty, height } = {}) {
   const hit = svg.querySelector('.hit');
   hit.addEventListener('pointermove', show);
   hit.addEventListener('pointerdown', show);
-  // Detail hanya selama disentuh atau diarahkan; saat jari diangkat atau kursor pergi, kembali ke titik terakhir.
-  hit.addEventListener('pointerleave', () => place(last));
-  hit.addEventListener('pointercancel', () => place(last));
+  // Diam: grafik bersih (hanya garis dan area nilai). Disentuh atau diarahkan: garis modal, kursor, gelembung, dan tanggal muncul; hilang saat jari diangkat atau kursor pergi.
+  const rest = () => { box.classList.remove('on'); place(last); };
+  hit.addEventListener('pointerleave', rest);
+  hit.addEventListener('pointercancel', rest);
 }
 
 /** Gambar ulang saat lebar kotak berubah (termasuk saat halamannya baru dibuka). */
@@ -169,6 +171,7 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty } = {}) {
       <text class="bv ${dir}" x="${cx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle">${esc(fmtV(it.v))}</text>
       <text class="bl" x="${cx.toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(it.label)}</text>`;
   }).join('');
+  box.classList.add('on'); // batang: gelembung diatur lewat atribut hidden, bukan kelas ini
   box.innerHTML = `<svg class="chart bars" viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(aria || '')}"><g class="axis">${grid}</g>${bars}</svg><div class="tip" hidden></div>`;
   // Sentuh (atau arahkan) satu batang: gelembung berisi bulan dan nilainya; hilang saat jari diangkat atau kursor pergi.
   const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), rects = svg.querySelectorAll('rect.bar');
