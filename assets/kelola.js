@@ -46,7 +46,7 @@ function renderList() {
     const meta = a.type === 'cash'
       ? [t.label, a.symbol, `saldo ${fmt.format(a.qty)}`]
       : [t.label, a.symbol, qty, `modal ${fmt.format(a.avgCost)} per unit`, a.buyDate ? `dibeli ${longDate(a.buyDate)}` : null];
-    return `<li><div class="asset-info"><i class="dot" style="background:var(--c-${esc(a.type)})"></i><div><strong>${esc(a.name || a.symbol)}</strong>
+    return `<li><div class="asset-info"><i class="dot" style="background:var(--c-${TYPE[a.type] ? a.type : 'manual'})"></i><div><strong>${esc(a.name || a.symbol)}</strong>
         <small>${esc(meta.filter(Boolean).join(' · '))}</small></div></div>
       <div class="row"><button class="btn" type="button" data-edit="${i}" aria-label="Ubah ${esc(a.name || a.symbol)}">Ubah</button><button class="btn" type="button" data-del="${i}" aria-label="Hapus ${esc(a.name || a.symbol)}">Hapus</button></div></li>`;
   }).join('') || '<li class="muted">Belum ada aset. Tekan “Tambah aset”.</li>';
@@ -91,6 +91,8 @@ function syncType() {
 }
 
 function openForm(i) {
+  // Jenis yang belum dikenal halaman ini (web lama di cache): jangan dibuka di form, nanti tersimpan rusak.
+  if (i != null && !TYPE[assets[i].type]) return status(`Jenis "${assets[i].type}" belum dikenal halaman ini. Muat ulang paksa halaman, lalu coba lagi.`);
   editing = i;
   const a = i == null ? { type: 'idx', currency: 'IDR' } : assets[i];
   $('dlg-h').textContent = i == null ? 'Tambah aset' : 'Ubah aset';

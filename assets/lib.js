@@ -11,6 +11,12 @@ export const TYPE = {
   manual: { label: 'Lainnya', unit: 'unit' },
 };
 export const ORDER = Object.keys(TYPE);
+// Jenis yang belum dikenal versi ini (mis. HP masih memegang web lama dari cache, sementara robot sudah menulis jenis baru)
+// tetap tampil dengan label apa adanya dan warna netral, bukan membuat seluruh dasbor berhenti.
+export const typeOf = (t) => TYPE[t] || { label: String(t || 'Lainnya'), unit: '' };
+export const colorOf = (t) => `var(--c-${TYPE[t] ? t : 'manual'})`;
+/** Urutan tampil jenis-jenis yang ada di data: yang dikenal menurut ORDER, sisanya di belakang. */
+export const typesIn = (keys) => [...ORDER.filter((t) => keys.includes(t)), ...keys.filter((t) => !TYPE[t])];
 export const MASK = '••••••';
 export const DAY = 86_400_000;
 

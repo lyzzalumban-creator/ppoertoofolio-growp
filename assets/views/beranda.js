@@ -1,5 +1,5 @@
 // Beranda: angka utama, sorotan, grafik, pergerakan hari ini, alokasi ringkas, target.
-import { $, ICON, ORDER, TYPE, arrow, delta, esc, fMonthLong, latest, money, notify, pct, state, symDisp, toMs, tone, weightText } from '../lib.js';
+import { $, ICON, ORDER, TYPE, arrow, colorOf, delta, esc, fMonthLong, latest, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { dayMovers, goalProgress, insights } from '../stats.js';
 import { drawChart, initChart, renderChart, renderRanges } from './chart.js';
 
@@ -44,8 +44,8 @@ function renderInsights() {
 
 function moverList(title, rows) {
   if (!rows.length) return '';
-  return `<div class="mv-group"><h3>${title}</h3><ul class="mv">${rows.map((p) => `<li><i class="dot" style="background:var(--c-${p.type})"></i>
-    <span class="n">${esc(symDisp(p))}<small>${esc(p.name && p.name !== p.symbol ? p.name : TYPE[p.type].label)}</small></span>
+  return `<div class="mv-group"><h3>${title}</h3><ul class="mv">${rows.map((p) => `<li><i class="dot" style="background:${colorOf(p.type)}"></i>
+    <span class="n">${esc(symDisp(p))}<small>${esc(p.name && p.name !== p.symbol ? p.name : typeOf(p.type).label)}</small></span>
     <span class="v">${delta(p.dayPct)}<small class="flat">${esc(money(p.dayAmt, { sign: true }))}</small></span></li>`).join('')}</ul></div>`;
 }
 
@@ -59,13 +59,13 @@ function renderMovers() {
 // Alokasi ringkas: tiap jenis adalah tautan ke daftar Aset yang sudah terfilter.
 function renderAlloc() {
   const L = latest();
-  const types = ORDER.filter((t) => L.byType && L.byType[t]);
+  const types = typesIn(Object.keys(L.byType || {}));
   let acc = 0;
   const stops = types.map((t, i) => {
     const from = acc;
     acc += L.byType[t].weight * 100;
     const to = i === types.length - 1 ? 100 : acc;
-    return `var(--c-${t}) ${from.toFixed(3)}% ${to.toFixed(3)}%`;
+    return `${colorOf(t)} ${from.toFixed(3)}% ${to.toFixed(3)}%`;
   });
   const donut = $('donut');
   donut.style.background = stops.length ? `conic-gradient(${stops.join(',')})` : '';
@@ -73,7 +73,7 @@ function renderAlloc() {
   $('legend').innerHTML = types.map((t) => {
     const b = L.byType[t];
     return `<li><a class="lg" href="#/aset/${t}" data-type="${t}">
-      <i class="sw" style="background:var(--c-${t})"></i><span class="nm">${TYPE[t].label}</span><span class="pc">${weightText(b.weight)}</span>
+      <i class="sw" style="background:${colorOf(t)}"></i><span class="nm">${esc(typeOf(t).label)}</span><span class="pc">${weightText(b.weight)}</span>
       <span class="am">${money(b.value)}</span></a></li>`;
   }).join('');
 }

@@ -41,16 +41,37 @@ function renderHeader() {
 
 // ---------- gambar semua halaman ----------
 
+// Galat di satu bagian tidak boleh membekukan yang lain. Dulu satu jenis aset yang tak dikenal (web lama di cache,
+// data dari robot baru) membuat kerangka pemuatan tidak pernah hilang. Sekarang bagian yang gagal dilaporkan, sisanya jalan.
+const failed = new Map(); // bagian -> pesan galat
+function safely(name, fn) {
+  try {
+    fn();
+    failed.delete(name);
+  } catch (e) {
+    failed.set(name, (e && e.message) || String(e));
+    console.error(e);
+  }
+}
+function reportFailures() {
+  const b = $('render-err');
+  b.hidden = !failed.size;
+  if (failed.size) b.innerHTML = `<strong>Sebagian tampilan gagal digambar (${esc([...failed.keys()].join(', '))}).</strong><br>Muat ulang halaman. Bila pesan ini tetap muncul, kirim teks ini: <code>${esc([...failed.values()][0])}</code>`;
+}
+
 function render() {
   if (state.snapshots.length) {
-    const index = returnIndex(state.snapshots);
-    state.perf = { index, months: monthlyReturns(state.snapshots), dd: maxDrawdown(index) };
-    renderHeader();
-    beranda.render();
-    analisis.render();
-    aset.render();
+    safely('Hitungan', () => {
+      const index = returnIndex(state.snapshots);
+      state.perf = { index, months: monthlyReturns(state.snapshots), dd: maxDrawdown(index) };
+    });
+    safely('Header', renderHeader);
+    safely('Beranda', beranda.render);
+    safely('Analisis', analisis.render);
+    safely('Aset', aset.render);
   }
-  profil.render(); // Profil tetap hidup walau data belum ada
+  safely('Profil', profil.render); // Profil tetap hidup walau data belum ada
+  reportFailures();
 }
 subscribe(render);
 
@@ -67,7 +88,11 @@ function route(byUser) {
   $('v-profil').hidden = !(view === 'profil' && (mode === 'dash' || mode === 'empty' || mode === 'error'));
   setActive(view);
   document.title = mode === 'connect' ? 'Lumbung' : `${NAMES[view]} · Lumbung`;
-  if (data || view === 'profil') VIEWS[view].show?.(sub);
+  if (data || view === 'profil') {
+    // nama terpisah: berhasil membuka halaman tidak boleh menghapus laporan gagal menggambar halaman itu
+    safely(`${NAMES[view]} (buka)`, () => VIEWS[view].show?.(sub));
+    reportFailures();
+  }
   if (byUser) {
     window.scrollTo(0, 0);
     $(`vt-${view}`).focus({ preventScroll: true }); // pembaca layar tahu halaman berganti
@@ -85,6 +110,7 @@ function show(m) { // 'connect' | 'dash' | 'empty' | 'error'
   $('actions').hidden = m === 'connect';
   $('privacy').hidden = m !== 'dash';
   if (m !== 'error' && m !== 'empty') $('banner').hidden = true;
+  if (m !== 'dash') { failed.clear(); $('render-err').hidden = true; }
   route(false);
 }
 

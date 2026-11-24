@@ -12,6 +12,7 @@
     "update:dry": "node scripts/update.mjs --dry-run",
     "serve": "python3 -m http.server 8080",
     "test": "node --test \"test/*.test.mjs\"",
-    "test:e2e": "node test/e2e/run.cjs"
+    "test:e2e": "node test/e2e/run.cjs",
+    "versi": "node scripts/web-version.mjs"
   }
 }

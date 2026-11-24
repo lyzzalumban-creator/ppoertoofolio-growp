@@ -1,5 +1,5 @@
 // Analisis: Kinerja, Alokasi, Risiko, Riwayat. Semua dihitung dari riwayat snapshot di browser.
-import { $, ORDER, TYPE, arrow, delta, esc, fDay, fMonth, latest, longDate, money, monthName, pct, state, symDisp, tile, toMs, tone, weightText } from '../lib.js';
+import { $, arrow, colorOf, delta, esc, fDay, fMonth, latest, longDate, money, monthName, pct, state, symDisp, tile, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { byTypePnl, cashSplit, concentration, currentDrawdown, riskStats } from '../stats.js';
 
 const SUBS = ['kinerja', 'alokasi', 'risiko', 'riwayat'];
@@ -44,7 +44,7 @@ function renderKinerja() {
   $('perf').innerHTML = rows.map((p) => {
     const w = (Math.abs(p.pnlPct) / span) * 100;
     const left = p.pnlPct < 0 ? z - w : z;
-    return `<li class="pr"><span class="pr-n" title="${esc(p.name)}"><i class="dot" style="background:var(--c-${p.type})"></i>${esc(symDisp(p))}</span>
+    return `<li class="pr"><span class="pr-n" title="${esc(p.name)}"><i class="dot" style="background:${colorOf(p.type)}"></i>${esc(symDisp(p))}</span>
       <span class="pr-t" aria-hidden="true"><i class="pr-b ${tone(p.pnlPct)}" style="left:${left.toFixed(2)}%;width:${Math.max(0.5, w).toFixed(2)}%"></i>${lo < 0 ? `<i class="pr-z" style="left:${z.toFixed(2)}%"></i>` : ''}</span>
       <span class="pr-v ${tone(p.pnlPct)}">${arrow(p.pnlPct)}${pct(p.pnlPct, 1)}</span></li>`;
   }).join('') || '<li class="muted">Belum ada aset dengan modal.</li>';
@@ -59,7 +59,7 @@ function renderAlokasi() {
   const invested = pos.filter((p) => p.type !== 'cash'); // konsentrasi dihitung di antara yang diinvestasikan, tanpa kas
   const c = concentration(invested);
   const stats = byTypePnl(pos);
-  const types = ORDER.filter((t) => stats[t]).sort((a, b) => stats[b].value - stats[a].value);
+  const types = typesIn(Object.keys(stats)).sort((a, b) => stats[b].value - stats[a].value);
   const total = types.reduce((s, t) => s + stats[t].value, 0) || 1;
   $('conc').innerHTML = [
     tile('Kas', money(split.cash), split.cash ? `${weightText(split.weight)} dari total` : 'belum ada aset kas'),
@@ -74,10 +74,10 @@ function renderAlokasi() {
     const s = stats[t];
     const w = s.value / total;
     return `<li><a class="ty" href="#/aset/${t}">
-      <i class="dot" style="background:var(--c-${t})"></i>
-      <span class="nm">${TYPE[t].label}<small>${s.count} aset · ${weightText(w)} dari total</small></span>
+      <i class="dot" style="background:${colorOf(t)}"></i>
+      <span class="nm">${esc(typeOf(t).label)}<small>${s.count} aset · ${weightText(w)} dari total</small></span>
       <span class="v"><b>${money(s.value)}</b>${t === 'cash' ? '' : delta(s.pnlPct)}</span>
-      <span class="bar" aria-hidden="true"><i style="width:${(w * 100).toFixed(1)}%;background:var(--c-${t})"></i></span></a></li>`;
+      <span class="bar" aria-hidden="true"><i style="width:${(w * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></a></li>`;
   }).join('');
 }
 

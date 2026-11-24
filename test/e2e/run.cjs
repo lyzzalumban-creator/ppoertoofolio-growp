@@ -803,6 +803,49 @@ const check = (name, ok, extra = '') => { results.push(!!ok); console.log(`${ok 
     await ctx.close();
   }
 
+  // ============ M. ketahanan: web lama vs data baru, galat terisolasi, berkas berversi ============
+  {
+    // M1: jenis aset yang belum dikenal (mis. robot sudah lebih baru dari web di cache HP) tidak boleh membekukan dasbor
+    const { buildSnapshot } = await load('scripts/lib/portfolio.mjs');
+    const fk = createFake();
+    const assets = [{ type: 'idx', symbol: 'BBCA', qty: 100, avgCost: 9000 }, { type: 'cash', symbol: 'KAS', qty: 1_000_000 }];
+    fk.call({ token: fk.token, action: 'saveAssets', assets });
+    const snap = buildSnapshot({ date: '2026-11-23', assets, quotes: new Map([['idx:BBCA', { price: 10_000, asOf: '2026-11-23' }], ['cash:KAS', { price: 1, asOf: '2026-11-23' }]]), fx: null });
+    // ubah jenis kas jadi jenis yang belum ada di versi web ini
+    for (const p of snap.positions) if (p.type === 'cash') p.type = 'jenisbaru';
+    snap.byType = { idx: snap.byType.idx, jenisbaru: snap.byType.cash };
+    fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...snap, at: '2026-11-23T06:30:00Z' } });
+    const { ctx, page, errors } = await newPage({ fake: fk });
+    const reqs = [];
+    page.on('request', (r) => { if (/\/assets\/|\/scripts\//.test(r.url())) reqs.push(r.url()); });
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fk.token });
+    await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).catch(() => {}); // bila membeku: gagal jelas, bukan menghentikan suite
+    check('M1 jenis aset tak dikenal: dasbor tetap terbuka (kerangka hilang, menu tampil), tanpa pesan galat', !(await page.locator('#skeleton').isVisible()) && (await page.locator('#kpis .hero').isVisible()) && !(await page.locator('#render-err').isVisible()) && errors.length === 0, errors.join(' | '));
+    await goto(page, '#/aset').catch(() => {});
+    check('M1b aset berjenis tak dikenal tetap terdaftar dengan labelnya', /jenisbaru/.test(await page.locator('#holdings').innerText()) && (await page.locator('#holdings details').count()) === 2);
+    const unversioned = reqs.filter((u) => !/\?v=[0-9a-f]{10}$/.test(u));
+    check('M3 semua JS/CSS dimuat dengan penanda versi (?v=), termasuk impor di dalam modul', reqs.length >= 10 && unversioned.length === 0, unversioned.join(', ') || `${reqs.length} berkas`);
+    await ctx.close();
+  }
+  {
+    // M2: bila satu bagian gagal digambar, bagian lain tetap jalan dan pesannya terlihat (bukan kerangka abadi)
+    const fk = createFake();
+    const { seedFake } = await load('test/e2e/seed.mjs');
+    seedFake(fk, { days: 3 });
+    const env0 = fk.call({ token: fk.token, action: 'list' }).history;
+    fk.call({ token: fk.token, action: 'appendSnapshot', snapshot: { ...env0.at(-1), positions: 'rusak' } }); // data cacat
+    const { ctx, page } = await newPage({ fake: fk });
+    await page.goto(`${BASE}/index.html`);
+    await connect(page, { token: fk.token });
+    await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).catch(() => {});
+    const msg = await page.locator('#render-err').innerText();
+    check('M2 data cacat: kerangka tetap hilang, menu tampil, pesan galat menyebut bagian yang gagal', !(await page.locator('#skeleton').isVisible()) && /gagal digambar/.test(msg) && /Beranda/.test(msg), msg.replace(/\n/g, ' '));
+    await nav(page, 'profil');
+    check('M2b bagian yang sehat (Profil) tetap bisa dipakai', (await page.locator('#v-profil').isVisible()) && (await page.locator('#logout').isVisible()));
+    await ctx.close();
+  }
+
   // ============ F. skrip Apps Script LAMA (belum mengenal tanggal beli) ============
   {
     const { ctx, page, fake, env } = await newPage();

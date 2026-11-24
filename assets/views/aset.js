@@ -1,5 +1,5 @@
 // Aset: cari, filter jenis (lewat rute #/aset/<jenis>), urutan, dan rincian tiap aset.
-import { $, ICON, ORDER, TYPE, assetName, delta, esc, fIdr, fNum, fUsd, heldText, latest, longDate, MASK, money, state, symDisp, weightText } from '../lib.js';
+import { $, ICON, assetName, colorOf, delta, esc, fIdr, fNum, fUsd, heldText, latest, longDate, MASK, money, state, symDisp, typeOf, typesIn, weightText } from '../lib.js';
 import { sortPositions } from '../stats.js';
 
 // Harga aset manual adalah angka ketikanmu sendiri (sering = saldo), jadi diperlakukan sebagai nominal.
@@ -8,14 +8,15 @@ function priceText(p, fmt) {
   return fmt.format(p.price);
 }
 
-const typeFilter = () => (TYPE[state.route.sub] && state.route.view === 'aset' ? state.route.sub : '');
+// Jenis dari rute dipakai hanya bila memang ada asetnya (rute ngawur = Semua).
+const typeFilter = () => (state.route.view === 'aset' && (latest().positions || []).some((p) => p.type === state.route.sub) ? state.route.sub : '');
 
 function renderChips() {
   const pos = latest().positions || [];
   const cur = typeFilter();
-  const present = ORDER.filter((t) => pos.some((p) => p.type === t));
-  const chip = (href, label, on, dot) => `<a href="${href}"${on ? ' aria-current="page"' : ''}>${dot ? `<i class="dot" style="background:var(--c-${dot})"></i>` : ''}${label}</a>`;
-  $('chips').innerHTML = chip('#/aset', `Semua (${pos.length})`, !cur) + present.map((t) => chip(`#/aset/${t}`, `${TYPE[t].label} (${pos.filter((p) => p.type === t).length})`, cur === t, t)).join('');
+  const present = typesIn([...new Set(pos.map((p) => p.type))]);
+  const chip = (href, label, on, dot) => `<a href="${href}"${on ? ' aria-current="page"' : ''}>${dot ? `<i class="dot" style="background:${colorOf(dot)}"></i>` : ''}${label}</a>`;
+  $('chips').innerHTML = chip('#/aset', `Semua (${pos.length})`, !cur) + present.map((t) => chip(`#/aset/${t}`, `${esc(typeOf(t).label)} (${pos.filter((p) => p.type === t).length})`, cur === t, t)).join('');
 }
 
 function renderList() {
@@ -31,7 +32,7 @@ function renderList() {
   const maxW = Math.max(0.0001, ...all.map((p) => p.weight || 0));
   $('holdings').innerHTML = rows.map((p) => {
     const priceFmt = p.currency === 'USD' ? fUsd : fIdr;
-    const t = TYPE[p.type];
+    const t = typeOf(p.type);
     const sym = symDisp(p);
     const name = assetName(p);
     const qty = state.hidden ? MASK : `${fNum.format(p.qty)}${t.unit ? ` ${t.unit}` : ''}`;
@@ -50,7 +51,7 @@ function renderList() {
         ${p.buyDate ? `<div><dt>Dibeli</dt><dd>${esc(longDate(p.buyDate))}<small>${esc(heldText(p.buyDate).replace(/^ \(|\)$/g, ''))}</small></dd></div>` : ''}`;
     return `<li><details class="asset-row" data-key="${esc(key)}"${state.open.has(key) ? ' open' : ''}>
       <summary>
-        <i class="dot" style="background:var(--c-${p.type})"></i>
+        <i class="dot" style="background:${colorOf(p.type)}"></i>
         <span class="a-main"><strong>${esc(name)}</strong><small>${esc(sub)}</small></span>
         <span class="a-val"><b>${money(p.value)}</b>${delta(p.dayPct)}</span>
         ${ICON.chev}

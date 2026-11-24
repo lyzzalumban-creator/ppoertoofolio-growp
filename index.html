@@ -7,8 +7,25 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <script src="assets/theme.js"></script>
-  <link rel="stylesheet" href="assets/style.css">
+  <script src="assets/theme.js?v=279268820a"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "./assets/app.js": "./assets/app.js?v=279268820a",
+      "./assets/creds.js": "./assets/creds.js?v=279268820a",
+      "./assets/lib.js": "./assets/lib.js?v=279268820a",
+      "./assets/nav.js": "./assets/nav.js?v=279268820a",
+      "./assets/stats.js": "./assets/stats.js?v=279268820a",
+      "./assets/views/analisis.js": "./assets/views/analisis.js?v=279268820a",
+      "./assets/views/aset.js": "./assets/views/aset.js?v=279268820a",
+      "./assets/views/beranda.js": "./assets/views/beranda.js?v=279268820a",
+      "./assets/views/chart.js": "./assets/views/chart.js?v=279268820a",
+      "./assets/views/profil.js": "./assets/views/profil.js?v=279268820a",
+      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=279268820a"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="assets/style.css?v=279268820a">
 </head>
 <body>
   <main class="wrap">
@@ -26,6 +43,7 @@
     <!-- menu utama dipasang di sini oleh assets/nav.js -->
 
     <div id="banner" class="banner" role="status" hidden></div>
+    <div id="render-err" class="banner error" role="alert" hidden></div>
 
     <!-- Kerangka selama data diambil (Apps Script bisa butuh beberapa detik) -->
     <div id="skeleton" class="skel" aria-hidden="true">
@@ -245,7 +263,7 @@
     </form>
   </dialog>
 
-  <script src="assets/nofile.js"></script>
-  <script type="module" src="assets/app.js"></script>
+  <script src="assets/nofile.js?v=279268820a"></script>
+  <script type="module" src="assets/app.js?v=279268820a"></script>
 </body>
 </html>
