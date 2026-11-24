@@ -16,12 +16,27 @@ export function inRange(snaps, range) {
   return snaps.filter((s) => end - toMs(s.date) <= days * DAY);
 }
 
-/** Ganti isi judul angka di atas grafik; angka yang berubah "bergulir" singkat (kabur lalu jelas). */
-export function rollText(el, html) {
-  if (!el || el.innerHTML === html) return;
+/**
+ * Ganti isi judul angka di atas grafik. Angka yang berubah berganti halus ala aplikasi pasar: angka lama naik sedikit
+ * sambil memudar, angka baru naik dari bawah sambil menjelas (tanpa blur, ±0,14 dtk), hanya saat disentuh; digambar ulang biasa berganti langsung supaya angka lama tidak sempat terlihat.
+ */
+export function rollText(el, html, animate = false) {
+  if (!el || el.dataset.h === html) return;
+  const old = el.querySelector('b');
+  const was = old && old.textContent;
+  el.dataset.h = html;
   el.innerHTML = html;
   const b = el.querySelector('b');
-  if (b) { b.classList.remove('roll'); void b.offsetWidth; b.classList.add('roll'); }
+  if (!animate || !old || !b || was === b.textContent || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const g = document.createElement('span');
+  g.className = 'roll-out';
+  g.setAttribute('aria-hidden', 'true');
+  g.textContent = was;
+  g.style.left = `${b.offsetLeft}px`;
+  g.style.top = `${b.offsetTop}px`;
+  g.addEventListener('animationend', () => g.remove());
+  el.append(g);
+  b.classList.add('roll-in');
 }
 
 export const rangesHtml = (cur) => RANGES.map(([l]) => `<button type="button" data-range="${l}" aria-pressed="${l === cur}">${l}</button>`).join('');
@@ -96,7 +111,7 @@ export function lineChart(box, pts, { fmtTip, label, empty, height, head, headHt
     <div class="tip"></div><div class="dpill"></div>`;
 
   const svg = box.querySelector('svg'), cur = svg.querySelector('.cursor'), tip = box.querySelector('.tip'), pill = box.querySelector('.dpill');
-  const place = (p) => {
+  const place = (p, anim = false) => {
     const cx = X(p.t), cy = Y(p.y);
     const ln = cur.querySelector('line'), dot = cur.querySelector('circle');
     ln.setAttribute('x1', cx); ln.setAttribute('x2', cx);
@@ -110,7 +125,7 @@ export function lineChart(box, pts, { fmtTip, label, empty, height, head, headHt
     pill.textContent = longDate(p.date);
     pill.style.left = `${Math.min(Math.max(2, cx - pill.offsetWidth / 2), W - pill.offsetWidth - 2)}px`;
     pill.style.top = `${mt + ih + 6}px`;
-    if (head && headHtml) rollText(head, headHtml(p, p === last)); // angka di atas grafik ikut titik yang disentuh
+    if (head && headHtml) rollText(head, headHtml(p, p === last), anim); // angka di atas grafik ikut titik yang disentuh
   };
   const last = pts[pts.length - 1];
   place(last);
@@ -120,13 +135,13 @@ export function lineChart(box, pts, { fmtTip, label, empty, height, head, headHt
     const px = ((ev.clientX - r.left) / r.width) * W;
     let best = pts[0];
     for (const p of pts) if (Math.abs(X(p.t) - px) < Math.abs(X(best.t) - px)) best = p;
-    place(best);
+    place(best, true);
   };
   const hit = svg.querySelector('.hit');
   hit.addEventListener('pointermove', show);
   hit.addEventListener('pointerdown', show);
   // Diam: grafik bersih (hanya garis dan area nilai). Disentuh atau diarahkan: garis modal, kursor, gelembung, dan tanggal muncul; hilang saat jari diangkat atau kursor pergi.
-  const rest = () => { box.classList.remove('on'); place(last); };
+  const rest = () => { box.classList.remove('on'); place(last, true); };
   hit.addEventListener('pointerleave', rest);
   hit.addEventListener('pointercancel', rest);
 }
@@ -200,7 +215,7 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty, head, restHead =
     const r = svg.getBoundingClientRect();
     const i = Math.min(items.length - 1, Math.max(0, Math.floor((((ev.clientX - r.left) / r.width) * W - ml) / slot)));
     rects.forEach((b, k) => b.classList.toggle('sel', k === i));
-    if (head && items[i].head) rollText(head, items[i].head);
+    if (head && items[i].head) rollText(head, items[i].head, true);
     if (!items[i].tip) return;
     tip.hidden = false;
     tip.innerHTML = items[i].tip;
@@ -210,7 +225,7 @@ export function barChart(box, items, { fmtY, fmtV, aria, empty, head, restHead =
   };
   svg.addEventListener('pointerdown', pick);
   svg.addEventListener('pointermove', pick);
-  const clear = () => { tip.hidden = true; rects.forEach((b) => b.classList.remove('sel')); if (head) rollText(head, restHead); };
+  const clear = () => { tip.hidden = true; rects.forEach((b) => b.classList.remove('sel')); if (head) rollText(head, restHead, true); };
   if (head) rollText(head, restHead);
   svg.addEventListener('pointerleave', clear);
   svg.addEventListener('pointercancel', clear);
