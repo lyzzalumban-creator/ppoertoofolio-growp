@@ -634,6 +634,11 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.locator('#v-save').click();
     await done('conv-dlg');
     check('N12 tukar dolar -> rupiah: 100 x 16.250 = 1.625.000 masuk kas rupiah (2.400.000 -> 4.025.000); dolar 900 -> 800', asset('KAS').qty === 4_025_000 && asset('USD').qty === 800);
+    await openAdd(page, 'convert');
+    check('N12b preset kurs: kurs terakhir (16.250) terisi otomatis dan ada sebagai pilihan cepat bersama 16.000 dan harga pasar', (await page.inputValue('#v-rate')) === '16250' && (await page.locator('#v-presets button').allInnerTexts()).some((t) => /16\.250/.test(t)) && (await page.locator('#v-presets button').allInnerTexts()).some((t) => /16\.000/.test(t)));
+    await page.locator('#v-presets button', { hasText: '16.000' }).click();
+    check('N12c ketuk pilihan kurs mengisi kolom kurs', (await page.inputValue('#v-rate')) === '16000');
+    await page.locator('#v-cancel').click();
     await nav(page, 'aktivitas');
     const rowsJb = await page.locator('#txs .tx').allInnerTexts();
     check('N13 Aktivitas > Jual-beli memuat baris Tukar (dua), Jual, Beli; baris Tukar menampilkan asal -> tujuan', rowsJb.filter((t) => /^Tukar/.test(t)).length === 2 && rowsJb.some((t) => /KAS → USD/.test(t)) && rowsJb.some((t) => /^Jual/.test(t)) && rowsJb.some((t) => /^Beli/.test(t)), rowsJb.map(flat).join(' | '));

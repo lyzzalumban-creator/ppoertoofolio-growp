@@ -201,3 +201,15 @@ test('fxStats: total, win rate, dan per bulan urut lama -> baru; kind lain tidak
 test('realized tidak ikut menghitung trading emas dan tukar mata uang', () => {
   assert.equal(realized([{ kind: 'fx', pnl: 50, pnlIdr: 800_000 }, { kind: 'convert' }, { kind: 'sell', pnlIdr: 100 }]), 100);
 });
+
+test('presisi desimal: 0,1 + 0,2 = 0,3 persis; jual semua tidak menyisakan debu; kas tidak jadi minus karena selisih floating-point', () => {
+  const a = buy({ type: 'crypto', symbol: 'BTC', qty: 0.1, avgCost: 100 }, { qty: 0.2, price: 100, fx: 1, date: '2026-01-01' }).asset;
+  assert.equal(a.qty, 0.3);
+  const r = sell(a, { qty: a.qty, price: 120, fx: 1, date: '2026-01-02' });
+  assert.equal(r.asset, null); // habis, bukan 5e-17
+  let kas = [{ type: 'cash', symbol: 'K', qty: 0.3, currency: 'IDR' }];
+  kas = withCash(kas, 'IDR', null, -0.1);
+  kas = withCash(kas, 'IDR', null, -0.2);
+  assert.equal(kas[0].qty, 0);
+  assert.doesNotThrow(() => withCash([{ type: 'cash', symbol: 'K', qty: 0.3, currency: 'IDR' }], 'IDR', null, -0.30000000000000004));
+});
