@@ -218,14 +218,14 @@ export function treemap(items, W = 100, H = 100) {
 }
 
 /**
- * Bahan peta aset: kas tidak ikut; aset berbobot < minShare (dari total non-kas) digabung jadi satu petak "Lainnya"
- * bila ada ≥ 2. metric: 'day' (perubahan hari ini) atau 'pnl' (untung total). Petak gabungan memakai rata-rata
+ * Bahan peta aset: semua aset termasuk kas (kas netral, tanpa warna arah); aset berbobot < minShare digabung jadi satu
+ * petak bila ada ≥ 2. metric: 'day' (perubahan hari ini) atau 'pnl' (untung total). Petak gabungan memakai rata-rata
  * tertimbang nilai dari anggota yang punya angka.
  */
 export function heatItems(positions, metric = 'day', minShare = 0.05) {
-  const rows = positions.filter((p) => p.type !== 'cash' && p.value > 0);
+  const rows = positions.filter((p) => p.value > 0);
   const total = rows.reduce((s, p) => s + p.value, 0);
-  const val = (p) => { const v = metric === 'pnl' ? p.pnlPct : p.dayPct; return Number.isFinite(v) ? v : null; };
+  const val = (p) => { if (p.type === 'cash') return null; const v = metric === 'pnl' ? p.pnlPct : p.dayPct; return Number.isFinite(v) ? v : null; };
   const small = rows.filter((p) => p.value / total < minShare);
   const group = small.length >= 2 ? small : [];
   const items = rows.filter((p) => !group.includes(p)).map((p) => ({ p, value: p.value, d: val(p) }));

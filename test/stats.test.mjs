@@ -248,12 +248,13 @@ test('treemap: luas petak sebanding nilai, semua di dalam kotak, tanpa tumpang t
 });
 
 import { heatItems } from '../assets/stats.js';
-test('heatItems: kas tidak ikut, aset kecil digabung jadi "Lainnya", metrik hari ini vs untung total', () => {
+test('heatItems: kas ikut tanpa warna arah, aset kecil digabung, metrik hari ini vs untung total', () => {
   const P = (symbol, value, dayPct, pnlPct, type = 'idx') => ({ type, symbol, value, dayPct, pnlPct });
-  const pos = [P('A', 600, 0.01, 0.2), P('B', 300, -0.02, 0.1), P('C', 30, 0.04, 0.5), P('D', 20, 0.02, 0.1), P('KAS', 9999, null, 0, 'cash')];
+  const pos = [P('A', 600, 0.01, 0.2), P('B', 300, -0.02, 0.1), P('C', 30, 0.04, 0.5), P('D', 20, 0.02, 0.1), P('KAS', 300, null, 0, 'cash')];
   const day = heatItems(pos, 'day');
-  assert.equal(day.length, 3); // A, B, dan satu petak gabungan C+D
-  assert.ok(!day.some((i) => i.p && i.p.type === 'cash') && !day.some((i) => i.group && i.group.some((g) => g.type === 'cash')));
+  assert.equal(day.length, 4); // A, B, KAS, dan satu petak gabungan C+D
+  const kas = day.find((i) => i.p && i.p.type === 'cash');
+  assert.ok(kas && kas.d === null && heatItems(pos, 'pnl').find((i) => i.p && i.p.type === 'cash').d === null);
   const g = day.find((i) => i.group);
   assert.equal(g.group.length, 2);
   assert.equal(g.value, 50);

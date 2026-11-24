@@ -125,11 +125,10 @@ const HEAT_FULL = { day: 0.025, pnl: 0.3 }; // persen yang sudah dianggap warna 
 function renderHeat() {
   const all = ((latest() && latest().positions) || []);
   const items = heatItems(all, state.heat);
-  $('heat-card').hidden = all.filter((p) => p.type !== 'cash' && p.value > 0).length < 2;
+  $('heat-card').hidden = all.filter((p) => p.value > 0).length < 2;
   if ($('heat-card').hidden) return;
   for (const b of $('heat-mode').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.heat === state.heat));
   const H = 92; // kotak 100 × 92 satuan; ditampilkan dengan aspect-ratio yang sama
-  const cashW = all.filter((p) => p.type === 'cash').reduce((s, p) => s + (p.weight || 0), 0);
   $('heat').innerHTML = treemap(items, 100, H).map(({ item, x, y, w, h }, i) => {
     const d = item.d;
     const heat = d == null ? 0 : Math.min(1, Math.abs(d) / HEAT_FULL[state.heat]).toFixed(2);
@@ -143,7 +142,6 @@ function renderHeat() {
       ? `<a class="${cls}" href="${assetHref(item.p)}" style="${geo}" aria-label="${esc(label)}">${inner}</a>`
       : `<div class="${cls}" style="${geo}" role="img" aria-label="${esc(label)}">${inner}</div>`;
   }).join('');
-  $('heat-cash').textContent = cashW > 0 ? `Kas ${weightText(cashW)} tidak masuk peta` : '';
 }
 
 // ---------- samping: alokasi ringkas dan target ----------
