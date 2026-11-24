@@ -216,19 +216,23 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .note-line:empty { display: none; }
 .hold-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .hold {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) 64px minmax(7.5em, auto); align-items: center; gap: 2px 12px;
-  min-height: 68px; padding: 12px 14px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow);
+  display: grid; grid-template-columns: auto minmax(0, 1fr) 64px auto; align-items: center; gap: 4px 11px;
+  min-height: 76px; padding: 13px 14px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow);
   color: inherit; text-decoration: none;
 }
 .hold:hover { box-shadow: 0 0 0 1px var(--border), var(--shadow); }
+.hold.nospark .h-id { grid-column: 2 / 4; }
+.h-av { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; background: color-mix(in srgb, var(--c) 22%, var(--surface)); color: var(--c); font-style: normal; font-weight: 700; font-size: 1.05rem; }
 .h-dot, .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
 .h-id { min-width: 0; }
 .h-id b { display: block; font-size: 1.02rem; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .h-id small { display: block; color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.h-spark .spark { width: 64px; height: 30px; }
+.h-spark .spark { width: 64px; height: 34px; }
 .h-val { text-align: right; font-size: 0.86rem; }
 .h-val b { display: block; font-size: 0.98rem; }
-.h-bar { grid-column: 2 / -1; height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.h-w { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; }
+.h-w small { flex: none; min-width: 3.2em; text-align: right; color: var(--muted); font-size: 0.74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.h-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
 .h-bar i { display: block; height: 100%; opacity: 0.7; }
 .hold.wait { opacity: 0.85; }
 .chip-wait { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 0.74rem; font-weight: 600; }
@@ -276,9 +280,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 @media (prefers-reduced-motion: reduce) { .wg-spark { animation: none; } }
 
 /* samping: alokasi dan target */
-.alloc-body { display: grid; grid-template-columns: 108px minmax(0, 1fr); align-items: center; gap: 14px; margin-top: 10px; }
-.donut { position: relative; width: 108px; height: 108px; border-radius: 50%; background: var(--surface-2); }
-.donut .hole { position: absolute; inset: 22%; display: grid; place-content: center; text-align: center; border-radius: 50%; background: var(--surface); line-height: 1.1; }
+.alloc-body { display: grid; grid-template-columns: 124px minmax(0, 1fr); align-items: center; gap: 14px; margin-top: 10px; }
+.donut { position: relative; width: 124px; height: 124px; border-radius: 50%; background: var(--surface-2); }
+.donut .hole { position: absolute; inset: 27%; display: grid; place-content: center; text-align: center; border-radius: 50%; background: var(--surface); line-height: 1.1; }
 .donut .hole strong { font-size: 1.2rem; }
 .donut .hole span { color: var(--muted); font-size: 0.7rem; }
 .legend { list-style: none; margin: 0; padding: 0; min-width: 0; }
@@ -287,9 +291,11 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .lg .sw { width: 10px; height: 10px; border-radius: 3px; }
 .lg .pc { font-weight: 700; }
 .lg .am { grid-column: 2 / -1; color: var(--muted); font-size: 0.76rem; }
-.goal { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: center; margin-top: 10px; }
-.ring { position: relative; width: 84px; height: 84px; border-radius: 50%; background: var(--surface-2); }
-.ring .hole { position: absolute; inset: 10px; display: grid; place-content: center; border-radius: 50%; background: var(--surface); font-weight: 700; }
+.lg .lb { grid-column: 2 / -1; height: 4px; margin-top: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+.lg .lb i { display: block; height: 100%; border-radius: 2px; }
+.goal { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 14px; align-items: center; margin-top: 10px; }
+.ring { position: relative; width: 92px; height: 92px; border-radius: 50%; background: var(--surface-2); }
+.ring .hole { position: absolute; inset: 12px; display: grid; place-content: center; border-radius: 50%; background: var(--surface); font-weight: 700; }
 .g-line { font-size: 0.9rem; overflow-wrap: anywhere; }
 .g-sub { margin: 2px 0 8px; color: var(--muted); font-size: 0.8rem; }
 .goal-empty { display: grid; gap: 10px; justify-items: start; margin-top: 8px; }

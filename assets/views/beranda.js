@@ -81,16 +81,16 @@ const chartDrawn = watch($('chart'), () => { if (state.series.length) drawChart(
 // Riwayat harga satu aset (rupiah) dari snapshot; untuk mini-grafik dan grafik di halaman aset.
 export const priceSeries = (key, n) => state.series.slice(-n).map((s) => (s.px ? s.px[key] : undefined)).filter(Number.isFinite);
 
-function holdingRow(p, maxW) {
+function holdingRow(p, maxW, i = 0) {
   const name = assetName(p);
   const sym = symDisp(p);
-  const spark = p.type === 'cash' ? '' : sparkline(priceSeries(keyOf(p), 30));
-  return `<li><a class="hold" href="${assetHref(p)}">
-    <i class="h-dot" style="background:${colorOf(p.type)}"></i>
+  const spark = p.type === 'cash' ? '' : sparkline(priceSeries(keyOf(p), 30), '', `gh${i}`); // melengkung bergradasi, satu id gradasi per baris
+  return `<li><a class="hold${spark ? '' : ' nospark'}" href="${assetHref(p)}">
+    <i class="h-av" style="--c:${colorOf(p.type)}" aria-hidden="true">${esc(sym.slice(0, 1))}</i>
     <span class="h-id"><b>${esc(sym)}</b><small>${esc(name !== sym ? name : typeOf(p.type).label)}</small></span>
-    <span class="h-spark">${spark}</span>
-    <span class="h-val"><b>${money(p.value)}</b>${p.type === 'cash' && !Number.isFinite(p.dayPct) ? `<span class="muted">${weightText(p.weight)}</span>` : delta(p.dayPct)}</span>
-    <span class="h-bar" aria-hidden="true"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%;background:${colorOf(p.type)}"></i></span>
+    ${spark ? `<span class="h-spark">${spark}</span>` : ''}
+    <span class="h-val"><b>${money(p.value)}</b>${p.type === 'cash' ? `<span class="muted">${esc(typeOf('cash').label)}</span>` : delta(p.dayPct)}</span>
+    <span class="h-w" aria-hidden="true"><span class="h-bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%;background:${colorOf(p.type)}"></i></span><small>${weightText(p.weight)}</small></span>
   </a></li>`;
 }
 
@@ -120,7 +120,7 @@ function renderHoldings() {
   $('sort').value = state.sort;
   $('filter-note').textContent = state.filter || q ? `${rows.length + wait.length} dari ${total} aset` : '';
   const maxW = Math.max(0.0001, ...all.map((p) => p.weight || 0));
-  $('holdings').innerHTML = rows.map((p) => holdingRow(p, maxW)).join('') + wait.map(pendingRow).join('')
+  $('holdings').innerHTML = rows.map((p, i) => holdingRow(p, maxW, i)).join('') + wait.map(pendingRow).join('')
     || `<li class="empty-row">${total ? 'Tidak ada aset yang cocok.' : 'Belum ada aset.'}</li>`;
   $('hold-tools').hidden = total < 2;
 }
@@ -161,13 +161,16 @@ function renderAlloc() {
   const stops = types.map((t, i) => {
     const from = acc;
     acc += L.byType[t].weight * 100;
-    return `${colorOf(t)} ${from.toFixed(3)}% ${(i === types.length - 1 ? 100 : acc).toFixed(3)}%`;
+    const to = i === types.length - 1 ? 100 : acc;
+    return types.length > 1 ? `${colorOf(t)} ${from.toFixed(3)}% ${(to - 0.8).toFixed(3)}%, var(--surface) ${(to - 0.8).toFixed(3)}% ${to.toFixed(3)}%` : `${colorOf(t)} 0 100%`; // celah tipis antar segmen
   });
   $('donut').style.background = stops.length ? `conic-gradient(${stops.join(',')})` : '';
   $('donut').innerHTML = `<div class="hole"><strong>${L ? (L.positions || []).length : 0}</strong><span>aset</span></div>`;
+  const maxType = Math.max(0.0001, ...types.map((t) => L.byType[t].weight));
   $('legend').innerHTML = types.map((t) => `<li><button type="button" class="lg" data-filter="${esc(t)}" aria-pressed="${state.filter === t}">
       <i class="sw" style="background:${colorOf(t)}"></i><span class="nm">${esc(typeOf(t).label)}</span><span class="pc">${weightText(L.byType[t].weight)}</span>
-      <span class="am">${money(L.byType[t].value)}</span></button></li>`).join('');
+      <span class="am">${money(L.byType[t].value)}</span>
+      <span class="lb" aria-hidden="true"><i style="width:${Math.max(3, (L.byType[t].weight / maxType) * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></button></li>`).join('');
 }
 
 function renderGoal() {
@@ -179,9 +182,9 @@ function renderGoal() {
   }
   const p = Math.floor(f * 100); // 99,8% tampil 99%, bukan 100% sebelum benar-benar tercapai
   $('goal').innerHTML = `<div class="goal">
-    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(var(--accent) ${(f * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
+    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(${f >= 1 ? 'var(--pos)' : 'var(--accent)'} ${(Math.min(f, 1) * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
     <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
-      <p class="g-sub">${f >= 1 ? 'Target tercapai' : `Sisa ${money(state.goal - L.total)}`}</p>
+      <p class="g-sub">${f >= 1 ? '<span class="pill pos">✓ Target tercapai</span>' : `Sisa ${money(state.goal - L.total)}`}</p>
       <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
 }
 
