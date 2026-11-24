@@ -7,31 +7,31 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <script src="assets/theme.js?v=97d0b86d62"></script>
+  <script src="assets/theme.js?v=d3772a72e2"></script>
   <script type="importmap">
   {
     "imports": {
-      "./assets/app.js": "./assets/app.js?v=97d0b86d62",
-      "./assets/creds.js": "./assets/creds.js?v=97d0b86d62",
-      "./assets/data.js": "./assets/data.js?v=97d0b86d62",
-      "./assets/demo.js": "./assets/demo.js?v=97d0b86d62",
-      "./assets/lib.js": "./assets/lib.js?v=97d0b86d62",
-      "./assets/nav.js": "./assets/nav.js?v=97d0b86d62",
-      "./assets/stats.js": "./assets/stats.js?v=97d0b86d62",
-      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=97d0b86d62",
-      "./assets/views/analisis.js": "./assets/views/analisis.js?v=97d0b86d62",
-      "./assets/views/beranda.js": "./assets/views/beranda.js?v=97d0b86d62",
-      "./assets/views/chart.js": "./assets/views/chart.js?v=97d0b86d62",
-      "./assets/views/detail.js": "./assets/views/detail.js?v=97d0b86d62",
-      "./assets/views/profil.js": "./assets/views/profil.js?v=97d0b86d62",
-      "./assets/views/sheets.js": "./assets/views/sheets.js?v=97d0b86d62",
-      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=97d0b86d62",
-      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=97d0b86d62",
-      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=97d0b86d62"
+      "./assets/app.js": "./assets/app.js?v=d3772a72e2",
+      "./assets/creds.js": "./assets/creds.js?v=d3772a72e2",
+      "./assets/data.js": "./assets/data.js?v=d3772a72e2",
+      "./assets/demo.js": "./assets/demo.js?v=d3772a72e2",
+      "./assets/lib.js": "./assets/lib.js?v=d3772a72e2",
+      "./assets/nav.js": "./assets/nav.js?v=d3772a72e2",
+      "./assets/stats.js": "./assets/stats.js?v=d3772a72e2",
+      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=d3772a72e2",
+      "./assets/views/analisis.js": "./assets/views/analisis.js?v=d3772a72e2",
+      "./assets/views/beranda.js": "./assets/views/beranda.js?v=d3772a72e2",
+      "./assets/views/chart.js": "./assets/views/chart.js?v=d3772a72e2",
+      "./assets/views/detail.js": "./assets/views/detail.js?v=d3772a72e2",
+      "./assets/views/profil.js": "./assets/views/profil.js?v=d3772a72e2",
+      "./assets/views/sheets.js": "./assets/views/sheets.js?v=d3772a72e2",
+      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=d3772a72e2",
+      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=d3772a72e2",
+      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=d3772a72e2"
     }
   }
   </script>
-  <link rel="stylesheet" href="assets/style.css?v=97d0b86d62">
+  <link rel="stylesheet" href="assets/style.css?v=d3772a72e2">
 </head>
 <body>
   <main class="wrap">
@@ -94,8 +94,14 @@
             </section>
 
             <section class="card" id="heat-card" aria-labelledby="heat-h" hidden>
-              <div class="card-head"><h2 id="heat-h">Peta aset</h2><span class="muted heat-key">Ukuran = bobot · warna = hari ini</span></div>
+              <div class="card-head"><h2 id="heat-h">Peta aset</h2>
+                <div class="seg heat-mode" id="heat-mode" role="group" aria-label="Warna peta">
+                  <button type="button" data-heat="day" aria-pressed="true">Hari ini</button>
+                  <button type="button" data-heat="pnl" aria-pressed="false">Untung total</button>
+                </div>
+              </div>
               <div id="heat" class="heat"></div>
+              <p id="heat-cash" class="muted heat-key"></p>
             </section>
 
             <section id="holdings-sec" class="holdings" aria-labelledby="hold-h">
@@ -429,7 +435,7 @@
     </form>
   </dialog>
 
-  <script src="assets/nofile.js?v=97d0b86d62"></script>
-  <script type="module" src="assets/app.js?v=97d0b86d62"></script>
+  <script src="assets/nofile.js?v=d3772a72e2"></script>
+  <script type="module" src="assets/app.js?v=d3772a72e2"></script>
 </body>
 </html>

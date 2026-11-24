@@ -246,3 +246,21 @@ test('treemap: luas petak sebanding nilai, semua di dalam kotak, tanpa tumpang t
   assert.equal(treemap([{ value: 0 }, { value: -3 }]).length, 0); // nilai nol/negatif diabaikan
   assert.equal(treemap([{ value: 5 }], 100, 50)[0].w, 100);
 });
+
+import { heatItems } from '../assets/stats.js';
+test('heatItems: kas tidak ikut, aset kecil digabung jadi "Lainnya", metrik hari ini vs untung total', () => {
+  const P = (symbol, value, dayPct, pnlPct, type = 'idx') => ({ type, symbol, value, dayPct, pnlPct });
+  const pos = [P('A', 600, 0.01, 0.2), P('B', 300, -0.02, 0.1), P('C', 30, 0.04, 0.5), P('D', 20, 0.02, 0.1), P('KAS', 9999, null, 0, 'cash')];
+  const day = heatItems(pos, 'day');
+  assert.equal(day.length, 3); // A, B, dan satu petak gabungan C+D
+  assert.ok(!day.some((i) => i.p && i.p.type === 'cash') && !day.some((i) => i.group && i.group.some((g) => g.type === 'cash')));
+  const g = day.find((i) => i.group);
+  assert.equal(g.group.length, 2);
+  assert.equal(g.value, 50);
+  assert.ok(Math.abs(g.d - (30 * 0.04 + 20 * 0.02) / 50) < 1e-12);
+  assert.equal(heatItems(pos, 'pnl').find((i) => i.p && i.p.symbol === 'A').d, 0.2);
+  // hanya satu aset kecil: tidak digabung
+  assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').length, 2);
+  assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').some((i) => i.group), false);
+  assert.equal(heatItems([P('X', 10, null, null)], 'day')[0].d, null);
+});
