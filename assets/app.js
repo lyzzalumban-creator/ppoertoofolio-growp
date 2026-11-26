@@ -33,7 +33,8 @@ function renderHeader() {
   $('subtitle').textContent = Number.isFinite(at)
     ? `Diperbarui ${fAtDate.format(at)}, ${fAtTime.format(at)} WIB (${agoText(age).replace(/ /g, ' ')})`
     : L ? `Data per ${longDate(L.date)}` : state.assets.length ? 'Menunggu harga pertama' : 'Belum ada aset';
-  if (state.demo) $('subtitle').textContent = 'Demo · data contoh 1 tahun';
+  $('demo-tag').hidden = !state.demo;
+  if (state.demo) $('subtitle').textContent = 'Data contoh 1 tahun, tidak disimpan';
   $('subtitle').classList.toggle('stale', !state.demo && Number.isFinite(at) && age > 12 * 3_600_000); // jadwal 6 jam: lewat 12 jam = ada yang macet
   const btn = $('privacy');
   const label = state.hidden ? 'Tampilkan nominal' : 'Sembunyikan nominal';
@@ -186,10 +187,6 @@ function startDemo() {
   mode = 'dash';
   render();
   show('dash');
-  const b = $('banner');
-  b.hidden = false;
-  b.className = 'banner';
-  b.innerHTML = '<strong>Mode demo.</strong> Semua data contoh dan tidak disimpan. Coba beli, jual, tukar, atau trade emas.';
   renderHeader();
 }
 
@@ -197,6 +194,7 @@ async function exitDemo() {
   state.demo = false;
   try { const v = localStorage.getItem('pf-hidden'); state.hidden = v === null ? true : v === '1'; } catch { state.hidden = true; }
   $('banner').hidden = true;
+  $('demo-tag').hidden = true;
   setData({});
   const c = readCreds();
   if (c) await start(c);
