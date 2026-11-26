@@ -31,6 +31,7 @@ export function rollText(el, html, animate = false) {
   const g = document.createElement('span');
   g.className = `${old.className.replace(/\broll-in\b/, '').trim()} roll-out`; // sama gayanya dengan angka asal
   g.setAttribute('aria-hidden', 'true');
+  g.setAttribute('style', old.getAttribute('style') || '');
   g.textContent = was;
   g.style.left = `${b.offsetLeft}px`;
   g.style.top = `${b.offsetTop}px`;

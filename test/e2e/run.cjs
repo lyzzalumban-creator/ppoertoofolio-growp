@@ -98,7 +98,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
   // Tombol + membuka menu; pilih satu tindakan (cash | asset | fx | convert).
   const openAdd = async (page, act) => { await page.locator('#nav-add').click(); await page.locator(`[data-menu-act="${act}"]`).click(); };
   const holdSyms = (page) => page.locator('#holdings .hold .h-id b').allInnerTexts();
-  const sumText = async (page) => `${await page.locator('#summary').innerText()}\n${await page.locator('#sumstats').innerText()}`; // ringkasan = kartu nilai + rincian
+  const sumText = async (page) => `${await page.locator('#summary').innerText()}\n${await page.locator('#chart-rows').innerText()}\n${await page.locator('#sumstats').innerText()}`; // ringkasan = kartu nilai + rincian
   const isOpen = (page, id) => page.locator(`#${id}`).evaluate((d) => d.open);
   const toastText = (page) => page.locator('#toast').innerText();
 
@@ -923,7 +923,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     const sum = flat(await sumText(page));
-    check('H3 ringkasan: Total profit dan Harian dengan panah dan tanda (rupiah ringkas), lalu Rincian: Modal, Terealisasi, Bulan ini', /Total profit\s*(\+Rp [\d.,]+ (jt|rb|M) )?[▲▼]\s?[+−]\d+,\d{2}%\s*Harian\s*(\+|−)?(Rp [\d.,]+( jt| rb| M)? )?[▲▼]\s?[+−]\d+,\d{2}%.*Modal.*Terealisasi\s*–.*Bulan ini\s*[▲▼]/i.test(sum), sum);
+    check('H3 ringkasan: Total profit dan Harian dengan panah dan tanda (rupiah lengkap), lalu Rincian: Modal, Terealisasi, Bulan ini', /Total profit\s*(\+Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%\s*Harian\s*(\+|−)?(Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%.*Modal.*Terealisasi\s*–.*Bulan ini\s*[▲▼]/i.test(sum), sum);
     check('H4 kartu aset: mini-grafik harga (bentuk saja, tanpa teks) untuk aset non-kas', (await page.locator('#holdings .hold svg.spark').count()) === 7 && (await page.locator('#holdings svg.spark text').count()) === 0);
     const bbca = await page.locator('#holdings .hold', { hasText: 'BBCA' }).getAttribute('href');
     check('H5 kartu aset menaut ke halaman asetnya', bbca === AH('idx:BBCA'), bbca);
@@ -962,7 +962,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#dash:not([hidden])');
     const list = await page.locator('#holdings').innerText();
     check('H8 "panw" tampil PANW; label manual "Depo Bca" tidak diubah', /PANW/.test(list) && !/panw/.test(list) && /Depo Bca/.test(list), flat(list).slice(0, 120));
-    check('H8b hanya satu hari data: ringkasan memberi tahu "belum ada pembanding", grafik butuh 2 hari', /belum ada pembanding/.test(await page.locator('#summary .today').innerText()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()));
+    check('H8b hanya satu hari data: ringkasan memberi tahu "belum ada pembanding", grafik butuh 2 hari', /belum ada pembanding/.test(await page.locator('#chart-rows .today').innerText()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()));
     await goto(page, '#/analisis/kinerja');
     check('H8c hanya satu hari data: Kinerja memberi tahu butuh 2 hari, tanpa metrik palsu', /minimal 2 hari/.test(await page.locator('#metrics').innerText()) && (await page.locator('#metrics .tile').count()) === 0);
     await ctx.close();
@@ -1199,7 +1199,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
 
     // tata letak desktop: grafik dan daftar di kiri, Alokasi dan Target bertumpuk di kanan
     const bb = (sel) => page.locator(sel).boundingBox();
-    const [sumB, chart, hold, alloc, g] = [await bb('#summary'), await bb('#chart-card'), await bb('#holdings-sec'), await bb('#alloc-card'), await bb('#goal')];
+    const [sumB, chart, hold, alloc, g] = [await bb('#sum-row'), await bb('#chart-card'), await bb('#holdings-sec'), await bb('#alloc-card'), await bb('#goal')];
     check('J11 desktop: ringkasan, grafik, daftar di kolom kiri; Alokasi lalu Target di kolom kanan', alloc.x > chart.x + chart.width - 1 && Math.abs(alloc.y - sumB.y) < 2 && g.y > alloc.y + alloc.height && hold.y > chart.y + chart.height && Math.abs(hold.x - chart.x) < 1, JSON.stringify({ chart, alloc, g, hold }));
     check('J12 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await shot(page, 'beranda-desktop.png', { fullPage: true });

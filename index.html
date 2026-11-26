@@ -7,31 +7,31 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <script src="assets/theme.js?v=bb6dbfbebd"></script>
+  <script src="assets/theme.js?v=eb36c40dbd"></script>
   <script type="importmap">
   {
     "imports": {
-      "./assets/app.js": "./assets/app.js?v=bb6dbfbebd",
-      "./assets/creds.js": "./assets/creds.js?v=bb6dbfbebd",
-      "./assets/data.js": "./assets/data.js?v=bb6dbfbebd",
-      "./assets/demo.js": "./assets/demo.js?v=bb6dbfbebd",
-      "./assets/lib.js": "./assets/lib.js?v=bb6dbfbebd",
-      "./assets/nav.js": "./assets/nav.js?v=bb6dbfbebd",
-      "./assets/stats.js": "./assets/stats.js?v=bb6dbfbebd",
-      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=bb6dbfbebd",
-      "./assets/views/analisis.js": "./assets/views/analisis.js?v=bb6dbfbebd",
-      "./assets/views/beranda.js": "./assets/views/beranda.js?v=bb6dbfbebd",
-      "./assets/views/chart.js": "./assets/views/chart.js?v=bb6dbfbebd",
-      "./assets/views/detail.js": "./assets/views/detail.js?v=bb6dbfbebd",
-      "./assets/views/profil.js": "./assets/views/profil.js?v=bb6dbfbebd",
-      "./assets/views/sheets.js": "./assets/views/sheets.js?v=bb6dbfbebd",
-      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=bb6dbfbebd",
-      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=bb6dbfbebd",
-      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=bb6dbfbebd"
+      "./assets/app.js": "./assets/app.js?v=eb36c40dbd",
+      "./assets/creds.js": "./assets/creds.js?v=eb36c40dbd",
+      "./assets/data.js": "./assets/data.js?v=eb36c40dbd",
+      "./assets/demo.js": "./assets/demo.js?v=eb36c40dbd",
+      "./assets/lib.js": "./assets/lib.js?v=eb36c40dbd",
+      "./assets/nav.js": "./assets/nav.js?v=eb36c40dbd",
+      "./assets/stats.js": "./assets/stats.js?v=eb36c40dbd",
+      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=eb36c40dbd",
+      "./assets/views/analisis.js": "./assets/views/analisis.js?v=eb36c40dbd",
+      "./assets/views/beranda.js": "./assets/views/beranda.js?v=eb36c40dbd",
+      "./assets/views/chart.js": "./assets/views/chart.js?v=eb36c40dbd",
+      "./assets/views/detail.js": "./assets/views/detail.js?v=eb36c40dbd",
+      "./assets/views/profil.js": "./assets/views/profil.js?v=eb36c40dbd",
+      "./assets/views/sheets.js": "./assets/views/sheets.js?v=eb36c40dbd",
+      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=eb36c40dbd",
+      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=eb36c40dbd",
+      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=eb36c40dbd"
     }
   }
   </script>
-  <link rel="stylesheet" href="assets/style.css?v=bb6dbfbebd">
+  <link rel="stylesheet" href="assets/style.css?v=eb36c40dbd">
 </head>
 <body>
   <main class="wrap">
@@ -79,9 +79,9 @@
         <h2 class="vh" id="vt-beranda" tabindex="-1">Beranda</h2>
         <div class="home">
           <div class="home-main">
-            <div class="sum-row" id="sum-row">
-              <section class="card summary" id="summary" aria-label="Ringkasan portofolio"></section>
-              <aside class="card motto" id="motto" aria-label="Doa rezeki: semoga sumber rezeki mengalir deras tanpa henti">
+            <div class="card sum-row" id="sum-row">
+              <section class="summary" id="summary" aria-label="Ringkasan portofolio"></section>
+              <aside class="motto" id="motto" aria-label="Doa rezeki: semoga sumber rezeki mengalir deras tanpa henti">
                 <b class="zh" lang="zh-Hans"><span>财源</span><span>滚滚来</span></b>
                 <small>Rezeki Datang Setiap Saat</small>
               </aside>
@@ -93,7 +93,8 @@
             </section>
 
             <section class="card" id="chart-card" aria-labelledby="chart-h">
-              <div class="card-head"><h2 id="chart-h">Nilai portofolio</h2></div>
+              <h2 id="chart-h" class="vh">Nilai portofolio</h2>
+              <div id="chart-rows"></div>
               <div id="chart" class="chart-box"></div>
               <div class="seg seg-ranges" id="ranges" role="group" aria-label="Rentang waktu"></div>
               <div id="chart-key" class="chart-key" aria-hidden="true"></div>
@@ -461,7 +462,7 @@
     </form>
   </dialog>
 
-  <script src="assets/nofile.js?v=bb6dbfbebd"></script>
-  <script type="module" src="assets/app.js?v=bb6dbfbebd"></script>
+  <script src="assets/nofile.js?v=eb36c40dbd"></script>
+  <script type="module" src="assets/app.js?v=eb36c40dbd"></script>
 </body>
 </html>

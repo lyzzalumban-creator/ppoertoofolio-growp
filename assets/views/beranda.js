@@ -1,6 +1,6 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, MASK, moneyShort, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
@@ -10,10 +10,14 @@ const keyOf = (p) => `${p.type}:${p.symbol}`;
 
 // ---------- ringkasan ----------
 
+/** Angka Total nilai: --n (jumlah karakter) dipakai CSS agar angkanya memenuhi lebar kartu, sepanjang apa pun. */
+const numHtml = (t) => `<b class="sum-value" style="--n:${t.length}">${esc(t)}</b>`;
+
 function renderSummary() {
   const L = latest();
   const box = $('summary');
   const stats = $('sumstats');
+  $('chart-rows').innerHTML = ''; // diisi lagi di bawah bila sudah ada data
   const solo = !L; // belum ada data: kartu ringkasan tampil sendiri tanpa kartu doa dan rincian
   $('sum-row').classList.toggle('solo', solo);
   $('motto').hidden = solo;
@@ -35,12 +39,12 @@ function renderSummary() {
   const n = (L.positions || []).length + state.pending.length;
   box.innerHTML = `
     <div class="sum-top"><span class="label">Total nilai</span></div>
-    <div id="sum-num"><b class="sum-value">${money(L.total)}</b></div>
-    <dl class="sum-rows">
-      <div><dt>Total profit</dt><dd class="${tone(L.pnl)}">${state.hidden ? '' : `${esc(moneyShort(L.pnl, { sign: true }))} `}${arrow(L.pnl)}${pct(L.pnlPct)}</dd></div>
+    <div id="sum-num">${numHtml(money(L.total))}</div>`;
+  $('chart-rows').innerHTML = `<dl class="sum-rows">
+      <div><dt>Total profit</dt><dd class="${tone(L.pnl)}">${state.hidden ? '' : `${esc(money(L.pnl, { sign: true }))} `}${arrow(L.pnl)}${pct(L.pnlPct)}</dd></div>
       <div class="today"><dt>Harian</dt>${L.dayPct == null
         ? '<dd class="flat">belum ada pembanding</dd>'
-        : `<dd class="${tone(L.dayPnl)}">${state.hidden ? '' : `${esc(moneyShort(L.dayPnl, { sign: true }))} `}${arrow(L.dayPct)}${pct(L.dayPct)}</dd>`}</div>
+        : `<dd class="${tone(L.dayPnl)}">${state.hidden ? '' : `${esc(money(L.dayPnl, { sign: true }))} `}${arrow(L.dayPct)}${pct(L.dayPct)}</dd>`}</div>
     </dl>`;
   stats.innerHTML = `
     <div class="sum-top"><span class="label">Rincian</span><span class="muted">${n} aset</span></div>
@@ -72,7 +76,7 @@ function drawChart() {
   lineChart($('chart'), pts, {
     // angka total di kartu atas ikut titik yang disentuh (nominal tersembunyi: tetap disamarkan)
     head: pts.length > 1 && $('chart').clientWidth ? $('sum-num') : null,
-    headHtml: (p) => `<b class="sum-value">${amt ? esc(fIdr.format(p.y)) : MASK}</b>`,
+    headHtml: (p) => numHtml(amt ? fIdr.format(p.y) : MASK),
     fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `<span>Modal ${esc(fIdr.format(p.c))}</span>` : ''}`,
     label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
     empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',
