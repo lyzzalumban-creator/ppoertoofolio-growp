@@ -281,6 +281,16 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .heat-mode { flex: none; }
 .heat-mode button { flex: none; min-height: 44px; padding: 4px 12px; font-size: 0.82rem; }
 .heat { position: relative; aspect-ratio: 100 / 92; max-width: 560px; margin-inline: auto; }
+.screen { display: grid; gap: 14px; }
+/* HP: Rincian (40%) dan Peta aset (60%) memenuhi satu layar */
+@media (max-width: 959px) {
+  .screen:has(#sumstats:not([hidden])):has(#heat-card:not([hidden])) { height: max(520px, calc(100dvh - var(--nav-h) - 24px)); grid-template-rows: minmax(min-content, 40fr) minmax(0, 60fr); }
+  .screen > .card { min-height: 0; }
+  #sumstats { display: flex; flex-direction: column; justify-content: space-between; }
+  #sumstats .stats.rows { margin-top: 0; }
+  #heat-card { display: flex; flex-direction: column; }
+  #heat-card .heat { flex: 1; min-height: 0; aspect-ratio: auto; max-width: none; width: 100%; }
+}
 .hm-tile { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; gap: 2px; padding: 9px 11px; border: 3px solid var(--surface); border-radius: var(--r); background-clip: padding-box; overflow: hidden; container-type: size; color: var(--text); text-decoration: none; background-color: var(--surface-2); }
 .hm-tile.pos { background-color: color-mix(in srgb, var(--pos) calc(10% + var(--h) * 38%), var(--surface-2)); }
 .hm-tile.neg { background-color: color-mix(in srgb, var(--neg) calc(10% + var(--h) * 38%), var(--surface-2)); }
