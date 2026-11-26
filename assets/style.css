@@ -220,11 +220,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .chart-key .k-cost::before { border-top: 2px dashed var(--soga); }
 
 /* daftar aset: satu kartu per aset */
-.holdings { display: grid; gap: 10px; }
 .sec-head { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 4px 0; }
 .sec-head h2 { font-size: 1.15rem; }
-.hold-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-.search input, .select {
+.select {
   width: 100%; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px;
   background: var(--surface); box-shadow: var(--shadow); color: var(--text); font: inherit; font-size: 16px;
 }
@@ -237,29 +235,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .chips button[aria-pressed="true"] { background: var(--text); color: var(--surface); }
 .chips .dot { width: 8px; height: 8px; }
 .note-line:empty { display: none; }
-.hold-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.hold {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) 64px auto; align-items: center; gap: 4px 11px;
-  min-height: 76px; padding: 13px 14px; border-radius: 20px; background: var(--surface); box-shadow: var(--shadow);
-  color: inherit; text-decoration: none;
-}
-.hold:hover { box-shadow: 0 0 0 1px var(--border), var(--shadow); }
-.hold.nospark .h-id { grid-column: 2 / 4; }
-.h-av { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; background: color-mix(in srgb, var(--c) 22%, var(--surface)); color: var(--c); font-style: normal; font-weight: 700; font-size: 1.05rem; }
-.h-dot, .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.h-id { min-width: 0; }
-.h-id b { display: block; font-size: 1.02rem; letter-spacing: -0.01em; overflow-wrap: anywhere; }
-.h-id small { display: block; color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.h-spark .spark { width: 64px; height: 34px; }
-.h-val { text-align: right; font-size: 0.86rem; }
-.h-val b { display: block; font-size: 0.98rem; }
-.h-w { grid-column: 2 / -1; display: flex; align-items: center; gap: 10px; }
-.h-w small { flex: none; min-width: 3.2em; text-align: right; color: var(--muted); font-size: 0.74rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.h-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
-.h-bar i { display: block; height: 100%; opacity: 0.7; }
-.hold.wait { opacity: 0.85; }
-.chip-wait { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 0.74rem; font-weight: 600; }
-.empty-row { padding: 18px; border-radius: 18px; background: var(--surface); color: var(--muted); text-align: center; }
 .spark { display: block; color: var(--muted); }
 .spark.pos { color: var(--pos); }
 .spark.neg { color: var(--neg); }
@@ -281,8 +256,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .heat-mode { flex: none; }
 .heat-mode button { flex: none; min-height: 44px; padding: 4px 12px; font-size: 0.82rem; }
 .heat { position: relative; aspect-ratio: 100 / 92; max-width: 560px; margin-inline: auto; }
-.screen { display: grid; gap: 14px; scroll-snap-align: start; scroll-margin-top: 8px; }
-@media (max-width: 959px) { html { scroll-snap-type: y proximity; } }
+.screen { display: grid; gap: 14px; }
 /* HP: Rincian (40%) dan Peta aset (60%) memenuhi satu layar */
 @media (max-width: 959px) {
   .screen:has(#sumstats:not([hidden])):has(#heat-card:not([hidden])) { height: max(520px, calc(100dvh - var(--nav-h) - 24px)); grid-template-rows: minmax(min-content, 40fr) minmax(0, 60fr); }
@@ -513,3 +487,21 @@ table.hist { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .card-head .seg button { flex: none; padding: 4px 12px; }
 .chart.bars .bar.sel { stroke: var(--text); stroke-width: 1.5; }
 .chart-box .tip span { display: block; }
+
+.chip-wait { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 0.74rem; font-weight: 600; }
+/* satu kapsul trading emas di Beranda: profit besar, bulan ini di kanan, bar win rate, rincian menang/kalah */
+.caps { margin: 8px 0 0; padding: 0; list-style: none; }
+.cap { display: grid; gap: 12px; padding: 18px 22px; border-radius: 32px; background: var(--surface); box-shadow: var(--shadow); }
+.cap-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.cap-i { display: grid; gap: 2px; min-width: 0; }
+.cap-i.end { text-align: right; }
+.cap-i span { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
+.cap-i b { white-space: nowrap; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.cap-i.big b { font-size: clamp(1.3rem, 6.4vw, 1.7rem); letter-spacing: -0.02em; }
+.cap-i.pos b { color: var(--pos); }
+.cap-i.neg b { color: var(--neg); }
+.cap-bar { height: 8px; border-radius: 4px; background: var(--neg-bg); overflow: hidden; }
+.cap-bar i { display: block; height: 100%; border-radius: 4px; background: var(--pos); }
+.cap-wl { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 0.76rem; font-weight: 600; }
+.cap-wl b { color: var(--text); }
+.sec-head a { font-size: 0.85rem; font-weight: 600; text-decoration: none; }

@@ -7,31 +7,31 @@
   <meta name="robots" content="noindex, nofollow">
   <title>Lumbung</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2333408f'/%3E%3Cpath d='M6 14.5 16 7l10 7.5' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M11 24v-4M16 24v-7M21 24v-5' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
-  <script src="assets/theme.js?v=5e9d6811f9"></script>
+  <script src="assets/theme.js?v=f31774e935"></script>
   <script type="importmap">
   {
     "imports": {
-      "./assets/app.js": "./assets/app.js?v=5e9d6811f9",
-      "./assets/creds.js": "./assets/creds.js?v=5e9d6811f9",
-      "./assets/data.js": "./assets/data.js?v=5e9d6811f9",
-      "./assets/demo.js": "./assets/demo.js?v=5e9d6811f9",
-      "./assets/lib.js": "./assets/lib.js?v=5e9d6811f9",
-      "./assets/nav.js": "./assets/nav.js?v=5e9d6811f9",
-      "./assets/stats.js": "./assets/stats.js?v=5e9d6811f9",
-      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=5e9d6811f9",
-      "./assets/views/analisis.js": "./assets/views/analisis.js?v=5e9d6811f9",
-      "./assets/views/beranda.js": "./assets/views/beranda.js?v=5e9d6811f9",
-      "./assets/views/chart.js": "./assets/views/chart.js?v=5e9d6811f9",
-      "./assets/views/detail.js": "./assets/views/detail.js?v=5e9d6811f9",
-      "./assets/views/profil.js": "./assets/views/profil.js?v=5e9d6811f9",
-      "./assets/views/sheets.js": "./assets/views/sheets.js?v=5e9d6811f9",
-      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=5e9d6811f9",
-      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=5e9d6811f9",
-      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=5e9d6811f9"
+      "./assets/app.js": "./assets/app.js?v=f31774e935",
+      "./assets/creds.js": "./assets/creds.js?v=f31774e935",
+      "./assets/data.js": "./assets/data.js?v=f31774e935",
+      "./assets/demo.js": "./assets/demo.js?v=f31774e935",
+      "./assets/lib.js": "./assets/lib.js?v=f31774e935",
+      "./assets/nav.js": "./assets/nav.js?v=f31774e935",
+      "./assets/stats.js": "./assets/stats.js?v=f31774e935",
+      "./assets/views/aktivitas.js": "./assets/views/aktivitas.js?v=f31774e935",
+      "./assets/views/analisis.js": "./assets/views/analisis.js?v=f31774e935",
+      "./assets/views/beranda.js": "./assets/views/beranda.js?v=f31774e935",
+      "./assets/views/chart.js": "./assets/views/chart.js?v=f31774e935",
+      "./assets/views/detail.js": "./assets/views/detail.js?v=f31774e935",
+      "./assets/views/profil.js": "./assets/views/profil.js?v=f31774e935",
+      "./assets/views/sheets.js": "./assets/views/sheets.js?v=f31774e935",
+      "./scripts/lib/api.mjs": "./scripts/lib/api.mjs?v=f31774e935",
+      "./scripts/lib/portfolio.mjs": "./scripts/lib/portfolio.mjs?v=f31774e935",
+      "./scripts/lib/trade.mjs": "./scripts/lib/trade.mjs?v=f31774e935"
     }
   }
   </script>
-  <link rel="stylesheet" href="assets/style.css?v=5e9d6811f9">
+  <link rel="stylesheet" href="assets/style.css?v=f31774e935">
 </head>
 <body>
   <main class="wrap">
@@ -115,24 +115,9 @@
               </section>
             </div>
 
-            <section id="holdings-sec" class="holdings" aria-labelledby="hold-h">
-              <div class="sec-head"><h2 id="hold-h">Aset</h2><span id="hold-count" class="muted"></span></div>
-              <div id="hold-tools" class="hold-tools">
-                <label class="search"><span class="vh">Cari aset</span>
-                  <input id="q" type="search" placeholder="Cari aset" autocomplete="off" enterkeyhint="search">
-                </label>
-                <label class="sort"><span class="vh">Urutkan</span>
-                  <select id="sort" class="select">
-                    <option value="value">Nilai terbesar</option>
-                    <option value="pnlPct">Untung tertinggi</option>
-                    <option value="dayPct">Naik hari ini</option>
-                    <option value="name">Nama A–Z</option>
-                  </select>
-                </label>
-              </div>
-              <div class="chips" id="chips" role="group" aria-label="Saring jenis aset"></div>
-              <p id="filter-note" class="muted note-line" role="status"></p>
-              <ul id="holdings" class="hold-list"></ul>
+            <section id="fx-sec" aria-labelledby="fx-h" hidden>
+              <div class="sec-head"><h2 id="fx-h">Trading emas</h2><a class="muted" href="#/aktivitas/trading">Lihat semua</a></div>
+              <ul class="caps" id="fx-caps"></ul>
             </section>
           </div>
 
@@ -453,7 +438,7 @@
     </form>
   </dialog>
 
-  <script src="assets/nofile.js?v=5e9d6811f9"></script>
-  <script type="module" src="assets/app.js?v=5e9d6811f9"></script>
+  <script src="assets/nofile.js?v=f31774e935"></script>
+  <script type="module" src="assets/app.js?v=f31774e935"></script>
 </body>
 </html>

@@ -101,11 +101,11 @@ function renderAlokasi() {
   $('types').innerHTML = types.map((t) => {
     const s = stats[t];
     const w = s.value / total;
-    return `<li><a class="ty" href="#/beranda" data-filter="${esc(t)}">
+    return `<li><div class="ty" data-type="${esc(t)}">
       <i class="dot" style="background:${colorOf(t)}"></i>
       <span class="nm">${esc(typeOf(t).label)}<small>${s.count} aset · ${weightText(w)} dari total</small></span>
       <span class="v"><b>${money(s.value)}</b>${t === 'cash' ? '' : delta(s.pnlPct)}</span>
-      <span class="bar" aria-hidden="true"><i style="width:${(w * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></a></li>`;
+      <span class="bar" aria-hidden="true"><i style="width:${(w * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></div></li>`;
   }).join('');
 }
 

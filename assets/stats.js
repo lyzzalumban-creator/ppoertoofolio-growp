@@ -46,21 +46,6 @@ export function maxDrawdown(index) {
   return out;
 }
 
-const label = (p) => String(p.name || p.symbol);
-// Persentase kosong (mis. modal 0) selalu di bawah; seri diurutkan menurut nilai.
-const byPct = (k) => (a, b) => (a[k] == null) - (b[k] == null) || (b[k] ?? 0) - (a[k] ?? 0) || b.value - a.value;
-const SORTS = {
-  value: (a, b) => b.value - a.value,
-  pnlPct: byPct('pnlPct'),
-  dayPct: byPct('dayPct'),
-  name: (a, b) => label(a).localeCompare(label(b), 'id', { sensitivity: 'base' }),
-};
-
-/** Salinan terurut; kunci tak dikenal = urut nilai. */
-export function sortPositions(rows, key) {
-  return [...rows].sort(SORTS[key] || SORTS.value);
-}
-
 // ---------- halaman depan ----------
 
 // Ambang konsentrasi. Kas dan aset "manual" (deposito, reksa dana pasar uang) tidak dihitung: dominannya bukan risiko pasar.
@@ -245,21 +230,10 @@ export function treemap(items, W = 100, H = 100) {
 }
 
 /**
- * Bahan peta aset: semua aset termasuk kas (kas netral, tanpa warna arah); aset berbobot < minShare digabung jadi satu
- * petak bila ada ≥ 2. metric: 'day' (perubahan hari ini) atau 'pnl' (untung total). Petak gabungan memakai rata-rata
- * tertimbang nilai dari anggota yang punya angka.
+ * Bahan peta aset: semua aset termasuk kas (kas netral, tanpa warna arah). metric: 'day' (perubahan hari ini) atau
+ * 'pnl' (untung total). d = null bila tidak ada angkanya.
  */
-export function heatItems(positions, metric = 'day', minShare = 0.05) {
-  const rows = positions.filter((p) => p.value > 0);
-  const total = rows.reduce((s, p) => s + p.value, 0);
+export function heatItems(positions, metric = 'day') {
   const val = (p) => { if (p.type === 'cash') return null; const v = metric === 'pnl' ? p.pnlPct : p.dayPct; return Number.isFinite(v) ? v : null; };
-  const small = rows.filter((p) => p.value / total < minShare);
-  const group = small.length >= 2 ? small : [];
-  const items = rows.filter((p) => !group.includes(p)).map((p) => ({ p, value: p.value, d: val(p) }));
-  if (group.length) {
-    const ok = group.filter((p) => val(p) != null);
-    const w = ok.reduce((s, p) => s + p.value, 0);
-    items.push({ group, value: group.reduce((s, p) => s + p.value, 0), d: w ? ok.reduce((s, p) => s + p.value * val(p), 0) / w : null });
-  }
-  return items;
+  return positions.filter((p) => p.value > 0).map((p) => ({ p, value: p.value, d: val(p) }));
 }

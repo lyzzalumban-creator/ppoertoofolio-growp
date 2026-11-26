@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { liveView, byTypePnl, cashSplit, concentration, currentDrawdown, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, riskStats, sortPositions } from '../assets/stats.js';
+import { liveView, byTypePnl, cashSplit, concentration, currentDrawdown, goalProgress, insights, maxDrawdown, monthlyReturns, returnIndex, riskStats } from '../assets/stats.js';
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg ?? ''} ${a} != ${b}`);
 const snap = (date, dayPct) => ({ date, dayPct });
@@ -65,20 +65,6 @@ test('maxDrawdown: selalu naik = 0 tanpa tanggal', () => {
   assert.deepEqual(maxDrawdown([{ date: 'a', idx: 1 }, { date: 'b', idx: 1.1 }]), { pct: 0, from: null, to: null });
 });
 
-test('sortPositions: persen kosong selalu di bawah, nama memakai urutan Indonesia', () => {
-  const rows = [
-    { symbol: 'B', name: 'bank', value: 10, pnlPct: null, dayPct: 0.01 },
-    { symbol: 'A', name: 'Apel', value: 30, pnlPct: -0.2, dayPct: null },
-    { symbol: 'C', name: 'cokelat', value: 20, pnlPct: 0.5, dayPct: -0.02 },
-  ];
-  const sym = (k) => sortPositions(rows, k).map((r) => r.symbol).join('');
-  assert.equal(sym('value'), 'ACB');
-  assert.equal(sym('pnlPct'), 'CAB');
-  assert.equal(sym('dayPct'), 'BCA');
-  assert.equal(sym('name'), 'ABC');
-  assert.equal(sym('ngawur'), 'ACB', 'kunci tak dikenal = urut nilai');
-  assert.equal(rows[0].symbol, 'B', 'array asli tidak diubah');
-});
 
 const P = (symbol, o = {}) => ({ type: 'idx', symbol, name: symbol, value: 100, weight: 0.1, dayPct: null, ...o });
 
@@ -248,21 +234,16 @@ test('treemap: luas petak sebanding nilai, semua di dalam kotak, tanpa tumpang t
 });
 
 import { heatItems } from '../assets/stats.js';
-test('heatItems: kas ikut tanpa warna arah, aset kecil digabung, metrik hari ini vs untung total', () => {
+test('heatItems: semua aset ikut (kas tanpa warna arah), hanya yang bernilai; metrik hari ini vs untung total', () => {
   const P = (symbol, value, dayPct, pnlPct, type = 'idx') => ({ type, symbol, value, dayPct, pnlPct });
-  const pos = [P('A', 600, 0.01, 0.2), P('B', 300, -0.02, 0.1), P('C', 30, 0.04, 0.5), P('D', 20, 0.02, 0.1), P('KAS', 300, null, 0, 'cash')];
+  const pos = [P('A', 600, 0.01, 0.2), P('B', 300, -0.02, 0.1), P('KAS', 300, null, 0, 'cash'), P('C', 30, 0.04, 0.5), P('Z', 0, 0.1, 0.1)];
   const day = heatItems(pos, 'day');
-  assert.equal(day.length, 4); // A, B, KAS, dan satu petak gabungan C+D
-  const kas = day.find((i) => i.p && i.p.type === 'cash');
-  assert.ok(kas && kas.d === null && heatItems(pos, 'pnl').find((i) => i.p && i.p.type === 'cash').d === null);
-  const g = day.find((i) => i.group);
-  assert.equal(g.group.length, 2);
-  assert.equal(g.value, 50);
-  assert.ok(Math.abs(g.d - (30 * 0.04 + 20 * 0.02) / 50) < 1e-12);
-  assert.equal(heatItems(pos, 'pnl').find((i) => i.p && i.p.symbol === 'A').d, 0.2);
-  // hanya satu aset kecil: tidak digabung
-  assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').length, 2);
-  assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').some((i) => i.group), false);
+  assert.equal(day.length, 4); // Z bernilai 0: tidak ikut; tidak ada penggabungan
+  const kas = day.find((i) => i.p.type === 'cash');
+  assert.equal(kas.d, null);
+  assert.equal(heatItems(pos, 'pnl').find((i) => i.p.type === 'cash').d, null);
+  assert.equal(day.find((i) => i.p.symbol === 'C').d, 0.04);
+  assert.equal(heatItems(pos, 'pnl').find((i) => i.p.symbol === 'A').d, 0.2);
   assert.equal(heatItems([P('X', 10, null, null)], 'day')[0].d, null);
 });
 
