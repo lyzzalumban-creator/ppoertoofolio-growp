@@ -145,7 +145,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 
 .sum-row { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr); gap: 12px; padding: 16px; background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, var(--soga) 16%, var(--surface)) 100%); } /* satu kartu bergradasi: nilai di kiri, doa di kanan */
 .sum-row.solo { grid-template-columns: minmax(0, 1fr); }
-.sum-row .summary { padding: 0; display: grid; align-content: start; } /* "Total nilai" mepet atas kiri */
+.sum-row .summary { padding: 0; display: grid; } /* "Total nilai" mepet atas kiri, angkanya di tengah kartu */
+.sum-row:not(.solo) .summary > * { grid-area: 1 / 1; }
+.sum-row:not(.solo) .summary .sum-top { align-self: start; }
+.sum-row:not(.solo) #sum-num { align-self: center; }
 .sum-row .sum-value { display: block; white-space: nowrap; font-size: min(2.6rem, calc(100cqw / (var(--n, 14) * 0.56))); } /* angka memenuhi lebar kartu */
 #sum-num { container-type: inline-size; }
 .sum-rows { display: grid; gap: 3px; margin: 0 0 6px; padding: 0; font-size: 0.74rem; }
