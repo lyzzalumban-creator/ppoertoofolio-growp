@@ -1178,6 +1178,19 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
     check('J6 target diingat setelah muat ulang', (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
+    // perkiraan target tercapai: asumsi return pengguna + performa YTD
+    check('J6b tanpa asumsi return: hanya baris Performa YTD (bila ada riwayat), tanpa baris Return per tahun', !/Return \d+% per tahun/.test(await page.locator('#goal').innerText()));
+    await page.locator('#goal [data-goal="open"]').click();
+    await page.fill('#goal-rate', '0');
+    await page.locator('#goal-form [type="submit"]').click();
+    check('J6c return 0 ditolak dengan pesan', (await page.locator('#goal-err').isVisible()) && /0–500/.test(await page.locator('#goal-err').innerText()));
+    await page.fill('#goal-rate', '20');
+    await page.locator('#goal-form [type="submit"]').click();
+    await page.waitForFunction(() => !document.getElementById('goal-dlg').open);
+    const proj = flat(await page.locator('#goal .g-proj').innerText());
+    const years = Math.log(goal / L.total) / Math.log(1.2);
+    check('J6d asumsi 20%: perkiraan "sekitar <bulan tahun> (N tahun)" sesuai bunga majemuk dari total sekarang', new RegExp(`Return 20% per tahun: sekitar \\S+ \\d{4} \\(${years.toLocaleString('id-ID', { maximumFractionDigits: 1 }).replace('.', '\\.')} tahun\\)`).test(proj), proj);
+    check('J6e asumsi return diingat setelah muat ulang', await (async () => { await page.reload({ waitUntil: 'networkidle' }); await page.waitForSelector('#dash:not([hidden])'); return /Return 20% per tahun/.test(await page.locator('#goal').innerText()); })());
 
     await page.locator('#privacy').click();
     const hid = await page.locator('main').textContent();

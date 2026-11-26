@@ -265,3 +265,31 @@ test('heatItems: kas ikut tanpa warna arah, aset kecil digabung, metrik hari ini
   assert.equal(heatItems([P('A', 900, 0, 0), P('B', 40, 0, 0)], 'day').some((i) => i.group), false);
   assert.equal(heatItems([P('X', 10, null, null)], 'day')[0].d, null);
 });
+
+import { dateAfterYears, ytdReturn, yearsToGoal } from '../assets/stats.js';
+test('yearsToGoal: bunga majemuk; 0 bila tercapai; null bila tidak akan tercapai', () => {
+  assert.ok(Math.abs(yearsToGoal(100, 200, 0.2) - Math.log(2) / Math.log(1.2)) < 1e-12); // ≈ 3,80 tahun
+  assert.ok(Math.abs(yearsToGoal(100, 144, 0.2) - 2) < 1e-9); // 100 × 1,2² = 144
+  assert.equal(yearsToGoal(300, 200, 0.2), 0);
+  assert.equal(yearsToGoal(100, 200, 0), null);
+  assert.equal(yearsToGoal(100, 200, -0.1), null);
+  assert.equal(yearsToGoal(0, 200, 0.2), null);
+  assert.equal(yearsToGoal(100, null, 0.2), null);
+});
+test('dateAfterYears: menambah tahun (365,25 hari/tahun)', () => {
+  assert.equal(dateAfterYears('2026-11-25', 0), '2026-11-25');
+  assert.equal(dateAfterYears('2026-01-01', 1), '2027-01-01');
+  assert.equal(dateAfterYears('2026-01-01', 2).slice(0, 4), '2028');
+});
+test('ytdReturn: dari akhir tahun lalu; bila riwayat baru mulai tahun ini, dari data pertama (full=false)', () => {
+  const idx = [{ date: '2025-12-30', idx: 1 }, { date: '2025-12-31', idx: 1.1 }, { date: '2026-03-01', idx: 1.21 }, { date: '2026-06-01', idx: 1.43 }];
+  const r = ytdReturn(idx);
+  assert.ok(Math.abs(r.ret - (1.43 / 1.1 - 1)) < 1e-12);
+  assert.equal(r.since, '2025-12-31');
+  assert.equal(r.full, true);
+  const p = ytdReturn([{ date: '2026-02-01', idx: 1 }, { date: '2026-06-01', idx: 1.3 }]);
+  assert.ok(Math.abs(p.ret - 0.3) < 1e-12);
+  assert.equal(p.full, false);
+  assert.equal(ytdReturn([{ date: '2026-02-01', idx: 1 }]), null);
+  assert.equal(ytdReturn([]), null);
+});

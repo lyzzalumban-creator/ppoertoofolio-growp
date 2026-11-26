@@ -1,7 +1,7 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
-import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, monthName, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { dateAfterYears, goalProgress, heatItems, insights, sortPositions, treemap, yearsToGoal, ytdReturn } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
 import { openAssetForm } from './sheets.js';
@@ -182,6 +182,21 @@ function renderAlloc() {
       <span class="lb" aria-hidden="true"><i style="width:${Math.max(3, (L.byType[t].weight / maxType) * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></button></li>`).join('');
 }
 
+// Perkiraan tercapai: bunga majemuk dari nilai sekarang (tanpa setoran baru), dengan asumsi return pengguna dan dengan return YTD.
+const durText = (y) => (y > 100 ? 'lebih dari 100 tahun' : y < 1 ? `${Math.max(1, Math.ceil(y * 12))} bulan` : `${y.toLocaleString('id-ID', { maximumFractionDigits: 1 })} tahun`);
+function projLine(label, rate, L) {
+  const y = yearsToGoal(L.total, state.goal, rate);
+  if (y == null) return `<li>${esc(label)}: <b class="neg">target tidak tercapai dengan laju ini</b></li>`;
+  return `<li>${esc(label)}: <b>sekitar ${esc(monthName(dateAfterYears(L.date, y).slice(0, 7)))}</b> <span class="muted">(${esc(durText(y))})</span></li>`;
+}
+function projHtml(L) {
+  const ytd = state.perf ? ytdReturn(state.perf.index) : null;
+  const lines = [];
+  if (state.goalRate) lines.push(projLine(`Return ${state.goalRate.toLocaleString('id-ID')}% per tahun`, state.goalRate / 100, L));
+  if (ytd) lines.push(projLine(`Performa YTD ${pct(ytd.ret)}${ytd.full ? '' : ' (sejak data pertama)'}`, ytd.ret, L));
+  return lines.length ? `<ul class="g-proj" aria-label="Perkiraan target tercapai">${lines.join('')}</ul>` : '';
+}
+
 function renderGoal() {
   const L = latest();
   const f = L ? goalProgress(L.total, state.goal) : null;
@@ -194,11 +209,13 @@ function renderGoal() {
     <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(${f >= 1 ? 'var(--pos)' : 'var(--accent)'} ${(Math.min(f, 1) * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
     <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
       <p class="g-sub">${f >= 1 ? '<span class="pill pos">✓ Target tercapai</span>' : `Sisa ${money(state.goal - L.total)}`}</p>
-      <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
+      <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>${f >= 1 ? '' : projHtml(L)}`;
 }
 
-function setGoal(v) {
+function setGoal(v, rate) {
   state.goal = v > 0 ? v : null;
+  state.goalRate = rate > 0 ? rate : null;
+  try { if (state.goalRate) localStorage.setItem('pf-goal-rate', String(state.goalRate)); else localStorage.removeItem('pf-goal-rate'); } catch { /* abaikan */ }
   try { if (state.goal) localStorage.setItem('pf-goal', String(state.goal)); else localStorage.removeItem('pf-goal'); } catch { /* abaikan */ }
   $('goal-dlg').close();
   notify();
@@ -259,6 +276,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('[data-goal="open"]')) return;
   $('goal-input').value = state.goal ?? '';
+  $('goal-rate').value = state.goalRate ?? '';
   $('goal-err').hidden = true;
   $('goal-del').hidden = state.goal == null;
   $('goal-dlg').showModal();
@@ -268,8 +286,10 @@ $('goal-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const v = $('goal-input').valueAsNumber;
   if (!(v > 0) || !Number.isFinite(v)) { $('goal-err').hidden = false; $('goal-err').textContent = 'Isi angka lebih dari 0.'; return; }
-  setGoal(v);
+  const r = $('goal-rate').value === '' ? null : $('goal-rate').valueAsNumber;
+  if (r != null && !(r > 0 && r <= 500)) { $('goal-err').hidden = false; $('goal-err').textContent = 'Return per tahun: isi angka 0–500, atau kosongkan.'; return; }
+  setGoal(v, r);
 });
-$('goal-del').addEventListener('click', () => setGoal(null));
-$('goal-input').addEventListener('input', () => { $('goal-err').hidden = true; });
+$('goal-del').addEventListener('click', () => setGoal(null, null));
+$('goal-form').addEventListener('input', () => { $('goal-err').hidden = true; });
 $('goal-cancel').addEventListener('click', () => $('goal-dlg').close());

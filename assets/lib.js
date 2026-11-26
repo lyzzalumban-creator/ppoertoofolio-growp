@@ -79,6 +79,8 @@ export const state = {
 try { const v = localStorage.getItem('pf-hidden'); state.hidden = v === null ? true : v === '1'; } catch { state.hidden = true; }
 // Target nilai: preferensi per perangkat (seperti pf-hidden), tidak dikirim ke Sheet.
 try { const g = Number(localStorage.getItem('pf-goal')); state.goal = g > 0 ? g : null; } catch { state.goal = null; }
+// Asumsi return per tahun (persen) untuk perkiraan kapan target tercapai: per perangkat juga.
+try { const r = Number(localStorage.getItem('pf-goal-rate')); state.goalRate = r > 0 ? r : null; } catch { state.goalRate = null; }
 
 export const latest = () => state.series[state.series.length - 1];
 export const canTrade = () => state.meta.version >= 3; // Code.gs versi 3: tab Transaksi (beli/jual)
