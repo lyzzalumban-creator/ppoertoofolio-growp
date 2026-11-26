@@ -1,7 +1,7 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
-import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, monthName, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { dateAfterYears, goalProgress, heatItems, insights, sortPositions, treemap, yearsToGoal, ytdReturn } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
 import { openAssetForm } from './sheets.js';
@@ -35,7 +35,6 @@ function renderSummary() {
   }
   const mtd = state.series.length > 1 && state.perf ? state.perf.months.at(-1) : null;
   const real = realized(state.txs);
-  const f = goalProgress(L.total, state.goal);
   const n = (L.positions || []).length + state.pending.length;
   box.innerHTML = `
     <div class="sum-top"><span class="label">Total nilai</span></div>
@@ -48,13 +47,13 @@ function renderSummary() {
     </dl>`;
   stats.innerHTML = `
     <div class="sum-top"><span class="label">Rincian</span><span class="muted">${n} aset</span></div>
-    <dl class="stats c3">
+    <dl class="stats rows">
       <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
       <div><dt>Terealisasi</dt><dd class="${tone(real)}">${state.txs.some((t) => t.kind === 'sell') ? money(real, { sign: true }) : '–'}</dd></div>
       <div><dt>Bulan ini</dt><dd>${delta(mtd && mtd.ret)}</dd></div>
     </dl>
     ${state.pending.length ? `<p class="muted pend">${state.pending.length} aset menunggu harga pertama dan belum masuk total.</p>` : ''}
-    ${f == null ? '' : `<div class="goal-line"><span class="bar" aria-hidden="true"><i style="width:${(f * 100).toFixed(1)}%"></i></span><span class="muted">${Math.floor(f * 100)}% dari target</span></div>`}`;
+    <div id="goal">${goalHtml(L)}</div>`;
 }
 
 function renderInsights() {
@@ -136,7 +135,7 @@ function renderHoldings() {
 
 // ---------- peta aset: ukuran petak = bobot, warna = perubahan hari ini atau untung total (hanya persen, tanpa nominal) ----------
 
-const RADII = ['28px', '28px 28px 28px 6px', '6px 28px 28px 28px', '44px 10px 28px 10px', '28px 6px 28px 6px']; // bentuk sudut bergantian
+const RADII = ['24px', '24px 24px 24px 12px', '12px 24px 24px 24px', '24px 12px 24px 12px']; // sudut bergantian, tetap serumpun
 const HEAT_FULL = { day: 0.025, pnl: 0.3 }; // persen yang sudah dianggap warna pekat penuh
 function renderHeat() {
   const all = ((latest() && latest().positions) || []);
@@ -160,45 +159,37 @@ function renderHeat() {
   }).join('');
 }
 
-// ---------- samping: alokasi ringkas dan target ----------
+// ---------- target (di kartu Rincian) ----------
 
-function renderAlloc() {
-  const L = latest();
-  const types = L ? typesIn(Object.keys(L.byType || {})) : [];
-  $('alloc-card').hidden = !types.length;
-  let acc = 0;
-  const stops = types.map((t, i) => {
-    const from = acc;
-    acc += L.byType[t].weight * 100;
-    const to = i === types.length - 1 ? 100 : acc;
-    return types.length > 1 ? `${colorOf(t)} ${from.toFixed(3)}% ${(to - 0.8).toFixed(3)}%, var(--surface) ${(to - 0.8).toFixed(3)}% ${to.toFixed(3)}%` : `${colorOf(t)} 0 100%`; // celah tipis antar segmen
-  });
-  $('donut').style.background = stops.length ? `conic-gradient(${stops.join(',')})` : '';
-  $('donut').innerHTML = `<div class="hole"><strong>${L ? (L.positions || []).length : 0}</strong><span>aset</span></div>`;
-  const maxType = Math.max(0.0001, ...types.map((t) => L.byType[t].weight));
-  $('legend').innerHTML = types.map((t) => `<li><button type="button" class="lg" data-filter="${esc(t)}" aria-pressed="${state.filter === t}">
-      <i class="sw" style="background:${colorOf(t)}"></i><span class="nm">${esc(typeOf(t).label)}</span><span class="pc">${weightText(L.byType[t].weight)}</span>
-      <span class="am">${money(L.byType[t].value)}</span>
-      <span class="lb" aria-hidden="true"><i style="width:${Math.max(3, (L.byType[t].weight / maxType) * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></button></li>`).join('');
+// Perkiraan tercapai (di kartu Rincian): bunga majemuk dari nilai sekarang, tanpa setoran baru; asumsi pengguna dan return YTD.
+const durText = (y) => (y > 100 ? '>100 thn' : y < 1 ? `${Math.max(1, Math.ceil(y * 12))} bln` : `${y.toLocaleString('id-ID', { maximumFractionDigits: 1 })} thn`);
+function projLine(label, rate, L) {
+  const y = yearsToGoal(L.total, state.goal, rate);
+  return `<li><span>${esc(label)}</span>${y == null
+    ? '<b class="neg">tidak tercapai</b>'
+    : `<b>${esc(monthName(dateAfterYears(L.date, y).slice(0, 7)))}</b><small>${esc(durText(y))}</small>`}</li>`;
+}
+function projHtml(L) {
+  const ytd = state.perf ? ytdReturn(state.perf.index) : null;
+  const lines = [];
+  if (state.goalRate) lines.push(projLine(`Return ${state.goalRate.toLocaleString('id-ID')}%/thn`, state.goalRate / 100, L));
+  if (ytd) lines.push(projLine(`YTD ${pct(ytd.ret)}${ytd.full ? '' : '*'}`, ytd.ret, L));
+  return lines.length ? `<ul class="g-proj" aria-label="Perkiraan target tercapai">${lines.join('')}</ul>` : '';
 }
 
-function renderGoal() {
-  const L = latest();
-  const f = L ? goalProgress(L.total, state.goal) : null;
-  if (f == null) {
-    $('goal').innerHTML = '<div class="goal-empty"><p>Tetapkan target nilai portofolio untuk melihat kemajuanmu.</p><button type="button" class="btn" data-goal="open">Atur target</button></div>';
-    return;
-  }
+/** Bagian target di kartu Rincian: belum diatur = ajakan; sudah = bar kemajuan, sisa, dan perkiraan tercapai. */
+function goalHtml(L) {
+  const f = goalProgress(L.total, state.goal);
+  if (f == null) return '<div class="goal-empty"><span class="muted">Target belum diatur</span><button type="button" class="btn" data-goal="open">Atur target</button></div>';
   const p = Math.floor(f * 100); // 99,8% tampil 99%, bukan 100% sebelum benar-benar tercapai
-  $('goal').innerHTML = `<div class="goal">
-    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(${f >= 1 ? 'var(--pos)' : 'var(--accent)'} ${(Math.min(f, 1) * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
-    <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
-      <p class="g-sub">${f >= 1 ? '<span class="pill pos">✓ Target tercapai</span>' : `Sisa ${money(state.goal - L.total)}`}</p>
-      <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
+  return `<div class="goal-line" role="img" aria-label="${p} persen menuju target"><span class="bar" aria-hidden="true"><i style="width:${(f * 100).toFixed(1)}%"></i></span><span class="muted">${p}% dari target</span><button type="button" class="btn sm" data-goal="open">Ubah</button></div>
+    ${f >= 1 ? '<p class="g-sub"><span class="pill pos">✓ Target tercapai</span></p>' : `<p class="g-sub">Sisa ${money(state.goal - L.total)} dari ${money(state.goal)}</p>${projHtml(L)}`}`;
 }
 
-function setGoal(v) {
+function setGoal(v, rate) {
   state.goal = v > 0 ? v : null;
+  state.goalRate = rate > 0 ? rate : null;
+  try { if (state.goalRate) localStorage.setItem('pf-goal-rate', String(state.goalRate)); else localStorage.removeItem('pf-goal-rate'); } catch { /* abaikan */ }
   try { if (state.goal) localStorage.setItem('pf-goal', String(state.goal)); else localStorage.removeItem('pf-goal'); } catch { /* abaikan */ }
   $('goal-dlg').close();
   notify();
@@ -209,8 +200,6 @@ export function render() {
   renderInsights();
   renderHeat();
   renderHoldings();
-  renderAlloc();
-  renderGoal();
   $('ranges').innerHTML = rangesHtml(state.range);
   $('chart-card').hidden = !state.series.length;
   if (state.series.length) drawChart();
@@ -236,16 +225,14 @@ $('ranges').addEventListener('click', (e) => {
   drawChart();
 });
 
-// Saring jenis: chip di atas daftar dan baris alokasi; ketuk lagi untuk melepas.
+// Saring jenis: chip di atas daftar (dan jenis di Analisis); ketuk lagi untuk melepas.
 document.addEventListener('click', (e) => {
-  const b = e.target.closest('#chips [data-filter], #legend [data-filter], #types [data-filter]');
+  const b = e.target.closest('#chips [data-filter], #types [data-filter]');
   if (!b) return;
   const t = b.dataset.filter;
   const fromTypes = !!b.closest('#types'); // dari Analisis: selalu pasang (tautannya juga pindah ke Beranda)
   state.filter = fromTypes ? t : state.filter === t || !t ? '' : t;
   renderHoldings();
-  renderAlloc();
-  if (b.closest('#legend')) $('holdings-sec').scrollIntoView({ block: 'start' });
 });
 
 $('q').addEventListener('input', (e) => { state.q = e.target.value; renderHoldings(); });
@@ -259,6 +246,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   if (!e.target.closest('[data-goal="open"]')) return;
   $('goal-input').value = state.goal ?? '';
+  $('goal-rate').value = state.goalRate ?? '';
   $('goal-err').hidden = true;
   $('goal-del').hidden = state.goal == null;
   $('goal-dlg').showModal();
@@ -268,8 +256,10 @@ $('goal-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const v = $('goal-input').valueAsNumber;
   if (!(v > 0) || !Number.isFinite(v)) { $('goal-err').hidden = false; $('goal-err').textContent = 'Isi angka lebih dari 0.'; return; }
-  setGoal(v);
+  const r = $('goal-rate').value === '' ? null : $('goal-rate').valueAsNumber;
+  if (r != null && !(r > 0 && r <= 500)) { $('goal-err').hidden = false; $('goal-err').textContent = 'Return per tahun: isi angka 0–500, atau kosongkan.'; return; }
+  setGoal(v, r);
 });
-$('goal-del').addEventListener('click', () => setGoal(null));
-$('goal-input').addEventListener('input', () => { $('goal-err').hidden = true; });
+$('goal-del').addEventListener('click', () => setGoal(null, null));
+$('goal-form').addEventListener('input', () => { $('goal-err').hidden = true; });
 $('goal-cancel').addEventListener('click', () => $('goal-dlg').close());

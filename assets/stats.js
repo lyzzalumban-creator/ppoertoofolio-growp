@@ -86,6 +86,30 @@ export function goalProgress(total, goal) {
   return Math.min(1, Math.max(0, total / goal));
 }
 
+/**
+ * Return YTD dari indeks return berantai (tanpa setoran/penarikan): sejak hari terakhir tahun lalu, atau sejak data
+ * pertama bila riwayat baru mulai tahun ini (full = false). null bila belum ada pembanding.
+ */
+export function ytdReturn(index) {
+  if (index.length < 2) return null;
+  const last = index[index.length - 1];
+  const before = index.filter((p) => p.date < `${last.date.slice(0, 4)}-01-01`);
+  const base = before.length ? before[before.length - 1] : index[0];
+  if (base === last || !(base.idx > 0)) return null;
+  return { ret: last.idx / base.idx - 1, since: base.date, full: before.length > 0 };
+}
+
+/** Tahun menuju target dengan bunga majemuk `rate` per tahun (0,2 = 20%): 0 bila sudah tercapai, null bila tidak akan tercapai. */
+export function yearsToGoal(value, goal, rate) {
+  if (!(goal > 0) || !(value > 0)) return null;
+  if (value >= goal) return 0;
+  if (!(rate > 0)) return null;
+  return Math.log(goal / value) / Math.log(1 + rate);
+}
+
+/** Tanggal (YYYY-MM-DD) sekian tahun setelah `fromIso`. */
+export const dateAfterYears = (fromIso, years) => new Date(Date.parse(`${fromIso}T00:00:00Z`) + years * 365.25 * 86_400_000).toISOString().slice(0, 10);
+
 // ---------- analisis: risiko, konsentrasi, per jenis ----------
 
 export const MIN_RISK_DAYS = 14;
