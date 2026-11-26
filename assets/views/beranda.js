@@ -1,9 +1,9 @@
-// Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
-// ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, monthName, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
-import { dateAfterYears, goalProgress, heatItems, insights, sortPositions, treemap, yearsToGoal, yearReturn } from '../stats.js';
-import { realized } from '../../scripts/lib/trade.mjs';
-import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
+// Beranda: kartu nilai, grafik portofolio, Rincian (+ target), peta aset, dan kapsul trading emas.
+// Ketuk petak aset untuk halaman detailnya.
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, delta, esc, fIdr, fUsd, latest, longDate, money, monthName, notify, pct, state, symDisp, todayWib, toMs, tone, weightText } from '../lib.js';
+import { dateAfterYears, goalProgress, heatItems, insights, treemap, yearsToGoal, yearReturn } from '../stats.js';
+import { fxStats, realized } from '../../scripts/lib/trade.mjs';
+import { inRange, lineChart, rangesHtml, watch } from './chart.js';
 import { openAssetForm } from './sheets.js';
 
 const keyOf = (p) => `${p.type}:${p.symbol}`;
@@ -84,53 +84,25 @@ function drawChart() {
 }
 const chartDrawn = watch($('chart'), () => { if (state.series.length) drawChart(); });
 
-// ---------- daftar aset ----------
+// ---------- trading emas: kapsul ringkasan (detail di Aktivitas) ----------
 
-// Riwayat harga satu aset (rupiah) dari snapshot; untuk mini-grafik dan grafik di halaman aset.
-export const priceSeries = (key, n) => state.series.slice(-n).map((s) => (s.px ? s.px[key] : undefined)).filter(Number.isFinite);
-
-function holdingRow(p, maxW, i = 0) {
-  const name = assetName(p);
-  const sym = symDisp(p);
-  const spark = p.type === 'cash' ? '' : sparkline(priceSeries(keyOf(p), 30), '', `gh${i}`); // melengkung bergradasi, satu id gradasi per baris
-  return `<li><a class="hold${spark ? '' : ' nospark'}" href="${assetHref(p)}">
-    <i class="h-av" style="--c:${colorOf(p.type)}" aria-hidden="true">${esc(sym.slice(0, 1))}</i>
-    <span class="h-id"><b>${esc(sym)}</b><small>${esc(name !== sym ? name : typeOf(p.type).label)}</small></span>
-    ${spark ? `<span class="h-spark">${spark}</span>` : ''}
-    <span class="h-val"><b>${money(p.value)}</b>${p.type === 'cash' ? `<span class="muted">${esc(typeOf('cash').label)}</span>` : delta(p.dayPct)}</span>
-    <span class="h-w" aria-hidden="true"><span class="h-bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%;background:${colorOf(p.type)}"></i></span><small>${weightText(p.weight)}</small></span>
-  </a></li>`;
-}
-
-function pendingRow(a) {
-  return `<li><a class="hold wait" href="${assetHref(a)}">
-    <i class="h-dot" style="background:${colorOf(a.type)}"></i>
-    <span class="h-id"><b>${esc(symDisp(a))}</b><small>${esc(a.name && a.name !== a.symbol ? a.name : typeOf(a.type).label)}</small></span>
-    <span class="h-spark"></span>
-    <span class="h-val"><b>–</b><span class="chip-wait">Menunggu harga</span></span>
-  </a></li>`;
-}
-
-function renderHoldings() {
+function renderFx() {
   const L = latest();
-  const all = (L && L.positions) || [];
-  const types = typesIn([...new Set([...all.map((p) => p.type), ...state.pending.map((a) => a.type)])]);
-  if (state.filter && !types.includes(state.filter)) state.filter = '';
-  const chip = (t, label, on) => `<button type="button" data-filter="${esc(t)}" aria-pressed="${on}">${t ? `<i class="dot" style="background:${colorOf(t)}"></i>` : ''}${esc(label)}</button>`;
-  $('chips').innerHTML = types.length > 1 ? chip('', 'Semua', !state.filter) + types.map((t) => chip(t, typeOf(t).label, state.filter === t)).join('') : '';
-
-  const q = state.q.trim().toLowerCase();
-  const match = (a) => (!state.filter || a.type === state.filter) && (!q || `${a.name || ''} ${a.symbol}`.toLowerCase().includes(q));
-  const rows = sortPositions(all, state.sort).filter(match);
-  const wait = state.pending.filter(match);
-  const total = all.length + state.pending.length;
-  $('hold-count').textContent = total ? `${total} aset` : '';
-  $('sort').value = state.sort;
-  $('filter-note').textContent = state.filter || q ? `${rows.length + wait.length} dari ${total} aset` : '';
-  const maxW = Math.max(0.0001, ...all.map((p) => p.weight || 0));
-  $('holdings').innerHTML = rows.map((p, i) => holdingRow(p, maxW, i)).join('') + wait.map(pendingRow).join('')
-    || `<li class="empty-row">${total ? 'Tidak ada aset yang cocok.' : 'Belum ada aset.'}</li>`;
-  $('hold-tools').hidden = total < 2;
+  $('fx-sec').hidden = !L;
+  if (!L) return;
+  const st = fxStats(state.txs);
+  const m = st.months.find((x) => x.month === todayWib().slice(0, 7));
+  const usd = (v) => (state.hidden ? MASK : `${v > 0 ? '+' : v < 0 ? '−' : ''}${fUsd.format(Math.abs(v))}`);
+  const cap = (label, value, cls = '') => `<li class="cap ${cls}"><span>${label}</span><b>${value}</b></li>`;
+  $('fx-caps').innerHTML = st.trades
+    ? [
+      cap('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, tone(st.total)),
+      cap('Bulan ini', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', m ? tone(m.pnl) : ''),
+      cap('Win rate', `${Math.round(st.winRate * 100)}%`),
+      cap('Menang / kalah', `${st.wins} / ${st.losses}`),
+      cap('Trade', String(st.trades)),
+    ].join('')
+    : cap('Trading emas', 'Belum ada trade');
 }
 
 // ---------- peta aset: ukuran petak = bobot, warna = perubahan hari ini atau untung total (hanya persen, tanpa nominal) ----------
@@ -144,18 +116,12 @@ function renderHeat() {
   if ($('heat-card').hidden) return;
   for (const b of $('heat-mode').querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.heat === state.heat));
   const H = 92; // kotak 100 × 92 satuan; ditampilkan dengan aspect-ratio yang sama
-  $('heat').innerHTML = treemap(items, 100, H).map(({ item, x, y, w, h }, i) => {
-    const d = item.d;
+  $('heat').innerHTML = treemap(items, 100, H).map(({ item: { p, d }, x, y, w, h }, i) => {
     const heat = d == null ? 0 : Math.min(1, Math.abs(d) / HEAT_FULL[state.heat]).toFixed(2);
-    const wt = item.p ? item.p.weight : item.group.reduce((s, p) => s + (p.weight || 0), 0);
-    const name = state.hidden ? MASK : item.p ? symDisp(item.p) : `Lainnya (${item.group.length})`; // nominal tersembunyi: nama aset ikut disamarkan
+    const name = state.hidden ? MASK : symDisp(p); // nominal tersembunyi: nama aset ikut disamarkan
     const geo = `left:${x.toFixed(2)}%;top:${((y / H) * 100).toFixed(2)}%;width:${w.toFixed(2)}%;height:${((h / H) * 100).toFixed(2)}%;--h:${heat};--r:${RADII[i % RADII.length]}`;
-    const label = `${name}, bobot ${weightText(wt)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}${item.group && !state.hidden ? `: ${item.group.map(symDisp).join(', ')}` : ''}`;
-    const inner = `<b class="hm-sym">${esc(state.hidden ? MASK : item.p ? name : `${item.group.length} lain`)}</b><span class="hm-pct">${weightText(wt)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}`;
-    const cls = `hm-tile ${d == null || d === 0 ? 'flat' : tone(d)}`;
-    return item.p
-      ? `<a class="${cls}" href="${assetHref(item.p)}" style="${geo}" aria-label="${esc(label)}">${inner}</a>`
-      : `<div class="${cls}" style="${geo}" role="img" aria-label="${esc(label)}">${inner}</div>`;
+    const label = `${name}, bobot ${weightText(p.weight)}${d == null ? '' : `, ${state.heat === 'pnl' ? 'untung' : 'hari ini'} ${pct(d)}`}`;
+    return `<a class="hm-tile ${d == null || d === 0 ? 'flat' : tone(d)}" href="${assetHref(p)}" style="${geo}" aria-label="${esc(label)}"><b class="hm-sym">${esc(name)}</b><span class="hm-pct">${weightText(p.weight)}</span>${d == null ? '' : `<span class="hm-d">${arrow(d)}${pct(d)}</span>`}</a>`;
   }).join('');
 }
 
@@ -199,7 +165,7 @@ export function render() {
   renderSummary();
   renderInsights();
   renderHeat();
-  renderHoldings();
+  renderFx();
   $('ranges').innerHTML = rangesHtml(state.range);
   $('chart-card').hidden = !state.series.length;
   if (state.series.length) drawChart();
@@ -225,18 +191,6 @@ $('ranges').addEventListener('click', (e) => {
   drawChart();
 });
 
-// Saring jenis: chip di atas daftar (dan jenis di Analisis); ketuk lagi untuk melepas.
-document.addEventListener('click', (e) => {
-  const b = e.target.closest('#chips [data-filter], #types [data-filter]');
-  if (!b) return;
-  const t = b.dataset.filter;
-  const fromTypes = !!b.closest('#types'); // dari Analisis: selalu pasang (tautannya juga pindah ke Beranda)
-  state.filter = fromTypes ? t : state.filter === t || !t ? '' : t;
-  renderHoldings();
-});
-
-$('q').addEventListener('input', (e) => { state.q = e.target.value; renderHoldings(); });
-$('sort').addEventListener('change', (e) => { state.sort = e.target.value; renderHoldings(); });
 
 document.addEventListener('click', (e) => {
   if (e.target.closest('[data-add]')) openAssetForm(null);

@@ -72,7 +72,7 @@ export const state = {
   hidden: true, goal: null,
   route: { view: 'beranda', sub: '' },
   demo: false, // mode demo: data contoh di memori, tidak ada jaringan dan tidak ada yang disimpan
-  range: 'Semua', arange: 'Semua', heat: 'day', sort: 'value', q: '', filter: '', histN: 30,
+  range: 'Semua', arange: 'Semua', heat: 'day', histN: 30,
 };
 
 // Privasi dulu: pada kunjungan pertama nominal tersembunyi; pilihanmu diingat di browser ini.
