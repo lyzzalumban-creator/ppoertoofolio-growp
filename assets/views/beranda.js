@@ -1,7 +1,7 @@
 // Beranda: kartu nilai, grafik portofolio, Rincian (+ target), peta aset, dan kapsul trading emas.
 // Ketuk petak aset untuk halaman detailnya.
 import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, delta, esc, fIdr, fUsd, latest, longDate, money, monthName, notify, pct, state, symDisp, todayWib, toMs, tone, weightText } from '../lib.js';
-import { dateAfterYears, goalProgress, heatItems, insights, treemap, yearsToGoal, yearReturn } from '../stats.js';
+import { goalProgress, heatItems, insights, treemap } from '../stats.js';
 import { fxStats, realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, watch } from './chart.js';
 import { openAssetForm } from './sheets.js';
@@ -96,7 +96,7 @@ function renderFx() {
   const item = (label, value, cls = '') => `<div class="cap-i ${cls}"><span>${label}</span><b>${value}</b></div>`;
   const win = st.trades ? Math.round(st.winRate * 100) : 0;
   $('fx-caps').innerHTML = `<li class="cap">${st.trades
-    ? `<div class="cap-top">${item('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, `${tone(st.total)} big`)}${item('Bulan ini', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', `${m ? tone(m.pnl) : ''} end`)}</div>
+    ? `<div class="cap-top">${item('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, `${tone(st.total)} big`)}${item('Bulan ini (emas)', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', `${m ? tone(m.pnl) : ''} end`)}</div>
       <div class="cap-bar" role="img" aria-label="Win rate ${win} persen"><i style="width:${win}%"></i></div>
       <div class="cap-wl"><span>Win rate <b>${win}%</b></span><span>${st.wins} menang · ${st.losses} kalah · ${st.trades} trade</span></div>`
     : item('Trading emas', 'Belum ada trade')}</li>`;
@@ -122,23 +122,7 @@ function renderHeat() {
   }).join('');
 }
 
-// ---------- target (di kartu Rincian) ----------
-
-// Perkiraan tercapai (di kartu Rincian): bunga majemuk dari nilai sekarang, tanpa setoran baru; asumsi pengguna dan return 12 bulan terakhir.
-const durText = (y) => (y > 100 ? '>100 thn' : y < 1 ? `${Math.max(1, Math.ceil(y * 12))} bln` : `${y.toLocaleString('id-ID', { maximumFractionDigits: 1 })} thn`);
-function projLine(label, rate, L) {
-  const y = yearsToGoal(L.total, state.goal, rate);
-  return `<li><span>${esc(label)}</span>${y == null
-    ? '<b class="neg">tidak tercapai</b>'
-    : `<b>${esc(monthName(dateAfterYears(L.date, y).slice(0, 7)))}</b><small>${esc(durText(y))}</small>`}</li>`;
-}
-function projHtml(L) {
-  const yr = state.perf ? yearReturn(state.perf.index) : null;
-  const lines = [];
-  if (state.goalRate) lines.push(projLine(`Return ${state.goalRate.toLocaleString('id-ID')}%/thn`, state.goalRate / 100, L));
-  if (yr) lines.push(projLine(yr.est ? `Disetahunkan ${pct(yr.ret)}` : `12 bln ${pct(yr.ret)}`, yr.ret, L));
-  return lines.length ? `<ul class="g-proj" aria-label="Perkiraan target tercapai">${lines.join('')}</ul>` : '';
-}
+// ---------- target (bar kemajuan di kartu Rincian; perkiraan tercapai ada di Profil) ----------
 
 /** Bagian target di kartu Rincian: belum diatur = ajakan; sudah = bar kemajuan, sisa, dan perkiraan tercapai. */
 function goalHtml(L) {
@@ -146,7 +130,7 @@ function goalHtml(L) {
   if (f == null) return '<div class="goal-empty"><span class="muted">Target belum diatur</span><button type="button" class="btn" data-goal="open">Atur target</button></div>';
   const p = Math.floor(f * 100); // 99,8% tampil 99%, bukan 100% sebelum benar-benar tercapai
   return `<div class="goal-line" role="img" aria-label="${p} persen menuju target"><span class="bar" aria-hidden="true"><i style="width:${(f * 100).toFixed(1)}%"></i></span><span class="muted">${p}% dari target</span><button type="button" class="btn sm" data-goal="open">Ubah</button></div>
-    ${f >= 1 ? '<p class="g-sub"><span class="pill pos">✓ Target tercapai</span></p>' : `<p class="g-sub">Sisa ${money(state.goal - L.total)} dari ${money(state.goal)}</p>${projHtml(L)}`}`;
+    ${f >= 1 ? '<p class="g-sub"><span class="pill pos">✓ Target tercapai</span></p>' : `<p class="g-sub">Sisa ${money(state.goal - L.total)} dari ${money(state.goal)}</p>`}`;
 }
 
 function setGoal(v, rate) {

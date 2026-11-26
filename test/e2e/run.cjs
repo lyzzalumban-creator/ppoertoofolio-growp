@@ -98,6 +98,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
   // Tombol + membuka menu; pilih satu tindakan (cash | asset | fx | convert).
   const openAdd = async (page, act) => { await page.locator('#nav-add').click(); await page.locator(`[data-menu-act="${act}"]`).click(); };
   const holdSyms = (page) => page.locator('#heat .hm-tile .hm-sym').allTextContents(); // nama aset di peta
+const projText = async (page) => { await page.evaluate(() => { location.hash = '#/profil'; }); await page.waitForSelector('body[data-route="profil"]'); const s = await page.locator('#set-proj').innerText(); await page.evaluate(() => { location.hash = '#/beranda'; }); await page.waitForSelector('body[data-route="beranda"]'); return s; };
   const sumText = async (page) => `${await page.locator('#summary').innerText()}\n${await page.locator('#chart-rows').innerText()}\n${await page.locator('#sumstats').innerText()}`; // ringkasan = kartu nilai + rincian
   const isOpen = (page, id) => page.locator(`#${id}`).evaluate((d) => d.open);
   const toastText = (page) => page.locator('#toast').innerText();
@@ -1151,7 +1152,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#dash:not([hidden])');
     check('J6 target diingat setelah muat ulang', (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
     // perkiraan target tercapai: asumsi return pengguna + return 12 bulan terakhir
-    check('J6b tanpa asumsi return: hanya baris return 12 bulan (bila ada riwayat), tanpa baris Return per tahun', !/Return \d+%\/thn/.test(await page.locator('#sumstats').innerText()));
+    check('J6b tanpa asumsi return: hanya baris return 12 bulan (bila ada riwayat), tanpa baris Return per tahun', !/Return \d+%\/thn/.test(await projText(page)));
     await page.locator('#goal [data-goal="open"]').click();
     await page.fill('#goal-rate', '0');
     await page.locator('#goal-form [type="submit"]').click();
@@ -1159,10 +1160,10 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.fill('#goal-rate', '20');
     await page.locator('#goal-form [type="submit"]').click();
     await page.waitForFunction(() => !document.getElementById('goal-dlg').open);
-    const proj = flat(await page.locator('#sumstats .g-proj').innerText());
+    const proj = flat(await projText(page));
     const years = Math.log(goal / L.total) / Math.log(1.2);
     check('J6d asumsi 20%: baris "Return 20%/thn" berisi bulan tahun dan durasi sesuai bunga majemuk dari total sekarang', new RegExp(`Return 20%/thn\\s+\\S+ \\d{4}\\s+${years.toLocaleString('id-ID', { maximumFractionDigits: 1 }).replace('.', '\\.')} thn`).test(proj), proj);
-    check('J6e asumsi return diingat setelah muat ulang', await (async () => { await page.reload({ waitUntil: 'networkidle' }); await page.waitForSelector('#dash:not([hidden])'); return /Return 20%\/thn/.test(await page.locator('#sumstats').innerText()); })());
+    check('J6e asumsi return diingat setelah muat ulang', await (async () => { await page.reload({ waitUntil: 'networkidle' }); await page.waitForSelector('#dash:not([hidden])'); return /Return 20%\/thn/.test(await projText(page)); })());
 
     await page.locator('#privacy').click();
     const hid = await page.locator('main').textContent();
