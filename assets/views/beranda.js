@@ -10,9 +10,18 @@ const keyOf = (p) => `${p.type}:${p.symbol}`;
 
 // ---------- ringkasan ----------
 
+/** Angka Total nilai: --n (jumlah karakter) dipakai CSS agar angkanya memenuhi lebar kartu, sepanjang apa pun. */
+const numHtml = (t) => `<b class="sum-value" style="--n:${t.length}">${esc(t)}</b>`;
+
 function renderSummary() {
   const L = latest();
   const box = $('summary');
+  const stats = $('sumstats');
+  $('chart-rows').innerHTML = ''; // diisi lagi di bawah bila sudah ada data
+  const solo = !L; // belum ada data: kartu ringkasan tampil sendiri tanpa kartu doa dan rincian
+  $('sum-row').classList.toggle('solo', solo);
+  $('motto').hidden = solo;
+  stats.hidden = solo;
   if (!state.assets.length && !L) {
     box.innerHTML = `<div class="onboard"><h2>Mulai dari kas</h2>
       <p class="muted">Tambah kas dulu, lalu beli aset darinya.</p>
@@ -29,14 +38,18 @@ function renderSummary() {
   const f = goalProgress(L.total, state.goal);
   const n = (L.positions || []).length + state.pending.length;
   box.innerHTML = `
-    <div class="sum-top"><span class="label">Total nilai</span><span class="muted">${n} aset</span></div>
-    <div class="sum-value">${money(L.total)}</div>
-    <div class="sum-day today">${L.dayPct == null
-      ? '<span class="flat">Hari ini: belum ada pembanding</span>'
-      : `<span class="pill ${tone(L.dayPct)}">${arrow(L.dayPct)}${pct(L.dayPct)}</span><span class="${tone(L.dayPnl)}">${state.hidden ? '' : `${money(L.dayPnl, { sign: true })} `}</span><span class="muted">hari ini</span>`}</div>
-    <dl class="stats">
+    <div class="sum-top"><span class="label">Total nilai</span></div>
+    <div id="sum-num">${numHtml(money(L.total))}</div>`;
+  $('chart-rows').innerHTML = `<dl class="sum-rows">
+      <div><dt>Total profit</dt><dd class="${tone(L.pnl)}">${state.hidden ? '' : `${esc(money(L.pnl, { sign: true }))} `}${arrow(L.pnl)}${pct(L.pnlPct)}</dd></div>
+      <div class="today"><dt>Harian</dt>${L.dayPct == null
+        ? '<dd class="flat">belum ada pembanding</dd>'
+        : `<dd class="${tone(L.dayPnl)}">${state.hidden ? '' : `${esc(money(L.dayPnl, { sign: true }))} `}${arrow(L.dayPct)}${pct(L.dayPct)}</dd>`}</div>
+    </dl>`;
+  stats.innerHTML = `
+    <div class="sum-top"><span class="label">Rincian</span><span class="muted">${n} aset</span></div>
+    <dl class="stats c3">
       <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
-      <div><dt>Untung</dt><dd>${delta(L.pnlPct)}<small>${money(L.pnl, { sign: true })}</small></dd></div>
       <div><dt>Terealisasi</dt><dd class="${tone(real)}">${state.txs.some((t) => t.kind === 'sell') ? money(real, { sign: true }) : '–'}</dd></div>
       <div><dt>Bulan ini</dt><dd>${delta(mtd && mtd.ret)}</dd></div>
     </dl>
@@ -60,14 +73,10 @@ function drawChart() {
     .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100, c: amt && Number.isFinite(s.cost) ? s.cost : null }));
   $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
   $('chart-key').innerHTML = amt && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
-  const first = pts[0];
   lineChart($('chart'), pts, {
-    head: $('chart-head'),
-    headHtml: (p, rest) => {
-      const d = p.y - first.y;
-      const shown = amt ? `${esc(money(d, { sign: true }))}${first.y ? ` (${esc(pct(p.y / first.y - 1))})` : ''}` : esc(pct(d / 100));
-      return `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b><span class="pill ${tone(d)}">${arrow(d)}${shown}</span><small class="muted">${rest ? `sejak ${esc(longDate(first.date))}` : esc(longDate(p.date))}</small>`;
-    },
+    // angka total di kartu atas ikut titik yang disentuh (nominal tersembunyi: tetap disamarkan)
+    head: pts.length > 1 && $('chart').clientWidth ? $('sum-num') : null,
+    headHtml: (p) => numHtml(amt ? fIdr.format(p.y) : MASK),
     fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `<span>Modal ${esc(fIdr.format(p.c))}</span>` : ''}`,
     label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
     empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',
@@ -81,16 +90,16 @@ const chartDrawn = watch($('chart'), () => { if (state.series.length) drawChart(
 // Riwayat harga satu aset (rupiah) dari snapshot; untuk mini-grafik dan grafik di halaman aset.
 export const priceSeries = (key, n) => state.series.slice(-n).map((s) => (s.px ? s.px[key] : undefined)).filter(Number.isFinite);
 
-function holdingRow(p, maxW) {
+function holdingRow(p, maxW, i = 0) {
   const name = assetName(p);
   const sym = symDisp(p);
-  const spark = p.type === 'cash' ? '' : sparkline(priceSeries(keyOf(p), 30));
-  return `<li><a class="hold" href="${assetHref(p)}">
-    <i class="h-dot" style="background:${colorOf(p.type)}"></i>
+  const spark = p.type === 'cash' ? '' : sparkline(priceSeries(keyOf(p), 30), '', `gh${i}`); // melengkung bergradasi, satu id gradasi per baris
+  return `<li><a class="hold${spark ? '' : ' nospark'}" href="${assetHref(p)}">
+    <i class="h-av" style="--c:${colorOf(p.type)}" aria-hidden="true">${esc(sym.slice(0, 1))}</i>
     <span class="h-id"><b>${esc(sym)}</b><small>${esc(name !== sym ? name : typeOf(p.type).label)}</small></span>
-    <span class="h-spark">${spark}</span>
-    <span class="h-val"><b>${money(p.value)}</b>${p.type === 'cash' && !Number.isFinite(p.dayPct) ? `<span class="muted">${weightText(p.weight)}</span>` : delta(p.dayPct)}</span>
-    <span class="h-bar" aria-hidden="true"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%;background:${colorOf(p.type)}"></i></span>
+    ${spark ? `<span class="h-spark">${spark}</span>` : ''}
+    <span class="h-val"><b>${money(p.value)}</b>${p.type === 'cash' ? `<span class="muted">${esc(typeOf('cash').label)}</span>` : delta(p.dayPct)}</span>
+    <span class="h-w" aria-hidden="true"><span class="h-bar"><i style="width:${Math.max(2, (p.weight / maxW) * 100).toFixed(1)}%;background:${colorOf(p.type)}"></i></span><small>${weightText(p.weight)}</small></span>
   </a></li>`;
 }
 
@@ -120,7 +129,7 @@ function renderHoldings() {
   $('sort').value = state.sort;
   $('filter-note').textContent = state.filter || q ? `${rows.length + wait.length} dari ${total} aset` : '';
   const maxW = Math.max(0.0001, ...all.map((p) => p.weight || 0));
-  $('holdings').innerHTML = rows.map((p) => holdingRow(p, maxW)).join('') + wait.map(pendingRow).join('')
+  $('holdings').innerHTML = rows.map((p, i) => holdingRow(p, maxW, i)).join('') + wait.map(pendingRow).join('')
     || `<li class="empty-row">${total ? 'Tidak ada aset yang cocok.' : 'Belum ada aset.'}</li>`;
   $('hold-tools').hidden = total < 2;
 }
@@ -161,13 +170,16 @@ function renderAlloc() {
   const stops = types.map((t, i) => {
     const from = acc;
     acc += L.byType[t].weight * 100;
-    return `${colorOf(t)} ${from.toFixed(3)}% ${(i === types.length - 1 ? 100 : acc).toFixed(3)}%`;
+    const to = i === types.length - 1 ? 100 : acc;
+    return types.length > 1 ? `${colorOf(t)} ${from.toFixed(3)}% ${(to - 0.8).toFixed(3)}%, var(--surface) ${(to - 0.8).toFixed(3)}% ${to.toFixed(3)}%` : `${colorOf(t)} 0 100%`; // celah tipis antar segmen
   });
   $('donut').style.background = stops.length ? `conic-gradient(${stops.join(',')})` : '';
   $('donut').innerHTML = `<div class="hole"><strong>${L ? (L.positions || []).length : 0}</strong><span>aset</span></div>`;
+  const maxType = Math.max(0.0001, ...types.map((t) => L.byType[t].weight));
   $('legend').innerHTML = types.map((t) => `<li><button type="button" class="lg" data-filter="${esc(t)}" aria-pressed="${state.filter === t}">
       <i class="sw" style="background:${colorOf(t)}"></i><span class="nm">${esc(typeOf(t).label)}</span><span class="pc">${weightText(L.byType[t].weight)}</span>
-      <span class="am">${money(L.byType[t].value)}</span></button></li>`).join('');
+      <span class="am">${money(L.byType[t].value)}</span>
+      <span class="lb" aria-hidden="true"><i style="width:${Math.max(3, (L.byType[t].weight / maxType) * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></button></li>`).join('');
 }
 
 function renderGoal() {
@@ -179,9 +191,9 @@ function renderGoal() {
   }
   const p = Math.floor(f * 100); // 99,8% tampil 99%, bukan 100% sebelum benar-benar tercapai
   $('goal').innerHTML = `<div class="goal">
-    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(var(--accent) ${(f * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
+    <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(${f >= 1 ? 'var(--pos)' : 'var(--accent)'} ${(Math.min(f, 1) * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
     <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
-      <p class="g-sub">${f >= 1 ? 'Target tercapai' : `Sisa ${money(state.goal - L.total)}`}</p>
+      <p class="g-sub">${f >= 1 ? '<span class="pill pos">✓ Target tercapai</span>' : `Sisa ${money(state.goal - L.total)}`}</p>
       <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
 }
 

@@ -98,6 +98,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
   // Tombol + membuka menu; pilih satu tindakan (cash | asset | fx | convert).
   const openAdd = async (page, act) => { await page.locator('#nav-add').click(); await page.locator(`[data-menu-act="${act}"]`).click(); };
   const holdSyms = (page) => page.locator('#holdings .hold .h-id b').allInnerTexts();
+  const sumText = async (page) => `${await page.locator('#summary').innerText()}\n${await page.locator('#chart-rows').innerText()}\n${await page.locator('#sumstats').innerText()}`; // ringkasan = kartu nilai + rincian
   const isOpen = (page, id) => page.locator(`#${id}`).evaluate((d) => d.open);
   const toastText = (page) => page.locator('#toast').innerText();
 
@@ -151,14 +152,14 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const lastDate = sheetOf(fake).history.at(-1).date;
     check('B4 grafik diam: bersih (tanpa gelembung, tanggal, kursor, garis modal); isi tersembunyi tetap menunjuk titik terakhir (= total)', !(await page.locator('#chart .tip').isVisible()) && !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart .cursor').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && nb(await page.locator('#chart .tip b').textContent()) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && (await page.locator('#chart .dpill').textContent()) === '23 Nov 2026' && lastDate === '2026-11-23');
     const before = await page.locator('#chart .dpill').textContent();
-    const headRest = await page.locator('#chart-head b').innerText();
-    check('B4g angka di atas grafik saat diam = total terakhir', nb(headRest) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && /sejak/.test(await page.locator('#chart-head small').innerText()));
+    const headRest = await page.locator('#sum-num b').innerText();
+    check('B4g angka total di kartu atas saat diam = total terakhir', nb(headRest) === nb(idr.format(sheetOf(fake).history.at(-1).total)));
     await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
     check('B4b mengarahkan kursor: gelembung, tanggal, garis modal dan kursor muncul; tanggal dan nilai ikut berubah', (await page.locator('#chart .dpill').isVisible()) && (await page.locator('#chart .tip').isVisible()) && (await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').innerText()) !== before && (await page.locator('#chart .cursor line').count()) === 1);
-    check('B4h angka di atas grafik: saat disentuh berubah mengikuti titik (nilai dan selisih dari awal rentang)', (await page.locator('#chart-head b').innerText()) !== headRest && /[▲▼]/.test(await page.locator('#chart-head .pill').innerText()));
+    check('B4h angka total di kartu atas berubah mengikuti titik yang disentuh', (await page.locator('#sum-num b').innerText()) !== headRest);
     await page.mouse.move(box.x + box.width * 0.5, box.y - 40);
     check('B4c kursor keluar dari grafik: bersih lagi', !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').textContent()) === before);
-    check('B4i kursor keluar: angka di atas grafik kembali ke total terakhir', (await page.locator('#chart-head b').innerText()) === headRest);
+    check('B4i kursor keluar: angka total kembali ke total terakhir', (await page.locator('#sum-num b').innerText()) === headRest);
     await shot(page, 'grafik.png');
     await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
     check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
@@ -355,7 +356,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('C3b2 pembelian memotong kas (3.000.000 - 1,5 x 1.000.000 = 1.500.000) dan tercatat sebagai transaksi Beli', kasNow === 1_500_000 && buyTx && buyTx.kind === 'buy' && buyTx.qty === 1.5 && buyTx.price === 1_000_000, `${kasNow} ${JSON.stringify(buyTx)}`);
     await nav(page, 'beranda');
     const wait = page.locator('#holdings .hold.wait');
-    check('C3c Beranda: aset baru ada di daftar dengan tanda "Menunggu harga"; ringkasan memberi tahu belum masuk total', (await wait.count()) === 1 && /SOL/.test(await wait.innerText()) && /1 aset menunggu harga/.test(await page.locator('#summary').innerText()));
+    check('C3c Beranda: aset baru ada di daftar dengan tanda "Menunggu harga"; ringkasan memberi tahu belum masuk total', (await wait.count()) === 1 && /SOL/.test(await wait.innerText()) && /1 aset menunggu harga/.test(await sumText(page)));
 
     // validasi: duplikat dan kosong
     await openAdd(page, 'asset');
@@ -481,7 +482,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('T5b pesan menyebut keuntungannya; tetap di halaman aset yang kini 600 lembar dengan 1 aktivitas', nb(await toastText(page)).includes(nb(`+${idr.format(200_000)}`)) && /600 lembar/.test(await page.locator('#detail').innerText()) && (await page.locator('#detail .tx').count()) === 1);
     const v600 = idr.format(600 * pos0('BBCA').price);
     await nav(page, 'beranda');
-    check('T6 Beranda langsung berubah: Terealisasi +Rp 200.000, nilai BBCA = 600 × harga terakhir', nb(flat(await page.locator('#summary').innerText())).toLowerCase().includes(nb(`terealisasi +${idr.format(200_000)}`).toLowerCase()) && nb(await page.locator('#holdings .hold', { hasText: 'BBCA' }).innerText()).includes(nb(v600)));
+    check('T6 Beranda langsung berubah: Terealisasi +Rp 200.000, nilai BBCA = 600 × harga terakhir', nb(flat(await sumText(page))).toLowerCase().includes(nb(`terealisasi +${idr.format(200_000)}`).toLowerCase()) && nb(await page.locator('#holdings .hold', { hasText: 'BBCA' }).innerText()).includes(nb(v600)));
     await nav(page, 'aktivitas');
     const real1 = nb(flat(await page.locator('#realized').innerText()));
     check('T7 Aktivitas: total terealisasi, tahun ini, 1 penjualan; baris Jual BBCA', real1.includes(nb(`+${idr.format(200_000)}`)) && /1 penjualan/.test(real1) && new RegExp(`Tahun ${todayWib().slice(0, 4)}`, 'i').test(real1) && /Jual\s*BBCA\s*400/.test(await page.locator('#txs').innerText()), real1);
@@ -839,7 +840,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const { ctx, page, fake, errors } = await newPage({ withHistory: false });
     await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
-    const sum = await page.locator('#summary').innerText();
+    const sum = await sumText(page);
     check('D6 riwayat kosong: aset pasar "Menunggu harga", kas dan manual langsung terhitung', (await page.locator('#holdings .hold.wait').count()) === 7 && (await page.locator('#holdings .hold:not(.wait)').count()) === 2 && sum.includes(idr.format(8_000_000).replace(/\s/g, ' ').slice(0, 2)) && /7 aset menunggu harga/.test(sum), flat(sum));
     check('D6b keadaan ini BUKAN kegagalan: subjudul netral, tanpa banner merah, grafik menjelaskan butuh 2 hari', !/Gagal/.test(await page.locator('#subtitle').innerText()) && !(await page.locator('#banner').isVisible()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()), await page.locator('#subtitle').innerText());
     await page.locator('#holdings .hold.wait', { hasText: 'BBCA' }).click();
@@ -854,7 +855,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const { ctx, page, errors } = await newPage({ fake: fk });
     await openDash(page, fk);
     await page.waitForSelector('#dash:not([hidden])');
-    check('D7 Sheet kosong: ajakan "Mulai dari kas" dengan tombol Tambah kas, tanpa grafik, alokasi, dan alat daftar', /Mulai dari kas/.test(await page.locator('#summary').innerText()) && !(await page.locator('#chart-card').isVisible()) && !(await page.locator('#alloc-card').isVisible()) && !(await page.locator('#hold-tools').isVisible()));
+    check('D7 Sheet kosong: ajakan "Mulai dari kas" dengan tombol Tambah kas, tanpa grafik, alokasi, dan alat daftar', /Mulai dari kas/.test(await sumText(page)) && !(await page.locator('#chart-card').isVisible()) && !(await page.locator('#alloc-card').isVisible()) && !(await page.locator('#hold-tools').isVisible()));
     await page.locator('#summary [data-add]').click();
     check('D7b tombolnya membuka lembar "Tambah kas" (jenis Kas terpilih, tanpa kolom bayar dari kas)', (await isOpen(page, 'asset-dlg')) && (await page.locator('#f-h').innerText()) === 'Tambah kas' && (await page.inputValue('#f-type')) === 'cash' && !(await page.locator('#pay-field').isVisible()));
     await page.selectOption('#f-type', 'cash');
@@ -921,8 +922,8 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const { ctx, page, fake, env } = await newPage();
     await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
-    const sum = flat(await page.locator('#summary').innerText());
-    check('H3 ringkasan: "hari ini" dengan panah dan tanda, lalu Modal, Untung, Terealisasi, Bulan ini', /[▲▼]\s?[+−]\d+,\d{2}%.*hari ini/.test(sum) && /Modal.*Untung\s*[▲▼]\s?[+−]\d+,\d{2}%.*Terealisasi\s*–.*Bulan ini/i.test(sum), sum);
+    const sum = flat(await sumText(page));
+    check('H3 ringkasan: Total profit dan Harian dengan panah dan tanda (rupiah lengkap), lalu Rincian: Modal, Terealisasi, Bulan ini', /Total profit\s*(\+Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%\s*Harian\s*(\+|−)?(Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%.*Modal.*Terealisasi\s*–.*Bulan ini\s*[▲▼]/i.test(sum), sum);
     check('H4 kartu aset: mini-grafik harga (bentuk saja, tanpa teks) untuk aset non-kas', (await page.locator('#holdings .hold svg.spark').count()) === 7 && (await page.locator('#holdings svg.spark text').count()) === 0);
     const bbca = await page.locator('#holdings .hold', { hasText: 'BBCA' }).getAttribute('href');
     check('H5 kartu aset menaut ke halaman asetnya', bbca === AH('idx:BBCA'), bbca);
@@ -961,7 +962,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.waitForSelector('#dash:not([hidden])');
     const list = await page.locator('#holdings').innerText();
     check('H8 "panw" tampil PANW; label manual "Depo Bca" tidak diubah', /PANW/.test(list) && !/panw/.test(list) && /Depo Bca/.test(list), flat(list).slice(0, 120));
-    check('H8b hanya satu hari data: ringkasan memberi tahu "belum ada pembanding", grafik butuh 2 hari', /belum ada pembanding/.test(await page.locator('#summary .today').innerText()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()));
+    check('H8b hanya satu hari data: ringkasan memberi tahu "belum ada pembanding", grafik butuh 2 hari', /belum ada pembanding/.test(await page.locator('#chart-rows .today').innerText()) && /minimal 2 hari/.test(await page.locator('#chart').innerText()));
     await goto(page, '#/analisis/kinerja');
     check('H8c hanya satu hari data: Kinerja memberi tahu butuh 2 hari, tanpa metrik palsu', /minimal 2 hari/.test(await page.locator('#metrics').innerText()) && (await page.locator('#metrics .tile').count()) === 0);
     await ctx.close();
@@ -1037,7 +1038,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const prOrder = (await page.locator('#perf .pr-n').allInnerTexts()).join();
     check('I10 untung/rugi per aset: satu batang per aset (tanpa Kas), terurut dari tertinggi', prOrder === [...L.positions].filter((p) => p.type !== 'cash').sort((a, b) => b.pnlPct - a.pnlPct).map((p) => p.symbol).join(), prOrder);
     await nav(page, 'beranda');
-    check('I11 ringkasan "Bulan ini" sama dengan bulan terakhir di kalender', flat(await page.locator('#summary').innerText()).includes(`Bulan ini ${months.at(-1).ret > 0 ? '▲' : '▼'} ${p2(months.at(-1).ret)}`.replace('▲ ', '▲').replace('▼ ', '▼')) || flat(await page.locator('#summary').innerText()).includes(p2(months.at(-1).ret)));
+    check('I11 ringkasan "Bulan ini" sama dengan bulan terakhir di kalender', flat(await sumText(page)).includes(`Bulan ini ${months.at(-1).ret > 0 ? '▲' : '▼'} ${p2(months.at(-1).ret)}`.replace('▲ ', '▲').replace('▼ ', '▼')) || flat(await sumText(page)).includes(p2(months.at(-1).ret)));
     check('I12 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
@@ -1173,7 +1174,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const wantPct = Math.floor((L.total / goal) * 100);
     const gtxt = nb(await page.locator('#goal').innerText());
     check('J5 target tersimpan: persen = total ÷ target (dibulatkan ke bawah), sisa dan target tampil', !(await isOpen(page, 'goal-dlg')) && gtxt.includes(`${wantPct}%`) && gtxt.includes(nb(idr.format(goal))) && gtxt.includes(nb(`Sisa ${idr.format(goal - L.total)}`)), flat(gtxt));
-    check('J5b cincin punya label untuk pembaca layar; ringkasan menampilkan garis kemajuan', (await page.locator('#goal .ring').getAttribute('aria-label')) === `${wantPct} persen menuju target` && (await page.locator('#summary .goal-line').innerText()).includes(`${wantPct}% dari target`));
+    check('J5b cincin punya label untuk pembaca layar; ringkasan menampilkan garis kemajuan', (await page.locator('#goal .ring').getAttribute('aria-label')) === `${wantPct} persen menuju target` && (await page.locator('#sumstats .goal-line').innerText()).includes(`${wantPct}% dari target`));
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
     check('J6 target diingat setelah muat ulang', (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
@@ -1198,7 +1199,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
 
     // tata letak desktop: grafik dan daftar di kiri, Alokasi dan Target bertumpuk di kanan
     const bb = (sel) => page.locator(sel).boundingBox();
-    const [sumB, chart, hold, alloc, g] = [await bb('#summary'), await bb('#chart-card'), await bb('#holdings-sec'), await bb('#alloc-card'), await bb('#goal')];
+    const [sumB, chart, hold, alloc, g] = [await bb('#sum-row'), await bb('#chart-card'), await bb('#holdings-sec'), await bb('#alloc-card'), await bb('#goal')];
     check('J11 desktop: ringkasan, grafik, daftar di kolom kiri; Alokasi lalu Target di kolom kanan', alloc.x > chart.x + chart.width - 1 && Math.abs(alloc.y - sumB.y) < 2 && g.y > alloc.y + alloc.height && hold.y > chart.y + chart.height && Math.abs(hold.x - chart.x) < 1, JSON.stringify({ chart, alloc, g, hold }));
     check('J12 tanpa error konsol', errors.length === 0, errors.join(' | '));
     await shot(page, 'beranda-desktop.png', { fullPage: true });

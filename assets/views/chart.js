@@ -29,8 +29,9 @@ export function rollText(el, html, animate = false) {
   const b = el.querySelector('b');
   if (!animate || !old || !b || was === b.textContent || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const g = document.createElement('span');
-  g.className = 'roll-out';
+  g.className = `${old.className.replace(/\broll-in\b/, '').trim()} roll-out`; // sama gayanya dengan angka asal
   g.setAttribute('aria-hidden', 'true');
+  g.setAttribute('style', old.getAttribute('style') || '');
   g.textContent = was;
   g.style.left = `${b.offsetLeft}px`;
   g.style.top = `${b.offsetTop}px`;
