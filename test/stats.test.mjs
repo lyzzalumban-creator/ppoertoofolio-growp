@@ -266,7 +266,7 @@ test('heatItems: kas ikut tanpa warna arah, aset kecil digabung, metrik hari ini
   assert.equal(heatItems([P('X', 10, null, null)], 'day')[0].d, null);
 });
 
-import { dateAfterYears, ytdReturn, yearsToGoal } from '../assets/stats.js';
+import { dateAfterYears, yearReturn, yearsToGoal } from '../assets/stats.js';
 test('yearsToGoal: bunga majemuk; 0 bila tercapai; null bila tidak akan tercapai', () => {
   assert.ok(Math.abs(yearsToGoal(100, 200, 0.2) - Math.log(2) / Math.log(1.2)) < 1e-12); // ≈ 3,80 tahun
   assert.ok(Math.abs(yearsToGoal(100, 144, 0.2) - 2) < 1e-9); // 100 × 1,2² = 144
@@ -281,15 +281,16 @@ test('dateAfterYears: menambah tahun (365,25 hari/tahun)', () => {
   assert.equal(dateAfterYears('2026-01-01', 1), '2027-01-01');
   assert.equal(dateAfterYears('2026-01-01', 2).slice(0, 4), '2028');
 });
-test('ytdReturn: dari akhir tahun lalu; bila riwayat baru mulai tahun ini, dari data pertama (full=false)', () => {
-  const idx = [{ date: '2025-12-30', idx: 1 }, { date: '2025-12-31', idx: 1.1 }, { date: '2026-03-01', idx: 1.21 }, { date: '2026-06-01', idx: 1.43 }];
-  const r = ytdReturn(idx);
-  assert.ok(Math.abs(r.ret - (1.43 / 1.1 - 1)) < 1e-12);
-  assert.equal(r.since, '2025-12-31');
-  assert.equal(r.full, true);
-  const p = ytdReturn([{ date: '2026-02-01', idx: 1 }, { date: '2026-06-01', idx: 1.3 }]);
-  assert.ok(Math.abs(p.ret - 0.3) < 1e-12);
-  assert.equal(p.full, false);
-  assert.equal(ytdReturn([{ date: '2026-02-01', idx: 1 }]), null);
-  assert.equal(ytdReturn([]), null);
+test('yearReturn: 12 bulan terakhir; bila riwayat lebih pendek, disetahunkan (est); null bila < 30 hari', () => {
+  const day = (n) => new Date(Date.parse('2026-11-25T00:00:00Z') - n * 86_400_000).toISOString().slice(0, 10);
+  const full = [{ date: day(400), idx: 0.8 }, { date: day(365), idx: 1 }, { date: day(100), idx: 1.1 }, { date: day(0), idx: 1.25 }];
+  const r = yearReturn(full);
+  assert.equal(r.est, false);
+  assert.ok(Math.abs(r.ret - 0.25) < 1e-12); // dari titik tepat 365 hari lalu, bukan dari yang 400 hari lalu
+  const short = yearReturn([{ date: day(73), idx: 1 }, { date: day(0), idx: 1.1 }]); // 73 hari = 1/5 tahun
+  assert.equal(short.est, true);
+  assert.ok(Math.abs(short.ret - (1.1 ** 5 - 1)) < 1e-9); // +10% dalam 1/5 tahun → ±61% setahun
+  assert.equal(yearReturn([{ date: day(10), idx: 1 }, { date: day(0), idx: 1.05 }]), null);
+  assert.equal(yearReturn([{ date: day(0), idx: 1 }]), null);
+  assert.equal(yearReturn([]), null);
 });
