@@ -48,13 +48,14 @@ function renderSummary() {
     </dl>`;
   stats.innerHTML = `
     <div class="sum-top"><span class="label">Rincian</span><span class="muted">${n} aset</span></div>
-    <dl class="stats c3">
+    <dl class="stats rows">
       <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
       <div><dt>Terealisasi</dt><dd class="${tone(real)}">${state.txs.some((t) => t.kind === 'sell') ? money(real, { sign: true }) : '–'}</dd></div>
       <div><dt>Bulan ini</dt><dd>${delta(mtd && mtd.ret)}</dd></div>
     </dl>
     ${state.pending.length ? `<p class="muted pend">${state.pending.length} aset menunggu harga pertama dan belum masuk total.</p>` : ''}
-    ${f == null ? '' : `<div class="goal-line"><span class="bar" aria-hidden="true"><i style="width:${(f * 100).toFixed(1)}%"></i></span><span class="muted">${Math.floor(f * 100)}% dari target</span></div>`}`;
+    ${f == null ? '' : `<div class="goal-line"><span class="bar" aria-hidden="true"><i style="width:${(f * 100).toFixed(1)}%"></i></span><span class="muted">${Math.floor(f * 100)}% dari target</span></div>`}
+    ${f == null || f >= 1 ? '' : projHtml(L)}`;
 }
 
 function renderInsights() {
@@ -136,7 +137,7 @@ function renderHoldings() {
 
 // ---------- peta aset: ukuran petak = bobot, warna = perubahan hari ini atau untung total (hanya persen, tanpa nominal) ----------
 
-const RADII = ['28px', '28px 28px 28px 6px', '6px 28px 28px 28px', '44px 10px 28px 10px', '28px 6px 28px 6px']; // bentuk sudut bergantian
+const RADII = ['24px', '24px 24px 24px 12px', '12px 24px 24px 24px', '24px 12px 24px 12px']; // sudut bergantian, tetap serumpun
 const HEAT_FULL = { day: 0.025, pnl: 0.3 }; // persen yang sudah dianggap warna pekat penuh
 function renderHeat() {
   const all = ((latest() && latest().positions) || []);
@@ -182,18 +183,19 @@ function renderAlloc() {
       <span class="lb" aria-hidden="true"><i style="width:${Math.max(3, (L.byType[t].weight / maxType) * 100).toFixed(1)}%;background:${colorOf(t)}"></i></span></button></li>`).join('');
 }
 
-// Perkiraan tercapai: bunga majemuk dari nilai sekarang (tanpa setoran baru), dengan asumsi return pengguna dan dengan return YTD.
-const durText = (y) => (y > 100 ? 'lebih dari 100 tahun' : y < 1 ? `${Math.max(1, Math.ceil(y * 12))} bulan` : `${y.toLocaleString('id-ID', { maximumFractionDigits: 1 })} tahun`);
+// Perkiraan tercapai (di kartu Rincian): bunga majemuk dari nilai sekarang, tanpa setoran baru; asumsi pengguna dan return YTD.
+const durText = (y) => (y > 100 ? '>100 thn' : y < 1 ? `${Math.max(1, Math.ceil(y * 12))} bln` : `${y.toLocaleString('id-ID', { maximumFractionDigits: 1 })} thn`);
 function projLine(label, rate, L) {
   const y = yearsToGoal(L.total, state.goal, rate);
-  if (y == null) return `<li>${esc(label)}: <b class="neg">target tidak tercapai dengan laju ini</b></li>`;
-  return `<li>${esc(label)}: <b>sekitar ${esc(monthName(dateAfterYears(L.date, y).slice(0, 7)))}</b> <span class="muted">(${esc(durText(y))})</span></li>`;
+  return `<li><span>${esc(label)}</span>${y == null
+    ? '<b class="neg">tidak tercapai</b>'
+    : `<b>${esc(monthName(dateAfterYears(L.date, y).slice(0, 7)))}</b><small>${esc(durText(y))}</small>`}</li>`;
 }
 function projHtml(L) {
   const ytd = state.perf ? ytdReturn(state.perf.index) : null;
   const lines = [];
-  if (state.goalRate) lines.push(projLine(`Return ${state.goalRate.toLocaleString('id-ID')}% per tahun`, state.goalRate / 100, L));
-  if (ytd) lines.push(projLine(`Performa YTD ${pct(ytd.ret)}${ytd.full ? '' : ' (sejak data pertama)'}`, ytd.ret, L));
+  if (state.goalRate) lines.push(projLine(`Return ${state.goalRate.toLocaleString('id-ID')}%/thn`, state.goalRate / 100, L));
+  if (ytd) lines.push(projLine(`YTD ${pct(ytd.ret)}${ytd.full ? '' : '*'}`, ytd.ret, L));
   return lines.length ? `<ul class="g-proj" aria-label="Perkiraan target tercapai">${lines.join('')}</ul>` : '';
 }
 
@@ -209,7 +211,7 @@ function renderGoal() {
     <div class="ring" role="img" aria-label="${p} persen menuju target" style="background:conic-gradient(${f >= 1 ? 'var(--pos)' : 'var(--accent)'} ${(Math.min(f, 1) * 100).toFixed(2)}%, var(--surface-2) 0)"><div class="hole">${p}%</div></div>
     <div><p class="g-line"><b>${money(L.total)}</b> dari ${money(state.goal)}</p>
       <p class="g-sub">${f >= 1 ? '<span class="pill pos">✓ Target tercapai</span>' : `Sisa ${money(state.goal - L.total)}`}</p>
-      <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>${f >= 1 ? '' : projHtml(L)}`;
+      <button type="button" class="btn" data-goal="open">Ubah target</button></div></div>`;
 }
 
 function setGoal(v, rate) {

@@ -169,6 +169,13 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .pill.neg { background: var(--neg-bg); }
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin: 14px 0 0; padding-top: 14px; box-shadow: inset 0 1px 0 var(--border); }
 @media (min-width: 560px) { .summary .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.stats.rows { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.stats.rows > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.stats.rows dd { margin: 0; text-align: right; white-space: nowrap; }
+.g-proj { display: grid; gap: 6px; margin: 12px 0 0; padding: 12px 0 0; list-style: none; box-shadow: inset 0 1px 0 var(--border); font-size: 0.82rem; }
+.g-proj li { display: flex; align-items: baseline; gap: 8px; }
+.g-proj li > span { color: var(--muted); font-weight: 600; margin-right: auto; }
+.g-proj small { color: var(--muted); min-width: 4.2em; text-align: right; }
 .stats.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
 .stats dt { color: var(--muted); font-size: 0.7rem; font-weight: 700; }
 .stats dd { margin: 2px 0 0; font-weight: 650; font-size: 0.98rem; overflow-wrap: anywhere; }
@@ -281,9 +288,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .hm-pct { font-size: clamp(1.05rem, 5.4vw, 1.7rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
 .hm-d { font-size: 0.74rem; font-weight: 650; white-space: nowrap; }
 .hm-tile:focus-visible { outline-offset: -3px; }
+@container (max-width: 64px) { .hm-sym { font-size: 0.7rem; } .hm-pct { font-size: 0.84rem; } .hm-d { display: none; } }
 @container (max-height: 70px) { .hm-d { display: none; } }
-@container (max-height: 46px) { .hm-pct { display: none; } }
-@container (max-width: 40px) { .hm-pct, .hm-d { display: none; } }
+@container (max-height: 30px) { .hm-pct { display: none; } }
+@container (max-width: 26px) { .hm-pct, .hm-d { display: none; } }
 @container (max-width: 26px) { .hm-sym { display: none; } }
 
 /* kartu statistik: label + pil arah, angka besar, mini-grafik melengkung bergradasi di kanan */
@@ -315,8 +323,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .ring .hole { position: absolute; inset: 12px; display: grid; place-content: center; border-radius: 50%; background: var(--surface); font-weight: 700; }
 .g-line { font-size: 0.9rem; overflow-wrap: anywhere; }
 .g-sub { margin: 2px 0 8px; color: var(--muted); font-size: 0.8rem; }
-.g-proj { display: grid; gap: 4px; margin: 12px 0 0; padding: 12px 0 0; list-style: none; box-shadow: inset 0 1px 0 var(--border); font-size: 0.82rem; line-height: 1.35; }
-.g-proj b { font-weight: 700; }
 .goal-empty { display: grid; gap: 10px; justify-items: start; margin-top: 8px; }
 .goal-empty p { color: var(--muted); font-size: 0.9rem; }
 
