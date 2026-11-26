@@ -13,6 +13,11 @@ const keyOf = (p) => `${p.type}:${p.symbol}`;
 function renderSummary() {
   const L = latest();
   const box = $('summary');
+  const stats = $('sumstats');
+  const solo = !L; // belum ada data: kartu ringkasan tampil sendiri tanpa kartu doa dan rincian
+  $('sum-row').classList.toggle('solo', solo);
+  $('motto').hidden = solo;
+  stats.hidden = solo;
   if (!state.assets.length && !L) {
     box.innerHTML = `<div class="onboard"><h2>Mulai dari kas</h2>
       <p class="muted">Tambah kas dulu, lalu beli aset darinya.</p>
@@ -29,11 +34,14 @@ function renderSummary() {
   const f = goalProgress(L.total, state.goal);
   const n = (L.positions || []).length + state.pending.length;
   box.innerHTML = `
-    <div class="sum-top"><span class="label">Total nilai</span><span class="muted">${n} aset</span></div>
+    <div class="sum-top"><span class="label">Total nilai</span></div>
     <div class="sum-value">${money(L.total)}</div>
     <div class="sum-day today">${L.dayPct == null
       ? '<span class="flat">Hari ini: belum ada pembanding</span>'
       : `<span class="pill ${tone(L.dayPct)}">${arrow(L.dayPct)}${pct(L.dayPct)}</span><span class="${tone(L.dayPnl)}">${state.hidden ? '' : `${money(L.dayPnl, { sign: true })} `}</span><span class="muted">hari ini</span>`}</div>
+    `;
+  stats.innerHTML = `
+    <div class="sum-top"><span class="label">Rincian</span><span class="muted">${n} aset</span></div>
     <dl class="stats">
       <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
       <div><dt>Untung</dt><dd>${delta(L.pnlPct)}<small>${money(L.pnl, { sign: true })}</small></dd></div>
