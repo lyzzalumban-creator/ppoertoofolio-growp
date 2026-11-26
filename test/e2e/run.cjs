@@ -152,14 +152,14 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     const lastDate = sheetOf(fake).history.at(-1).date;
     check('B4 grafik diam: bersih (tanpa gelembung, tanggal, kursor, garis modal); isi tersembunyi tetap menunjuk titik terakhir (= total)', !(await page.locator('#chart .tip').isVisible()) && !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart .cursor').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && nb(await page.locator('#chart .tip b').textContent()) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && (await page.locator('#chart .dpill').textContent()) === '23 Nov 2026' && lastDate === '2026-11-23');
     const before = await page.locator('#chart .dpill').textContent();
-    const headRest = await page.locator('#chart-head b').innerText();
-    check('B4g angka di atas grafik saat diam = total terakhir', nb(headRest) === nb(idr.format(sheetOf(fake).history.at(-1).total)) && /sejak/.test(await page.locator('#chart-head small').innerText()));
+    const headRest = await page.locator('#sum-num b').innerText();
+    check('B4g angka total di kartu atas saat diam = total terakhir', nb(headRest) === nb(idr.format(sheetOf(fake).history.at(-1).total)));
     await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5);
     check('B4b mengarahkan kursor: gelembung, tanggal, garis modal dan kursor muncul; tanggal dan nilai ikut berubah', (await page.locator('#chart .dpill').isVisible()) && (await page.locator('#chart .tip').isVisible()) && (await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').innerText()) !== before && (await page.locator('#chart .cursor line').count()) === 1);
-    check('B4h angka di atas grafik: saat disentuh berubah mengikuti titik (nilai dan selisih dari awal rentang)', (await page.locator('#chart-head b').innerText()) !== headRest && /[▲▼]/.test(await page.locator('#chart-head .pill').innerText()));
+    check('B4h angka total di kartu atas berubah mengikuti titik yang disentuh', (await page.locator('#sum-num b').innerText()) !== headRest);
     await page.mouse.move(box.x + box.width * 0.5, box.y - 40);
     check('B4c kursor keluar dari grafik: bersih lagi', !(await page.locator('#chart .dpill').isVisible()) && !(await page.locator('#chart path.cost').isVisible()) && (await page.locator('#chart .dpill').textContent()) === before);
-    check('B4i kursor keluar: angka di atas grafik kembali ke total terakhir', (await page.locator('#chart-head b').innerText()) === headRest);
+    check('B4i kursor keluar: angka total kembali ke total terakhir', (await page.locator('#sum-num b').innerText()) === headRest);
     await shot(page, 'grafik.png');
     await page.locator('#ranges').getByRole('button', { name: '1 bln' }).click();
     check('B5 rentang waktu berfungsi', (await page.locator('#ranges').getByRole('button', { name: '1 bln' }).getAttribute('aria-pressed')) === 'true');
@@ -923,7 +923,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     const sum = flat(await sumText(page));
-    check('H3 ringkasan: "hari ini" dengan panah dan tanda, lalu Modal, Untung, Terealisasi, Bulan ini', /[▲▼]\s?[+−]\d+,\d{2}%.*hari ini/.test(sum) && /Modal.*Untung\s*[▲▼]\s?[+−]\d+,\d{2}%.*Terealisasi\s*–.*Bulan ini/i.test(sum), sum);
+    check('H3 ringkasan: Total profit dan Harian dengan panah dan tanda (rupiah ringkas), lalu Rincian: Modal, Terealisasi, Bulan ini', /Total profit\s*(\+Rp [\d.,]+ (jt|rb|M) )?[▲▼]\s?[+−]\d+,\d{2}%\s*Harian\s*(\+|−)?(Rp [\d.,]+( jt| rb| M)? )?[▲▼]\s?[+−]\d+,\d{2}%.*Modal.*Terealisasi\s*–.*Bulan ini\s*[▲▼]/i.test(sum), sum);
     check('H4 kartu aset: mini-grafik harga (bentuk saja, tanpa teks) untuk aset non-kas', (await page.locator('#holdings .hold svg.spark').count()) === 7 && (await page.locator('#holdings svg.spark text').count()) === 0);
     const bbca = await page.locator('#holdings .hold', { hasText: 'BBCA' }).getAttribute('href');
     check('H5 kartu aset menaut ke halaman asetnya', bbca === AH('idx:BBCA'), bbca);

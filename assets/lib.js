@@ -96,6 +96,17 @@ export function setHidden(v) {
 
 // ---------- pemformat ----------
 
+/** Rupiah ringkas untuk ruang sempit: Rp 175,8 jt, Rp 1,2 M (nominal tersembunyi tetap •••••• lewat money). */
+export function moneyShort(v, { sign = false } = {}) {
+  if (v == null || !Number.isFinite(v)) return '–';
+  if (state.hidden) return MASK;
+  const a = Math.abs(v);
+  const f = (n, d) => n.toLocaleString('id-ID', { maximumFractionDigits: d });
+  const s = a >= 1e9 ? `Rp ${f(a / 1e9, 2)} M` : a >= 1e6 ? `Rp ${f(a / 1e6, 1)} jt` : a >= 1e4 ? `Rp ${f(a / 1e3, 0)} rb` : fIdr.format(a);
+  if (v < 0) return `−${s}`;
+  return sign && v > 0 ? `+${s}` : s;
+}
+
 export function money(v, { sign = false } = {}) {
   if (v == null || !Number.isFinite(v)) return '–';
   if (state.hidden) return MASK;

@@ -143,10 +143,14 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .home-main, .home-side { display: grid; gap: 14px; align-content: start; min-width: 0; }
 @media (min-width: 960px) { .home { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); align-items: start; } }
 
-.sum-row { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 12px; }
+.sum-row { display: grid; grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr); gap: 12px; }
 .sum-row.solo { grid-template-columns: minmax(0, 1fr); }
 .sum-row .summary { padding: 16px; }
-.sum-row .sum-value { font-size: clamp(1.1rem, 5.2vw, 2rem); }
+.sum-row .sum-value { font-size: clamp(1.1rem, 5.2vw, 2rem); display: block; }
+.sum-rows { display: grid; gap: 3px; margin: 8px 0 0; padding: 0; font-size: 0.7rem; }
+.sum-rows > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 6px; align-items: baseline; }
+.sum-rows dt { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.sum-rows dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .motto { display: grid; place-content: center; justify-items: center; gap: 8px; padding: 12px; text-align: center; background: color-mix(in srgb, var(--soga) 15%, var(--surface)); color: var(--soga); }
 .motto .zh { display: grid; font-size: clamp(1.5rem, 7.4vw, 2.2rem); font-weight: 700; line-height: 1.18; letter-spacing: 0.08em; font-family: "Noto Serif SC", "Songti SC", "STSong", "Noto Serif CJK SC", serif; }
 .motto small { color: var(--text); font-size: 0.74rem; font-weight: 600; line-height: 1.3; }
@@ -256,8 +260,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .chart-head b, .chart-head .roll-out { font-size: clamp(1.6rem, 7.2vw, 2.1rem); font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .chart-head small { flex-basis: 100%; font-size: 0.78rem; }
 .chart-head { position: relative; }
-.chart-head .roll-in { animation: roll-in 0.14s ease-out; }
-.chart-head .roll-out { position: absolute; pointer-events: none; animation: roll-out 0.14s ease-out forwards; }
+.roll-in { animation: roll-in 0.14s ease-out; }
+#sum-num { position: relative; }
+.roll-out { position: absolute; pointer-events: none; animation: roll-out 0.14s ease-out forwards; }
 @keyframes roll-in { from { opacity: 0.3; transform: translateY(5px); } }
 @keyframes roll-out { to { opacity: 0; transform: translateY(-5px); } }
 .heat-key { margin: 8px 0 0; font-size: 0.74rem; text-align: center; }

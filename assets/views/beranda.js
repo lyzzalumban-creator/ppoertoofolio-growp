@@ -1,6 +1,6 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
-import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
+import { $, ICON, MASK, moneyShort, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
 import { goalProgress, heatItems, insights, sortPositions, treemap } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
@@ -35,16 +35,17 @@ function renderSummary() {
   const n = (L.positions || []).length + state.pending.length;
   box.innerHTML = `
     <div class="sum-top"><span class="label">Total nilai</span></div>
-    <div class="sum-value">${money(L.total)}</div>
-    <div class="sum-day today">${L.dayPct == null
-      ? '<span class="flat">Hari ini: belum ada pembanding</span>'
-      : `<span class="pill ${tone(L.dayPct)}">${arrow(L.dayPct)}${pct(L.dayPct)}</span><span class="${tone(L.dayPnl)}">${state.hidden ? '' : `${money(L.dayPnl, { sign: true })} `}</span><span class="muted">hari ini</span>`}</div>
-    `;
+    <div id="sum-num"><b class="sum-value">${money(L.total)}</b></div>
+    <dl class="sum-rows">
+      <div><dt>Total profit</dt><dd class="${tone(L.pnl)}">${state.hidden ? '' : `${esc(moneyShort(L.pnl, { sign: true }))} `}${arrow(L.pnl)}${pct(L.pnlPct)}</dd></div>
+      <div class="today"><dt>Harian</dt>${L.dayPct == null
+        ? '<dd class="flat">belum ada pembanding</dd>'
+        : `<dd class="${tone(L.dayPnl)}">${state.hidden ? '' : `${esc(moneyShort(L.dayPnl, { sign: true }))} `}${arrow(L.dayPct)}${pct(L.dayPct)}</dd>`}</div>
+    </dl>`;
   stats.innerHTML = `
     <div class="sum-top"><span class="label">Rincian</span><span class="muted">${n} aset</span></div>
-    <dl class="stats">
+    <dl class="stats c3">
       <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
-      <div><dt>Untung</dt><dd>${delta(L.pnlPct)}<small>${money(L.pnl, { sign: true })}</small></dd></div>
       <div><dt>Terealisasi</dt><dd class="${tone(real)}">${state.txs.some((t) => t.kind === 'sell') ? money(real, { sign: true }) : '–'}</dd></div>
       <div><dt>Bulan ini</dt><dd>${delta(mtd && mtd.ret)}</dd></div>
     </dl>
@@ -68,14 +69,10 @@ function drawChart() {
     .map((s) => ({ t: toMs(s.date), date: s.date, y: amt ? s.total : s.pnlPct * 100, c: amt && Number.isFinite(s.cost) ? s.cost : null }));
   $('chart-h').textContent = amt ? 'Nilai portofolio' : 'Untung/rugi dari modal (%)';
   $('chart-key').innerHTML = amt && pts.length > 1 ? '<span>Nilai</span><span class="k-cost">Modal</span>' : '';
-  const first = pts[0];
   lineChart($('chart'), pts, {
-    head: $('chart-head'),
-    headHtml: (p, rest) => {
-      const d = p.y - first.y;
-      const shown = amt ? `${esc(money(d, { sign: true }))}${first.y ? ` (${esc(pct(p.y / first.y - 1))})` : ''}` : esc(pct(d / 100));
-      return `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b><span class="pill ${tone(d)}">${arrow(d)}${shown}</span><small class="muted">${rest ? `sejak ${esc(longDate(first.date))}` : esc(longDate(p.date))}</small>`;
-    },
+    // angka total di kartu atas ikut titik yang disentuh (nominal tersembunyi: tetap disamarkan)
+    head: pts.length > 1 && $('chart').clientWidth ? $('sum-num') : null,
+    headHtml: (p) => `<b class="sum-value">${amt ? esc(fIdr.format(p.y)) : MASK}</b>`,
     fmtTip: (p) => `<b>${esc(amt ? fIdr.format(p.y) : pct(p.y / 100))}</b>${p.c != null ? `<span>Modal ${esc(fIdr.format(p.c))}</span>` : ''}`,
     label: (a, b) => `${amt ? 'Nilai portofolio' : 'Untung rugi dari modal'} dari ${amt ? fIdr.format(a.y) : pct(a.y / 100)} pada ${longDate(a.date)} menjadi ${amt ? fIdr.format(b.y) : pct(b.y / 100)} pada ${longDate(b.date)}`,
     empty: state.series.length < 2 ? 'Grafik muncul setelah ada data minimal 2 hari. Isi <em>Tanggal beli</em> saat menambah aset, lalu robot mengisi riwayat sejak tanggal itu.' : '',
