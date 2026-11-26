@@ -87,16 +87,19 @@ export function goalProgress(total, goal) {
 }
 
 /**
- * Return YTD dari indeks return berantai (tanpa setoran/penarikan): sejak hari terakhir tahun lalu, atau sejak data
- * pertama bila riwayat baru mulai tahun ini (full = false). null bila belum ada pembanding.
+ * Return 12 bulan terakhir dari indeks return berantai (tanpa efek setoran/penarikan). Bila riwayat belum 12 bulan,
+ * return yang ada disetahunkan (est = true). null bila riwayat < 30 hari.
  */
-export function ytdReturn(index) {
+export function yearReturn(index) {
   if (index.length < 2) return null;
   const last = index[index.length - 1];
-  const before = index.filter((p) => p.date < `${last.date.slice(0, 4)}-01-01`);
-  const base = before.length ? before[before.length - 1] : index[0];
-  if (base === last || !(base.idx > 0)) return null;
-  return { ret: last.idx / base.idx - 1, since: base.date, full: before.length > 0 };
+  const t = (d) => Date.parse(`${d}T00:00:00Z`);
+  const base = [...index].reverse().find((p) => t(p.date) <= t(last.date) - 365 * 86_400_000);
+  const from = base || index[0];
+  const days = (t(last.date) - t(from.date)) / 86_400_000;
+  if (days < 30 || !(from.idx > 0)) return null;
+  const r = last.idx / from.idx;
+  return base ? { ret: r - 1, est: false } : { ret: r ** (365 / days) - 1, est: true };
 }
 
 /** Tahun menuju target dengan bunga majemuk `rate` per tahun (0,2 = 20%): 0 bila sudah tercapai, null bila tidak akan tercapai. */

@@ -1178,8 +1178,8 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForSelector('#dash:not([hidden])');
     check('J6 target diingat setelah muat ulang', (await page.locator('#goal').innerText()).includes(`${wantPct}%`));
-    // perkiraan target tercapai: asumsi return pengguna + performa YTD
-    check('J6b tanpa asumsi return: hanya baris Performa YTD (bila ada riwayat), tanpa baris Return per tahun', !/Return \d+%\/thn/.test(await page.locator('#sumstats').innerText()));
+    // perkiraan target tercapai: asumsi return pengguna + return 12 bulan terakhir
+    check('J6b tanpa asumsi return: hanya baris return 12 bulan (bila ada riwayat), tanpa baris Return per tahun', !/Return \d+%\/thn/.test(await page.locator('#sumstats').innerText()));
     await page.locator('#goal [data-goal="open"]').click();
     await page.fill('#goal-rate', '0');
     await page.locator('#goal-form [type="submit"]').click();

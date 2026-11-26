@@ -1,7 +1,7 @@
 // Beranda: ringkasan, sorotan, grafik portofolio, dan daftar aset (kartu dengan grafik harga masing-masing),
 // ditambah alokasi ringkas dan target di samping. Ketuk aset untuk halaman detailnya.
 import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, assetName, colorOf, delta, esc, fIdr, latest, longDate, money, monthName, notify, pct, state, symDisp, toMs, tone, typeOf, typesIn, weightText } from '../lib.js';
-import { dateAfterYears, goalProgress, heatItems, insights, sortPositions, treemap, yearsToGoal, ytdReturn } from '../stats.js';
+import { dateAfterYears, goalProgress, heatItems, insights, sortPositions, treemap, yearsToGoal, yearReturn } from '../stats.js';
 import { realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, sparkline, watch } from './chart.js';
 import { openAssetForm } from './sheets.js';
@@ -161,7 +161,7 @@ function renderHeat() {
 
 // ---------- target (di kartu Rincian) ----------
 
-// Perkiraan tercapai (di kartu Rincian): bunga majemuk dari nilai sekarang, tanpa setoran baru; asumsi pengguna dan return YTD.
+// Perkiraan tercapai (di kartu Rincian): bunga majemuk dari nilai sekarang, tanpa setoran baru; asumsi pengguna dan return 12 bulan terakhir.
 const durText = (y) => (y > 100 ? '>100 thn' : y < 1 ? `${Math.max(1, Math.ceil(y * 12))} bln` : `${y.toLocaleString('id-ID', { maximumFractionDigits: 1 })} thn`);
 function projLine(label, rate, L) {
   const y = yearsToGoal(L.total, state.goal, rate);
@@ -170,10 +170,10 @@ function projLine(label, rate, L) {
     : `<b>${esc(monthName(dateAfterYears(L.date, y).slice(0, 7)))}</b><small>${esc(durText(y))}</small>`}</li>`;
 }
 function projHtml(L) {
-  const ytd = state.perf ? ytdReturn(state.perf.index) : null;
+  const yr = state.perf ? yearReturn(state.perf.index) : null;
   const lines = [];
   if (state.goalRate) lines.push(projLine(`Return ${state.goalRate.toLocaleString('id-ID')}%/thn`, state.goalRate / 100, L));
-  if (ytd) lines.push(projLine(`YTD ${pct(ytd.ret)}${ytd.full ? '' : '*'}`, ytd.ret, L));
+  if (yr) lines.push(projLine(yr.est ? `Disetahunkan ${pct(yr.ret)}` : `12 bln ${pct(yr.ret)}`, yr.ret, L));
   return lines.length ? `<ul class="g-proj" aria-label="Perkiraan target tercapai">${lines.join('')}</ul>` : '';
 }
 
