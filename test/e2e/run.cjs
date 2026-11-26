@@ -235,7 +235,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O1 form sambung punya tombol "Coba demo"', await page.locator('#demo-btn').isVisible());
     await page.locator('#demo-btn').click();
     await page.waitForSelector('#dash:not([hidden])');
-    check('O2 demo: dasbor langsung terbuka, banner "Mode demo", subjudul demo, menu tampil', /Mode demo/.test(await page.locator('#banner').innerText()) && /Demo/.test(await page.locator('#subtitle').innerText()) && (await page.locator('#nav').isVisible()));
+    check('O2 demo: dasbor langsung terbuka, tanda "Demo" di samping judul, tanpa banner, subjudul demo, menu tampil', (await page.locator('#demo-tag').isVisible()) && /Demo/.test(await page.locator('#demo-tag').innerText()) && !(await page.locator('#banner').isVisible()) && /Data contoh/.test(await page.locator('#subtitle').innerText()) && (await page.locator('#nav').isVisible()));
     check('O3 demo tidak memanggil Google sama sekali dan tidak menyimpan kredensial; pilihan sembunyikan nominalmu tidak berubah', env.calls.length === 0 && (await page.evaluate(() => localStorage.getItem('pf-api'))) === null && (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === null);
     check('O4 demo menampilkan angka (nominal tampil) dan banyak aset', /Rp\s?\d/.test(await page.locator('#summary .sum-value').innerText()) && (await page.locator('#holdings .hold').count()) >= 8);
     check('O4h peta aset: petak per aset, bisa diketuk ke halaman aset, tanpa nominal rupiah; terbesar = bobot terbesar', (await page.locator('#heat .hm-tile').count()) >= 5 && /#\/aset\//.test(await page.locator('#heat .hm-tile').first().getAttribute('href')) && !/Rp/.test(await page.locator('#heat').innerText()) && (await page.locator('#heat .hm-tile').first().evaluate((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height)) >= (await page.locator('#heat .hm-tile').last().evaluate((e) => e.getBoundingClientRect().width * e.getBoundingClientRect().height)));
@@ -278,7 +278,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O10 Profil: tombol "Keluar dari demo"; Muat ulang data membuat demo dari awal tanpa jaringan', (await page.locator('#logout').innerText()) === 'Keluar dari demo');
     await page.locator('#set-reload').click();
     await page.waitForTimeout(200);
-    check('O10b setelah muat ulang demo: tetap mode demo, 0 panggilan', /Mode demo/.test(await page.locator('#banner').innerText()) && env.calls.length === 0);
+    check('O10b setelah muat ulang demo: tetap mode demo, 0 panggilan', (await page.locator('#demo-tag').isVisible()) && env.calls.length === 0);
     await nav(page, 'profil');
     await page.locator('#logout').click();
     const o11 = [await page.locator('#connect').isVisible(), !(await page.locator('#banner').isVisible()), !/Rp\s?\d/.test(await page.locator('main').innerText()), (await page.evaluate(() => localStorage.getItem('pf-hidden'))) === null];
@@ -292,12 +292,12 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     await openDash(page, fake);
     const n = env.calls.length;
     await page.goto(`${BASE}/index.html?demo`);
-    await page.waitForSelector('#banner:not([hidden])');
-    check('O13 ?demo membuka demo walau sudah tersambung, tanpa panggilan baru', /Mode demo/.test(await page.locator('#banner').innerText()) && env.calls.length === n);
+    await page.waitForSelector('#demo-tag:not([hidden])');
+    check('O13 ?demo membuka demo walau sudah tersambung, tanpa panggilan baru', (await page.locator('#demo-tag').isVisible()) && env.calls.length === n);
     await nav(page, 'profil');
     await page.locator('#logout').click();
     await page.waitForFunction(() => !/Demo/.test(document.getElementById('subtitle').textContent) && document.getElementById('banner').hidden && !document.getElementById('nav').hidden);
-    check('O14 keluar dari demo: kredensial TIDAK terhapus dan data asli dimuat lagi', !!(await page.evaluate(() => localStorage.getItem('pf-api'))) && !/Mode demo/.test(await page.locator('#subtitle').innerText()) && env.calls.length === n + 1);
+    check('O14 keluar dari demo: kredensial TIDAK terhapus dan data asli dimuat lagi', !!(await page.evaluate(() => localStorage.getItem('pf-api'))) && !(await page.locator('#demo-tag').isVisible()) && env.calls.length === n + 1);
     await ctx.close();
   }
 

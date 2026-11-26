@@ -50,6 +50,7 @@ body {
 .wrap { max-width: 1080px; margin: 0 auto; padding: 14px 16px calc(var(--nav-h) + 32px + env(safe-area-inset-bottom)); }
 @media (min-width: 900px) { .wrap { padding: 18px 24px 56px; } }
 
+.demo-tag { padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--warn) 22%, var(--surface)); color: var(--warn); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em; }
 h1 { margin: 0; font-size: 1.3rem; line-height: 1.2; letter-spacing: -0.015em; }
 h2 { margin: 0; font-size: 1.02rem; letter-spacing: -0.01em; }
 h3 { margin: 0; font-size: 0.95rem; }
