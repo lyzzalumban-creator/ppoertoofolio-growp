@@ -94,14 +94,11 @@ function renderFx() {
   const m = st.months.find((x) => x.month === todayWib().slice(0, 7));
   const usd = (v) => (state.hidden ? MASK : `${v > 0 ? '+' : v < 0 ? '−' : ''}${fUsd.format(Math.abs(v))}`);
   const item = (label, value, cls = '') => `<div class="cap-i ${cls}"><span>${label}</span><b>${value}</b></div>`;
+  const win = st.trades ? Math.round(st.winRate * 100) : 0;
   $('fx-caps').innerHTML = `<li class="cap">${st.trades
-    ? [
-      item('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, tone(st.total)),
-      item('Bulan ini', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', m ? tone(m.pnl) : ''),
-      item('Win rate', `${Math.round(st.winRate * 100)}%`),
-      item('Menang / kalah', `${st.wins} / ${st.losses}`),
-      item('Trade', String(st.trades)),
-    ].join('')
+    ? `<div class="cap-top">${item('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, `${tone(st.total)} big`)}${item('Bulan ini', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', `${m ? tone(m.pnl) : ''} end`)}</div>
+      <div class="cap-bar" role="img" aria-label="Win rate ${win} persen"><i style="width:${win}%"></i></div>
+      <div class="cap-wl"><span>Win rate <b>${win}%</b></span><span>${st.wins} menang · ${st.losses} kalah · ${st.trades} trade</span></div>`
     : item('Trading emas', 'Belum ada trade')}</li>`;
 }
 

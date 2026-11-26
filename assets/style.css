@@ -489,12 +489,19 @@ table.hist { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
 .chart-box .tip span { display: block; }
 
 .chip-wait { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-size: 0.74rem; font-weight: 600; }
-/* satu kapsul trading emas di Beranda */
+/* satu kapsul trading emas di Beranda: profit besar, bulan ini di kanan, bar win rate, rincian menang/kalah */
 .caps { margin: 8px 0 0; padding: 0; list-style: none; }
-.cap { display: flex; flex-wrap: wrap; gap: 10px 22px; padding: 14px 22px; border-radius: 32px; background: var(--surface); box-shadow: var(--shadow); }
-.cap-i { display: grid; gap: 1px; min-width: 0; }
-.cap-i span { color: var(--muted); font-size: 0.72rem; font-weight: 600; }
-.cap-i b { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.cap { display: grid; gap: 12px; padding: 18px 22px; border-radius: 32px; background: var(--surface); box-shadow: var(--shadow); }
+.cap-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.cap-i { display: grid; gap: 2px; min-width: 0; }
+.cap-i.end { text-align: right; }
+.cap-i span { color: var(--muted); font-size: 0.74rem; font-weight: 600; }
+.cap-i b { white-space: nowrap; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.cap-i.big b { font-size: clamp(1.3rem, 6.4vw, 1.7rem); letter-spacing: -0.02em; }
 .cap-i.pos b { color: var(--pos); }
 .cap-i.neg b { color: var(--neg); }
+.cap-bar { height: 8px; border-radius: 4px; background: var(--neg-bg); overflow: hidden; }
+.cap-bar i { display: block; height: 100%; border-radius: 4px; background: var(--pos); }
+.cap-wl { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 0.76rem; font-weight: 600; }
+.cap-wl b { color: var(--text); }
 .sec-head a { font-size: 0.85rem; font-weight: 600; text-decoration: none; }
