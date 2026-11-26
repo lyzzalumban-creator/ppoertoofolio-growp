@@ -93,16 +93,16 @@ function renderFx() {
   const st = fxStats(state.txs);
   const m = st.months.find((x) => x.month === todayWib().slice(0, 7));
   const usd = (v) => (state.hidden ? MASK : `${v > 0 ? '+' : v < 0 ? '−' : ''}${fUsd.format(Math.abs(v))}`);
-  const cap = (label, value, cls = '') => `<li class="cap ${cls}"><span>${label}</span><b>${value}</b></li>`;
-  $('fx-caps').innerHTML = st.trades
+  const item = (label, value, cls = '') => `<div class="cap-i ${cls}"><span>${label}</span><b>${value}</b></div>`;
+  $('fx-caps').innerHTML = `<li class="cap">${st.trades
     ? [
-      cap('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, tone(st.total)),
-      cap('Bulan ini', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', m ? tone(m.pnl) : ''),
-      cap('Win rate', `${Math.round(st.winRate * 100)}%`),
-      cap('Menang / kalah', `${st.wins} / ${st.losses}`),
-      cap('Trade', String(st.trades)),
+      item('Total profit', `${arrow(st.total)}${esc(usd(st.total))}`, tone(st.total)),
+      item('Bulan ini', m ? `${arrow(m.pnl)}${esc(usd(m.pnl))}` : '–', m ? tone(m.pnl) : ''),
+      item('Win rate', `${Math.round(st.winRate * 100)}%`),
+      item('Menang / kalah', `${st.wins} / ${st.losses}`),
+      item('Trade', String(st.trades)),
     ].join('')
-    : cap('Trading emas', 'Belum ada trade');
+    : item('Trading emas', 'Belum ada trade')}</li>`;
 }
 
 // ---------- peta aset: ukuran petak = bobot, warna = perubahan hari ini atau untung total (hanya persen, tanpa nominal) ----------

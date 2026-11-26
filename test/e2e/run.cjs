@@ -239,7 +239,7 @@ const AH = (key) => `#/aset/${encodeURIComponent(key)}`; // alamat halaman satu 
     check('O4j peta aset: "Untung total" mengganti warna dan tombol ditandai; kembali ke "Hari ini" memulihkan', (await page.locator('#heat-mode [data-heat="pnl"]').getAttribute('aria-pressed')) === 'true' && (await colorOf()) !== dayColor && (await page.locator('#heat .hm-tile:not(.flat)').first().innerText()).includes('%'));
     await page.locator('#heat-mode [data-heat="day"]').click();
     check('O4k kembali ke Hari ini: warna semula', (await colorOf()) === dayColor);
-    check('O4m kapsul trading emas (demo): Total profit, Bulan ini, Win rate, Menang / kalah, Trade; bertanda panah dan dolar', (await page.locator('#fx-caps .cap').count()) === 5 && /Total profit\s*[▲▼]\s*[+−]?US\$/.test(await page.locator('#fx-caps').innerText()) && /Win rate\s*\d+%/.test(await page.locator('#fx-caps').innerText()) && /Menang \/ kalah\s*\d+ \/ \d+/.test(await page.locator('#fx-caps').innerText()));
+    check('O4m satu kapsul trading emas (demo): Total profit, Bulan ini, Win rate, Menang / kalah, Trade; bertanda panah dan dolar', (await page.locator('#fx-caps .cap-i').count()) === 5 && (await page.locator('#fx-caps .cap').count()) === 1 && /Total profit\s*[▲▼]\s*[+−]?US\$/.test(await page.locator('#fx-caps').innerText()) && /Win rate\s*\d+%/.test(await page.locator('#fx-caps').innerText()) && /Menang \/ kalah\s*\d+ \/ \d+/.test(await page.locator('#fx-caps').innerText()));
     await page.locator('#privacy').click();
     check('O4n nominal tersembunyi: kapsul trading emas tanpa dolar, win rate tetap', !/US\$\s?\d/.test(await page.locator('#fx-caps').innerText()) && /Win rate\s*\d+%/.test(await page.locator('#fx-caps').innerText()));
     await page.locator('#privacy').click();
