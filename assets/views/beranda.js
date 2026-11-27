@@ -1,6 +1,6 @@
 // Beranda: kartu nilai, grafik portofolio, Rincian (+ target), peta aset, dan kapsul trading emas.
 // Ketuk petak aset untuk halaman detailnya.
-import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, delta, esc, fIdr, fUsd, latest, longDate, money, monthName, notify, pct, state, symDisp, todayWib, toMs, tone, weightText } from '../lib.js';
+import { $, ICON, MASK, ORDER, TYPE, arrow, assetHref, esc, fIdr, fUsd, latest, longDate, money, monthName, notify, pct, state, symDisp, todayWib, toMs, tone, weightText } from '../lib.js';
 import { goalProgress, heatItems, insights, treemap } from '../stats.js';
 import { fxStats, realized } from '../../scripts/lib/trade.mjs';
 import { inRange, lineChart, rangesHtml, watch } from './chart.js';
@@ -50,7 +50,7 @@ function renderSummary() {
     <dl class="stats rows">
       <div><dt>Modal</dt><dd>${money(L.cost)}</dd></div>
       <div><dt>Terealisasi</dt><dd class="${tone(real)}">${state.txs.some((t) => t.kind === 'sell') ? money(real, { sign: true }) : '–'}</dd></div>
-      <div><dt>Bulan ini</dt><dd>${delta(mtd && mtd.ret)}</dd></div>
+      <div><dt>Bulan ini</dt>${mtd ? `<dd class="${tone(mtd.ret)}">${state.hidden ? '' : `${esc(money(mtd.pnl, { sign: true }))} `}${arrow(mtd.ret)}${pct(mtd.ret)}</dd>` : '<dd class="flat">–</dd>'}</div>
     </dl>
     ${state.pending.length ? `<p class="muted pend">${state.pending.length} aset menunggu harga pertama dan belum masuk total.</p>` : ''}
     <div id="goal">${goalHtml(L)}</div>`;

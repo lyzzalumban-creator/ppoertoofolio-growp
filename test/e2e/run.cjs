@@ -923,7 +923,7 @@ const projText = async (page) => { await page.evaluate(() => { location.hash = '
     await openDash(page, fake);
     await page.waitForSelector('#dash:not([hidden])');
     const sum = flat(await sumText(page));
-    check('H3 ringkasan: Total profit dan Harian dengan panah dan tanda (rupiah lengkap), lalu Rincian: Modal, Terealisasi, Bulan ini', /Total profit\s*(\+Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%\s*Harian\s*(\+|−)?(Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%.*Modal.*Terealisasi\s*–.*Bulan ini\s*[▲▼]/i.test(sum), sum);
+    check('H3 ringkasan: Total profit dan Harian dengan panah dan tanda (rupiah lengkap), lalu Rincian: Modal, Terealisasi, Bulan ini', /Total profit\s*(\+Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%\s*Harian\s*(\+|−)?(Rp [\d.,]+ )?[▲▼]\s?[+−]\d+,\d{2}%.*Modal.*Terealisasi\s*–.*Bulan ini\s*(\+|−)?(Rp [\d.,]+ )?[▲▼]/i.test(sum), sum);
     const bbca = await page.locator('#heat a.hm-tile', { hasText: 'BBCA' }).getAttribute('href');
     check('H5 petak aset menaut ke halaman asetnya', bbca === AH('idx:BBCA'), bbca);
 

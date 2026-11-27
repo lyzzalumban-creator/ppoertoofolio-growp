@@ -220,7 +220,7 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .chart-key .k-cost::before { border-top: 2px dashed var(--soga); }
 
 /* daftar aset: satu kartu per aset */
-.sec-head { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 4px 0; }
+.sec-head { display: flex; justify-content: space-between; align-items: baseline; padding: 2px 0 0; }
 .sec-head h2 { font-size: 1.15rem; }
 .select {
   width: 100%; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px;
@@ -259,9 +259,10 @@ a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visib
 .screen { display: grid; gap: 14px; }
 /* HP: Rincian (40%) dan Peta aset (60%) memenuhi satu layar */
 @media (max-width: 959px) {
-  .screen:has(#sumstats:not([hidden])):has(#heat-card:not([hidden])) { height: max(520px, calc(100dvh - var(--nav-h) - 24px)); grid-template-rows: minmax(min-content, 40fr) minmax(0, 60fr); }
+  .screen:has(#sumstats:not([hidden])):has(#heat-card:not([hidden])) { height: max(520px, calc(100dvh - var(--nav-h) - 24px)); grid-template-rows: auto minmax(0, 1fr); }
   .screen > .card { min-height: 0; }
-  #sumstats { display: flex; flex-direction: column; justify-content: space-between; }
+  #sumstats { display: flex; flex-direction: column; }
+
   #sumstats .stats.rows { margin-top: 0; }
   #heat-card { display: flex; flex-direction: column; }
   #heat-card .heat { flex: 1; min-height: 0; aspect-ratio: auto; max-width: none; width: 100%; }
